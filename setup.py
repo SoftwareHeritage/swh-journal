@@ -18,7 +18,7 @@ setup(
     author='Software Heritage developers',
     author_email='swh-devel@inria.fr',
     url='https://forge.softwareheritage.org/diffusion/DJNL/',
-    packages=[],  # packages's modules
+    packages=['swh.journal'],  # packages's modules
     scripts=[],   # scripts to package
     install_requires=parse_requirements(),
     setup_requires=['vcversioner'],
