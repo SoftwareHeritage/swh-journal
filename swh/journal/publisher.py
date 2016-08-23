@@ -24,7 +24,7 @@ class SWHJournalPublisher(SWHConfig):
         'consumer_id': ('str', 'swh.journal.publisher.test'),
         'publisher_id': ('str', 'swh.journal.publisher.test'),
 
-        'object_types': ('list[str]', ['content']),
+        'object_types': ('list[str]', ['content', 'revision', 'release']),
 
         'storage_class': ('str', 'local_storage'),
         'storage_args': ('list[str]', ['service=softwareheritage',
@@ -77,6 +77,8 @@ class SWHJournalPublisher(SWHConfig):
     def process_objects(self, messages):
         processors = {
             'content': self.process_contents,
+            'revision': self.process_revisions,
+            'release': self.process_releases,
         }
 
         return {
@@ -95,6 +97,14 @@ class SWHJournalPublisher(SWHConfig):
     def process_contents(self, content_objs):
         metadata = self.storage.content_get_metadata(content_objs)
         return [(content['sha1'], content) for content in metadata]
+
+    def process_revisions(self, revision_objs):
+        metadata = self.storage.revision_get(revision_objs)
+        return [(revision['id'], revision) for revision in metadata]
+
+    def process_releases(self, release_objs):
+        metadata = self.storage.release_get(release_objs)
+        return [(release['id'], release) for release in metadata]
 
 if __name__ == '__main__':
     logging.basicConfig(
