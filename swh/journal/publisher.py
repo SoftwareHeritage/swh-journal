@@ -26,9 +26,12 @@ class SWHJournalPublisher(SWHConfig):
 
         'object_types': ('list[str]', ['content', 'revision', 'release']),
 
-        'storage_class': ('str', 'local_storage'),
-        'storage_args': ('list[str]', ['service=softwareheritage',
-                                       '/srv/softwareheritage/objects']),
+        'storage': ('dict', {
+            'cls': 'remote',
+            'args': {
+                'url': 'http://localhost:5002/',
+            }
+        }),
     }
 
     CONFIG_BASE_FILENAME = 'journal/publisher'
@@ -38,8 +41,7 @@ class SWHJournalPublisher(SWHConfig):
         if extra_configuration:
             config.update(extra_configuration)
 
-        self.storage = get_storage(config['storage_class'],
-                                   config['storage_args'])
+        self.storage = get_storage(**config['storage'])
 
         self.consumer = KafkaConsumer(
             bootstrap_servers=config['brokers'],
@@ -105,6 +107,7 @@ class SWHJournalPublisher(SWHConfig):
     def process_releases(self, release_objs):
         metadata = self.storage.release_get(release_objs)
         return [(release['id'], release) for release in metadata]
+
 
 if __name__ == '__main__':
     logging.basicConfig(
