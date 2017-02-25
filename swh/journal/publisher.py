@@ -32,6 +32,8 @@ class SWHJournalPublisher(SWHConfig):
                 'url': 'http://localhost:5002/',
             }
         }),
+
+        'max_messages': ('int', 10000),
     }
 
     CONFIG_BASE_FILENAME = 'journal/publisher'
@@ -61,7 +63,9 @@ class SWHJournalPublisher(SWHConfig):
                     for object_type in config['object_types']],
         )
 
-    def poll(self, max_messages):
+        self.max_messages = self.config['max_messages']
+
+    def poll(self):
         """Process a batch of messages"""
         num = 0
         messages = defaultdict(list)
@@ -69,7 +73,7 @@ class SWHJournalPublisher(SWHConfig):
         for num, message in enumerate(self.consumer):
             object_type = message.topic.split('.')[-1]
             messages[object_type].append(message.value)
-            if num >= max_messages:
+            if num >= self.max_messages:
                 break
 
         new_objects = self.process_objects(messages)
@@ -116,4 +120,4 @@ if __name__ == '__main__':
     )
     publisher = SWHJournalPublisher()
     while True:
-        publisher.poll(10000)
+        publisher.poll()
