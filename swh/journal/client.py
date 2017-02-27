@@ -14,25 +14,28 @@ from .serializers import kafka_to_value
 
 
 class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
-    """Journal client to read messages from specific topics (what we
-    called queue with celery).
+    """SWH Journal client able to subscribe and react to events from
+    specific topics.
 
     The configuration defines:
-    - brokers: the brokers to receive events from
+    - brokers ([str]): the brokers to receive messages from
 
-    - topic_prefix: the topic prefix string used to transfer messages
+    - topic_prefix (str): the topic prefix string name used to
+      read messages from
 
-    - consumer_id: identifier used by the consumer
+    - consumer_id (str): consumer identifier
 
-    - object_types: the types of object to subscribe events for. This
-      is used in conjunction of the topic_prefix key
+    - object_types ([str]): object types to subscribe events for. This
+      is used in conjunction of the topic_prefix key to compute the
+      queue name.
 
-    - max_messages: The number of messages to treat together.
+    - max_messages (int): Group messages in block of max_messages
+      before sending them.
 
     """
     DEFAULT_CONFIG = {
         # Broker to connect to
-        'brokers': ('list[str]', ['getty.internal.softwareheritage.org']),
+        'brokers': ('list[str]', ['localhost']),
         # Prefix topic to receive notification from
         'topic_prefix': ('str', 'swh.journal.test_publisher'),
         # Consumer identifier
@@ -77,13 +80,9 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
 
         """
         while True:
-            self.log.info('client polling')
-
-            num = 0
             messages = defaultdict(list)
 
             for num, message in enumerate(self.consumer):
-                self.log.info(num, message)
                 object_type = message.topic.split('.')[-1]
                 messages[object_type].append(message.value)
                 if num >= self.max_messages:
@@ -99,7 +98,7 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
         """Process the objects (store, compute, etc...)
 
         Args:
-            messages (dict): Dict of key object_types (as per
+            messages (dict): Dict of key object_type (as per
             configuration) and their associated values.
 
         """
