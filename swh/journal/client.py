@@ -13,6 +13,20 @@ from swh.core.config import SWHConfig
 from .serializers import kafka_to_value
 
 
+# Only accepted offset reset policy accepted
+ACCEPTED_OFFSET_RESET = ['earliest', 'latest']
+
+# Only accepted object types
+ACCEPTED_OBJECT_TYPES = [
+    'content',
+    'revision',
+    'release',
+    'occurrence',
+    'origin',
+    'origin_visit'
+]
+
+
 class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
     """A base client for the Software Heritage journal.
 
@@ -37,11 +51,13 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
         # Prefix topic to receive notification from
         'topic_prefix': ('str', 'swh.journal.test_publisher'),
         # Consumer identifier
-        'consumer_id': ('str', 'swh.journal.client.test'),
+        'consumer_identifier': ('str', 'swh.journal.client.test'),
         # Object types to deal with (in a subscription manner)
         'object_types': ('list[str]', [
-            'content', 'revision', 'release', 'occurrence',
-            'origin', 'origin_visit']),
+            'content', 'revision',
+            'release', 'occurrence',
+            'origin', 'origin_visit'
+        ]),
         # Number of messages to batch process
         'max_messages': ('int', 100),
         'auto_offset_reset': ('str', 'earliest')
@@ -60,19 +76,29 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
         self.log = logging.getLogger('swh.journal.client.SWHJournalClient')
 
         auto_offset_reset = self.config['auto_offset_reset']
-        assert auto_offset_reset in ['earliest', 'latest']
+        if auto_offset_reset not in ACCEPTED_OFFSET_RESET:
+            raise ValueError(
+                'Option \'auto_offset_reset\' only accept %s.' %
+                ACCEPTED_OFFSET_RESET)
+
+        object_types = self.config['object_types']
+        for object_type in object_types:
+            if object_type not in ACCEPTED_OBJECT_TYPES:
+                raise ValueError(
+                    'Option \'object_types\' only accepts %s.' %
+                    ACCEPTED_OFFSET_RESET)
 
         self.consumer = KafkaConsumer(
             bootstrap_servers=self.config['brokers'],
             value_deserializer=kafka_to_value,
             auto_offset_reset=auto_offset_reset,
             enable_auto_commit=False,
-            group_id=self.config['consumer_id'],
+            group_id=self.config['consumer_identifier'],
         )
 
         self.consumer.subscribe(
             topics=['%s.%s' % (self.config['topic_prefix'], object_type)
-                    for object_type in self.config['object_types']],
+                    for object_type in object_types],
         )
 
         self.max_messages = self.config['max_messages']
