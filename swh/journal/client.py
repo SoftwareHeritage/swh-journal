@@ -14,23 +14,21 @@ from .serializers import kafka_to_value
 
 
 class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
-    """SWH Journal client able to subscribe and react to events from
-    specific topics.
+    """A base client for the Software Heritage journal.
 
-    The configuration defines:
-    - brokers ([str]): the brokers to receive messages from
+    The current implementation of the journal uses Apache Kafka
+    brokers to publish messages under a given topic prefix, with each
+    object type using a specific topic under that prefix.
 
-    - topic_prefix (str): the topic prefix string name used to
-      read messages from
+    Clients subscribe to events specific to each object type by using
+    the `object_types` configuration variable.
 
-    - consumer_id (str): consumer identifier
+    Clients can be sharded by setting the `client_id` to a common
+    value across instances. The journal will share the message
+    throughput across the nodes sharing the same client_id.
 
-    - object_types ([str]): object types to subscribe events for. This
-      is used in conjunction of the topic_prefix key to compute the
-      queue name.
-
-    - max_messages (int): Group messages in block of max_messages
-      before sending them.
+    Messages are processed by the `process_objects` method in batches
+    of maximum `max_messages`.
 
     """
     DEFAULT_CONFIG = {
