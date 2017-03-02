@@ -44,6 +44,7 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
             'origin', 'origin_visit']),
         # Number of messages to batch process
         'max_messages': ('int', 100),
+        'auto_offset_reset': ('str', 'earliest')
     }
 
     CONFIG_BASE_FILENAME = 'journal/client'
@@ -58,10 +59,13 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
 
         self.log = logging.getLogger('swh.journal.client.SWHJournalClient')
 
+        auto_offset_reset = self.config['auto_offset_reset']
+        assert auto_offset_reset in ['earliest', 'latest']
+
         self.consumer = KafkaConsumer(
             bootstrap_servers=self.config['brokers'],
             value_deserializer=kafka_to_value,
-            auto_offset_reset='earliest',
+            auto_offset_reset=auto_offset_reset,
             enable_auto_commit=False,
             group_id=self.config['consumer_id'],
         )
