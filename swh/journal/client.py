@@ -49,7 +49,7 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
         # Broker to connect to
         'brokers': ('list[str]', ['localhost']),
         # Prefix topic to receive notification from
-        'topic_prefix': ('str', 'swh.journal.test_publisher'),
+        'topic_prefix': ('str', 'swh.journal.objects'),
         # Consumer identifier
         'consumer_identifier': ('str', 'swh.journal.client.test'),
         # Object types to deal with (in a subscription manner)
