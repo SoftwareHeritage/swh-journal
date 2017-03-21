@@ -1,5 +1,8 @@
-swh-journal (0-0) UNRELEASED; urgency=medium
+swh-journal (0.0.1-1~swh1) unstable-swh; urgency=medium
 
-  * Initial release.
+  * Initial release
+  * v0.0.1
+  * Add a journal publisher
+  * Add a base class interface for journal clients
 
- -- Nicolas Dandrimont <olasd@softwareheritage.org>  Thu, 18 Aug 2016 15:04:29 +0200
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Tue, 21 Mar 2017 14:38:13 +0100
