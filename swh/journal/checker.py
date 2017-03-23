@@ -21,6 +21,10 @@ from .backend import Backend
 from .serializers import value_to_kafka
 
 
+SUPPORTED_OBJECT_TYPES = set([
+    'origin', 'content', 'directory', 'revision', 'release'])
+
+
 class SWHJournalSimpleCheckerProducer(SWHConfig):
     """Class in charge of reading the storage's objects and sends those
        back to the publisher queue.
@@ -30,7 +34,7 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
     """
     DEFAULT_CONFIG = {
         'brokers': ('list[str]', ['getty.internal.softwareheritage.org']),
-        'writing_prefix': ('str', 'swh.journal.objects'),
+        'writing_prefix': ('str', 'swh.tmp_journal.new'),
         'publisher_id': ('str', 'swh.journal.publisher.test'),
         'object_types': ('list[str]', ['content', 'revision', 'release']),
         'storage_dbconn': ('str', 'service=swh-dev'),
@@ -43,6 +47,13 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
         if extra_configuration:
             config.update(extra_configuration)
 
+        self.object_types = self.config['object_types']
+        for obj_type in self.object_types:
+            if obj_type not in SUPPORTED_OBJECT_TYPES:
+                raise ValueError('The object type %s is not supported. '
+                                 'Possible values are %s' % (
+                                     obj_type, SUPPORTED_OBJECT_TYPES))
+
         self.storage_backend = Backend(self.config['storage_dbconn'])
 
         self.producer = KafkaProducer(
@@ -51,20 +62,13 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
             client_id=config['publisher_id'],
         )
 
-        self.object_read_fn = {
-            'content': self.storage_backend.content_get_ids,
-            'origin': self.storage_backend.origin_get_ids,
-            'revision': self.storage_backend.revision_get_ids,
-            'release': self.storage_backend.release_get_ids,
-        }
-
     def _read_storage(self):
         """Read all the storage's objects and returns as dict of object_types,
            set of identifiers.
 
         """
-        for obj_type in self.config['object_types']:
-            for obj_id in self.object_read_fn[obj_type]():
+        for obj_type in self.object_types:
+            for obj_id in self.storage_backend.fetch(obj_type):
                 yield obj_type, obj_id
 
     def run(self):
