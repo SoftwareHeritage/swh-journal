@@ -41,7 +41,7 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
     """
     DEFAULT_CONFIG = {
         'brokers': ('list[str]', ['getty.internal.softwareheritage.org']),
-        'writing_prefix': ('str', 'swh.tmp_journal.new'),
+        'temporary_prefix': ('str', 'swh.tmp_journal.new'),
         'publisher_id': ('str', 'swh.journal.publisher.test'),
         'object_types': ('list[str]', ['content', 'revision', 'release']),
         'storage_dbconn': ('str', 'service=swh-dev'),
@@ -70,8 +70,11 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
         )
 
     def _read_storage(self):
-        """Read all the storage's objects and returns as dict of object_types,
-           set of identifiers.
+        """Read storage's objects and generates tuple as object_type, dict of
+           object.
+
+           Yields:
+               tuple of object_type, object as dict
 
         """
         for obj_type in self.object_types:
@@ -79,13 +82,12 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
                 yield obj_type, obj
 
     def run(self):
-        """Reads storage's subscribed object types and send them all back to
-           the publisher queue.
+        """Reads storage's subscribed object types and send them to the
+           publisher's reading queue.
 
         """
-
         for obj_type, obj in self._read_storage():
-            topic = '%s.%s' % (self.config['writing_prefix'], obj_type)
+            topic = '%s.%s' % (self.config['temporary_prefix'], obj_type)
             self.producer.send(topic, value=obj)
 
 
