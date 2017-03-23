@@ -1,4 +1,4 @@
-# Copyright (C) 2016  The Software Heritage developers
+# Copyright (C) 2016-2017 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -11,7 +11,7 @@ from kafka import KafkaProducer, KafkaConsumer
 from swh.core.config import SWHConfig
 from swh.storage import get_storage
 
-from .serializers import kafka_to_value, value_to_kafka
+from .serializers import kafka_to_key, key_to_kafka, value_to_kafka
 
 
 class SWHJournalPublisher(SWHConfig):
@@ -45,15 +45,17 @@ class SWHJournalPublisher(SWHConfig):
 
         self.storage = get_storage(**config['storage'])
 
+        # yes, the temporary topics contain values that are actually _keys_
         self.consumer = KafkaConsumer(
             bootstrap_servers=config['brokers'],
-            value_deserializer=kafka_to_value,
+            value_deserializer=kafka_to_key,
             auto_offset_reset='earliest',
             enable_auto_commit=False,
             group_id=config['consumer_id'],
         )
         self.producer = KafkaProducer(
             bootstrap_servers=config['brokers'],
+            key_serializer=key_to_kafka,
             value_serializer=value_to_kafka,
             client_id=config['publisher_id'],
         )
