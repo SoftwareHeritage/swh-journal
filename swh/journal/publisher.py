@@ -103,15 +103,16 @@ class SWHJournalPublisher(SWHConfig):
         self.producer.flush()
 
     def process_contents(self, content_objs):
-        metadata = self.storage.content_get_metadata(content_objs)
+        metadata = self.storage.content_get_metadata(
+            (c[b'sha1'] for c in content_objs))
         return [(content['sha1'], content) for content in metadata]
 
     def process_revisions(self, revision_objs):
-        metadata = self.storage.revision_get(revision_objs)
+        metadata = self.storage.revision_get((r[b'id'] for r in revision_objs))
         return [(revision['id'], revision) for revision in metadata]
 
     def process_releases(self, release_objs):
-        metadata = self.storage.release_get(release_objs)
+        metadata = self.storage.release_get((r[b'id'] for r in release_objs))
         return [(release['id'], release) for release in metadata]
 
 
