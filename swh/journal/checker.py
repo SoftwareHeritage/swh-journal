@@ -22,7 +22,14 @@ from .serializers import value_to_kafka
 
 
 SUPPORTED_OBJECT_TYPES = set([
-    'origin', 'content', 'directory', 'revision', 'release'])
+    'origin',
+    'content',
+    'directory',
+    'revision',
+    'release',
+    'origin_visit',
+    'skipped_content',
+])
 
 
 class SWHJournalSimpleCheckerProducer(SWHConfig):
@@ -68,8 +75,8 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
 
         """
         for obj_type in self.object_types:
-            for obj_id in self.storage_backend.fetch(obj_type):
-                yield obj_type, obj_id
+            for obj in self.storage_backend.fetch(obj_type):
+                yield obj_type, obj
 
     def run(self):
         """Reads storage's subscribed object types and send them all back to
@@ -77,9 +84,9 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
 
         """
 
-        for obj_type, obj_id in self._read_storage():
+        for obj_type, obj in self._read_storage():
             topic = '%s.%s' % (self.config['writing_prefix'], obj_type)
-            self.producer.send(topic, value=obj_id)
+            self.producer.send(topic, value=obj)
 
 
 if __name__ == '__main__':
