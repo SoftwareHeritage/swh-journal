@@ -14,22 +14,63 @@ storage and sends every object identifier back to the journal.
 
 """
 
+import psycopg2
+
 from kafka import KafkaProducer
 
 from swh.core.config import SWHConfig
-from .backend import Backend
 from .serializers import value_to_kafka
 
 
-SUPPORTED_OBJECT_TYPES = set([
-    'origin',
-    'content',
-    'directory',
-    'revision',
-    'release',
-    'origin_visit',
-    'skipped_content',
-])
+TYPE_TO_PRIMARY_KEY = {
+    'origins': ['id'],
+    'content': ['sha1'],
+    'directory': ['id'],
+    'revision': ['id'],
+    'release': ['id'],
+    'origin_visit': ['origin', 'visit'],
+    'skipped_content': ['sha1', 'sha1_git', 'sha256'],
+}
+
+
+def entry_to_bytes(entry):
+    """Convert an entry coming from the database to bytes"""
+    if isinstance(entry, memoryview):
+        return entry.tobytes()
+    if isinstance(entry, tuple):
+        return [entry_to_bytes(value) for value in entry]
+    return entry
+
+
+def fetch(db_conn, obj_type):
+    """Fetch all obj_type's identifiers from db.
+
+    This opens one connection, stream objects and when done, close
+    the connection.
+
+    Raises:
+        ValueError if obj_type is not supported
+
+    Yields:
+        Identifiers for the specific object_type
+
+    """
+    primary_key = TYPE_TO_PRIMARY_KEY.get(obj_type)
+    if not primary_key:
+        raise ValueError('The object type %s is not supported. '
+                         'Only possible values are %s' % (
+                             obj_type, TYPE_TO_PRIMARY_KEY.keys()))
+
+    primary_key_str = ','.join(primary_key)
+    query = 'select %s from %s order by %s' % (
+        primary_key_str, obj_type, primary_key_str)
+    server_side_cursor_name = 'swh.journal.%s' % obj_type
+
+    with psycopg2.connect(db_conn) as db:
+        cursor = db.cursor(name=server_side_cursor_name)
+        cursor.execute(query)
+        for o in cursor:
+            yield dict(zip(primary_key, entry_to_bytes(o)))
 
 
 class SWHJournalSimpleCheckerProducer(SWHConfig):
@@ -56,12 +97,13 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
 
         self.object_types = self.config['object_types']
         for obj_type in self.object_types:
-            if obj_type not in SUPPORTED_OBJECT_TYPES:
+            if obj_type not in TYPE_TO_PRIMARY_KEY:
                 raise ValueError('The object type %s is not supported. '
                                  'Possible values are %s' % (
-                                     obj_type, SUPPORTED_OBJECT_TYPES))
+                                     obj_type,
+                                     ', '.join(TYPE_TO_PRIMARY_KEY)))
 
-        self.storage_backend = Backend(self.config['storage_dbconn'])
+        self.storage_dbconn = self.config['storage_dbconn']
 
         self.producer = KafkaProducer(
             bootstrap_servers=config['brokers'],
@@ -78,7 +120,7 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
 
         """
         for obj_type in self.object_types:
-            for obj in self.storage_backend.fetch(obj_type):
+            for obj in fetch(self.storage_dbconn, obj_type):
                 yield obj_type, obj
 
     def run(self):
