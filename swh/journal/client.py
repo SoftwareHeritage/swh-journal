@@ -10,7 +10,7 @@ from collections import defaultdict
 from kafka import KafkaConsumer
 
 from swh.core.config import SWHConfig
-from .serializers import kafka_to_value
+from .serializers import kafka_to_key, kafka_to_value
 
 
 # Only accepted offset reset policy accepted
@@ -51,7 +51,7 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
         # Prefix topic to receive notification from
         'topic_prefix': ('str', 'swh.journal.objects'),
         # Consumer identifier
-        'consumer_identifier': ('str', 'swh.journal.client.test'),
+        'consumer_id': ('str', 'swh.journal.client'),
         # Object types to deal with (in a subscription manner)
         'object_types': ('list[str]', [
             'content', 'revision',
@@ -90,10 +90,11 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
 
         self.consumer = KafkaConsumer(
             bootstrap_servers=self.config['brokers'],
+            key_deserializer=kafka_to_key,
             value_deserializer=kafka_to_value,
             auto_offset_reset=auto_offset_reset,
             enable_auto_commit=False,
-            group_id=self.config['consumer_identifier'],
+            group_id=self.config['consumer_id'],
         )
 
         self.consumer.subscribe(

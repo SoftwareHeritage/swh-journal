@@ -1,8 +1,12 @@
-swh-journal (0.0.1-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-journal (0.0.2-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * v0.0.2
+  * Adapt swh.journal.publisher
+  * Adapt swh.journal.client
+  * Add swh.journal.checker basic implementation (reads and sends all
+  * objects to publisher's subscribed queues).
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Tue, 21 Mar 2017 14:38:13 +0100
+ -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 24 Mar 2017 12:54:16 +0100
 
 swh-journal (0.0.1-1~swh1) unstable-swh; urgency=medium
 
