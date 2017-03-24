@@ -11,7 +11,7 @@ from kafka import KafkaProducer, KafkaConsumer
 from swh.core.config import SWHConfig
 from swh.storage import get_storage
 
-from .serializers import kafka_to_key, key_to_kafka, value_to_kafka
+from .serializers import kafka_to_key, key_to_kafka
 
 
 class SWHJournalPublisher(SWHConfig):
@@ -56,7 +56,7 @@ class SWHJournalPublisher(SWHConfig):
         self.producer = KafkaProducer(
             bootstrap_servers=config['brokers'],
             key_serializer=key_to_kafka,
-            value_serializer=value_to_kafka,
+            value_serializer=key_to_kafka,
             client_id=config['publisher_id'],
         )
 
