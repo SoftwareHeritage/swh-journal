@@ -21,8 +21,8 @@ class SWHJournalPublisher(SWHConfig):
         'temporary_prefix': ('str', 'swh.tmp_journal.new'),
         'final_prefix': ('str', 'swh.journal.objects'),
 
-        'consumer_id': ('str', 'swh.journal.publisher.test'),
-        'publisher_id': ('str', 'swh.journal.publisher.test'),
+        'consumer_id': ('str', 'swh.journal.publisher'),
+        'publisher_id': ('str', 'swh.journal.publisher'),
 
         'object_types': ('list[str]', ['content', 'revision', 'release']),
 
