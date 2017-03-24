@@ -19,7 +19,7 @@ class SWHJournalPublisher(SWHConfig):
         'brokers': ('list[str]', ['getty.internal.softwareheritage.org']),
 
         'temporary_prefix': ('str', 'swh.tmp_journal.new'),
-        'final_prefix': ('str', 'swh.journal.test_publisher'),
+        'final_prefix': ('str', 'swh.journal.objects'),
 
         'consumer_id': ('str', 'swh.journal.publisher.test'),
         'publisher_id': ('str', 'swh.journal.publisher.test'),
