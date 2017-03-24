@@ -51,7 +51,7 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
         # Prefix topic to receive notification from
         'topic_prefix': ('str', 'swh.journal.objects'),
         # Consumer identifier
-        'consumer_identifier': ('str', 'swh.journal.client.test'),
+        'consumer_id': ('str', 'swh.journal.client'),
         # Object types to deal with (in a subscription manner)
         'object_types': ('list[str]', [
             'content', 'revision',
@@ -94,7 +94,7 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
             value_deserializer=kafka_to_value,
             auto_offset_reset=auto_offset_reset,
             enable_auto_commit=False,
-            group_id=self.config['consumer_identifier'],
+            group_id=self.config['consumer_id'],
         )
 
         self.consumer.subscribe(
