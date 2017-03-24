@@ -24,7 +24,7 @@ from .serializers import key_to_kafka
 
 TYPE_TO_PRIMARY_KEY = {
     'origin': ['id'],
-    'content': ['sha1'],
+    'content': ['sha1', 'sha1_git', 'sha256'],
     'directory': ['id'],
     'revision': ['id'],
     'release': ['id'],
