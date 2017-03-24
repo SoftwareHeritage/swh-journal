@@ -19,7 +19,7 @@ import psycopg2
 from kafka import KafkaProducer
 
 from swh.core.config import SWHConfig
-from .serializers import value_to_kafka
+from .serializers import key_to_kafka
 
 
 TYPE_TO_PRIMARY_KEY = {
@@ -107,7 +107,7 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
 
         self.producer = KafkaProducer(
             bootstrap_servers=config['brokers'],
-            value_serializer=value_to_kafka,
+            value_serializer=key_to_kafka,
             client_id=config['publisher_id'],
         )
 
