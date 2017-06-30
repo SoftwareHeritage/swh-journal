@@ -1,8 +1,9 @@
-swh-journal (0.0.2-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-journal (0.0.3-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * Release swh.journal v0.0.3
+  * Prepare building for stretch
 
- -- Antoine R. Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Fri, 24 Mar 2017 12:54:16 +0100
+ -- Nicolas Dandrimont <nicolas@dandrimont.eu>  Fri, 30 Jun 2017 17:29:15 +0200
 
 swh-journal (0.0.2-1~swh1) unstable-swh; urgency=medium
 
