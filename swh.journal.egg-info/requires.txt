@@ -1,2 +1,5 @@
-kafka
+kafka-python
+msgpack-python
+swh.core
+swh.storage
 vcversioner
