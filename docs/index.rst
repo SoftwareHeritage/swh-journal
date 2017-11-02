@@ -1,3 +1,5 @@
+.. _swh-journal:
+
 Software Heritage - Development Documentation
 =============================================
 
