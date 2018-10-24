@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2017 The Software Heritage developers
+# Copyright (C) 2016-2018 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -43,7 +43,12 @@ class SWHJournalPublisher(SWHConfig):
         if extra_configuration:
             config.update(extra_configuration)
 
-        self.storage = get_storage(**config['storage'])
+        self._prepare_storage(config)
+        self._prepare_journal(config)
+
+        self.max_messages = self.config['max_messages']
+
+    def _prepare_journal(self, config):
 
         # yes, the temporary topics contain values that are actually _keys_
         self.consumer = KafkaConsumer(
@@ -65,7 +70,8 @@ class SWHJournalPublisher(SWHConfig):
                     for object_type in config['object_types']],
         )
 
-        self.max_messages = self.config['max_messages']
+    def _prepare_storage(self, config):
+        self.storage = get_storage(**config['storage'])
 
     def poll(self):
         """Process a batch of messages"""
