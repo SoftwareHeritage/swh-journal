@@ -1,2 +1,2 @@
 swh.core
-swh.storage
+swh.storage >= 0.0.108

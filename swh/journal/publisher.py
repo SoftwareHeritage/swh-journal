@@ -10,6 +10,7 @@ from kafka import KafkaProducer, KafkaConsumer
 
 from swh.core.config import SWHConfig
 from swh.storage import get_storage
+from swh.storage.algos import snapshot
 
 from .serializers import kafka_to_key, key_to_kafka
 
@@ -136,6 +137,7 @@ class SWHJournalPublisher(SWHConfig):
             'content': self.process_contents,
             'revision': self.process_revisions,
             'release': self.process_releases,
+            'snapshot': self.process_snapshots,
         }
 
         return {
@@ -172,6 +174,15 @@ class SWHJournalPublisher(SWHConfig):
     def process_releases(self, release_objs):
         metadata = self.storage.release_get((r[b'id'] for r in release_objs))
         return [(release['id'], release) for release in metadata]
+
+    def process_snapshots(self, snapshot_objs):
+        metadata = []
+        for snap in snapshot_objs:
+            full_obj = snapshot.snapshot_get_all_branches(
+                self.storage, snap[b'id'])
+            metadata.append((full_obj['id'], full_obj))
+
+        return metadata
 
 
 if __name__ == '__main__':
