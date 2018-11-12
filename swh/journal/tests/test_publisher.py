@@ -67,6 +67,19 @@ RELEASES = [
     },
 ]
 
+ORIGINS = [
+    {
+        'id': 1,
+        'url': 'https://somewhere.org/den/fox',
+        'type': 'git',
+    },
+    {
+        'id': 2,
+        'url': 'https://overtherainbow.org/fox/den',
+        'type': 'svn',
+    }
+]
+
 
 class JournalPublisherTest(SWHJournalPublisher):
     def parse_config_file(self):
@@ -99,6 +112,7 @@ class TestPublisher(unittest.TestCase):
         self.contents = [{b'sha1': c['sha1']} for c in CONTENTS]
         self.revisions = [{b'id': c['id']} for c in REVISIONS]
         self.releases = [{b'id': c['id']} for c in RELEASES]
+        self.origins = ORIGINS
 
     def test_process_contents(self):
         actual_contents = self.publisher.process_contents(self.contents)
@@ -115,11 +129,17 @@ class TestPublisher(unittest.TestCase):
         expected_releases = [(c['id'], c) for c in RELEASES]
         self.assertEqual(actual_releases, expected_releases)
 
+    def test_process_origins(self):
+        actual_releases = self.publisher.process_origins(self.origins)
+        expected_releases = self.origins
+        self.assertEqual(actual_releases, expected_releases)
+
     def test_process_objects(self):
         messages = {
             'content': self.contents,
             'revision': self.revisions,
             'release': self.releases,
+            'origin': self.origins,
         }
 
         actual_objects = self.publisher.process_objects(messages)
@@ -127,11 +147,13 @@ class TestPublisher(unittest.TestCase):
         expected_contents = [(c['sha1'], c) for c in CONTENTS]
         expected_revisions = [(c['id'], c) for c in REVISIONS]
         expected_releases = [(c['id'], c) for c in RELEASES]
+        expected_origins = ORIGINS
 
         expected_objects = {
             'content': expected_contents,
             'revision': expected_revisions,
             'release': expected_releases,
+            'origin': expected_origins,
         }
 
         self.assertEqual(actual_objects, expected_objects)
