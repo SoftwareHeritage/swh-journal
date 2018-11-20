@@ -7,72 +7,16 @@ import unittest
 
 from swh.model.hashutil import hash_to_bytes
 from swh.journal.publisher import SWHJournalPublisher
-
-
-class MockStorage:
-    # Type from object to their corresponding expected key id
-    type_to_key = {
-        'content': 'sha1',
-        'revision': 'id',
-        'release': 'id',
-    }
-
-    def __init__(self, state):
-        """Initialize mock storage's state.
-
-        Args:
-            state (dict): keys are the object type (content, revision,
-                          release) and values are a list of dict
-                          representing the associated typed objects
-
-        """
-        self.state = {}
-        for type, key in self.type_to_key.items():
-            self.state[type] = {
-                obj[key]: obj for obj in state[type]
-            }
-
-    def get(self, type, objects):
-        """Given an object type and a list of objects with type type, returns
-           the state's matching objects.
-
-        Args:
-            type (str): expected object type (release, revision, content)
-            objects ([bytes]): list of object id (bytes)
-
-        Returns:
-            list of dict corresponding to the id provided
-
-        """
-        data = []
-        if type not in self.type_to_key:
-            raise ValueError('Programmatic error: expected %s not %s' % (
-                ', '.join(self.type_to_key), type
-            ))
-        object_ids = self.state[type]
-        for _id in objects:
-            c = object_ids.get(_id)
-            if c:
-                data.append(c)
-
-        return data
-
-    def content_get_metadata(self, contents):
-        return self.get('content', contents)
-
-    def revision_get(self, revisions):
-        return self.get('revision', revisions)
-
-    def release_get(self, releases):
-        return self.get('release', releases)
-
+from swh.storage.in_memory import Storage
 
 CONTENTS = [
     {
-        'data': b'42\n',
         'length': 3,
         'sha1': hash_to_bytes(
             '34973274ccef6ab4dfaaf86599792fa9c3fe4689'),
+        'sha1_git': b'foo',
+        'blake2s256': b'bar',
+        'sha256': b'baz',
         'status': 'visible',
     },
 ]
@@ -81,10 +25,30 @@ REVISIONS = [
     {
         'id': hash_to_bytes('7026b7c1a2af56521e951c01ed20f255fa054238'),
         'message': b'hello',
+        'date': {
+            'timestamp': {
+                'seconds': 1234567891,
+                'microseconds': 0,
+            },
+            'offset': 120,
+            'negative_utc': None,
+        },
+        'committer': None,
+        'committer_date': None,
     },
     {
         'id': hash_to_bytes('368a48fe15b7db2383775f97c6b247011b3f14f4'),
         'message': b'hello again',
+        'date': {
+            'timestamp': {
+                'seconds': 1234567892,
+                'microseconds': 0,
+            },
+            'offset': 120,
+            'negative_utc': None,
+        },
+        'committer': None,
+        'committer_date': None,
     },
 ]
 
@@ -92,6 +56,14 @@ RELEASES = [
     {
         'id': hash_to_bytes('d81cc0710eb6cf9efd5b920a8453e1e07157b6cd'),
         'name': b'v0.0.1',
+        'date': {
+            'timestamp': {
+                'seconds': 1234567890,
+                'microseconds': 0,
+            },
+            'offset': 120,
+            'negative_utc': None,
+        },
     },
 ]
 
@@ -109,11 +81,10 @@ class JournalPublisherTest(SWHJournalPublisher):
         }
 
     def _prepare_storage(self, config):
-        self.storage = MockStorage(state={
-            'content': CONTENTS,
-            'revision': REVISIONS,
-            'release': RELEASES,
-        })
+        self.storage = Storage()
+        self.storage.content_add({'data': b'42', **c} for c in CONTENTS)
+        self.storage.revision_add(REVISIONS)
+        self.storage.release_add(RELEASES)
 
     def _prepare_journal(self, config):
         """No journal for now
