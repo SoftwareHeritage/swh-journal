@@ -69,12 +69,10 @@ RELEASES = [
 
 ORIGINS = [
     {
-        'id': 1,
         'url': 'https://somewhere.org/den/fox',
         'type': 'git',
     },
     {
-        'id': 2,
         'url': 'https://overtherainbow.org/fox/den',
         'type': 'svn',
     }
@@ -98,6 +96,7 @@ class JournalPublisherTest(SWHJournalPublisher):
         self.storage.content_add({'data': b'42', **c} for c in CONTENTS)
         self.storage.revision_add(REVISIONS)
         self.storage.release_add(RELEASES)
+        self.storage.origin_add(ORIGINS)
 
     def _prepare_journal(self, config):
         """No journal for now
