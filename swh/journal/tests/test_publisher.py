@@ -78,6 +78,15 @@ ORIGINS = [
     }
 ]
 
+ORIGIN_VISITS = [
+    {
+        'date': '2013-05-07T04:20:39.369271+00:00',
+    },
+    {
+        'date': '2018-11-27T17:20:39.000000+00:00',
+    }
+]
+
 
 class JournalPublisherTest(SWHJournalPublisher):
     def parse_config_file(self):
@@ -96,7 +105,14 @@ class JournalPublisherTest(SWHJournalPublisher):
         self.storage.content_add({'data': b'42', **c} for c in CONTENTS)
         self.storage.revision_add(REVISIONS)
         self.storage.release_add(RELEASES)
-        self.storage.origin_add(ORIGINS)
+        origins = self.storage.origin_add(ORIGINS)
+        origin_visits = []
+        for i, ov in enumerate(ORIGIN_VISITS):
+            origin_id = origins[i]['id']
+            ov = self.storage.origin_visit_add(origin_id, ov['date'])
+            origin_visits.append(ov)
+        self.origins = origins
+        self.origin_visits = origin_visits
 
     def _prepare_journal(self, config):
         """No journal for now
@@ -111,7 +127,20 @@ class TestPublisher(unittest.TestCase):
         self.contents = [{b'sha1': c['sha1']} for c in CONTENTS]
         self.revisions = [{b'id': c['id']} for c in REVISIONS]
         self.releases = [{b'id': c['id']} for c in RELEASES]
-        self.origins = ORIGINS
+        # those needs id generation from the storage
+        # so initialization is different than other entities
+        self.origins = [{'url': o['url'],
+                         'type': o['type']}
+                        for o in self.publisher.origins]
+        self.origin_visits = [{'origin': ov['origin'],
+                               'visit': ov['visit']}
+                              for ov in self.publisher.origin_visits]
+        # full objects
+        storage = self.publisher.storage
+        ovs = []
+        for ov in self.origin_visits:
+            ovs.append(storage.origin_visit_get_by(**ov))
+        self.expected_origin_visits = ovs
 
     def test_process_contents(self):
         actual_contents = self.publisher.process_contents(self.contents)
@@ -129,9 +158,15 @@ class TestPublisher(unittest.TestCase):
         self.assertEqual(actual_releases, expected_releases)
 
     def test_process_origins(self):
-        actual_releases = self.publisher.process_origins(self.origins)
-        expected_releases = self.origins
-        self.assertEqual(actual_releases, expected_releases)
+        actual_origins = self.publisher.process_origins(self.origins)
+        expected_origins = self.origins
+        self.assertEqual(actual_origins, expected_origins)
+
+    def test_process_origin_visits(self):
+        actual_ovs = self.publisher.process_origin_visits(self.origin_visits)
+        expected_ovs = [((ov['origin'], ov['visit']), ov)
+                        for ov in self.expected_origin_visits]
+        self.assertEqual(actual_ovs, expected_ovs)
 
     def test_process_objects(self):
         messages = {
@@ -139,6 +174,7 @@ class TestPublisher(unittest.TestCase):
             'revision': self.revisions,
             'release': self.releases,
             'origin': self.origins,
+            'origin_visit': self.origin_visits,
         }
 
         actual_objects = self.publisher.process_objects(messages)
@@ -147,12 +183,15 @@ class TestPublisher(unittest.TestCase):
         expected_revisions = [(c['id'], c) for c in REVISIONS]
         expected_releases = [(c['id'], c) for c in RELEASES]
         expected_origins = ORIGINS
+        expected_ovs = [((ov['origin'], ov['visit']), ov)
+                        for ov in self.expected_origin_visits]
 
         expected_objects = {
             'content': expected_contents,
             'revision': expected_revisions,
             'release': expected_releases,
             'origin': expected_origins,
+            'origin_visit': expected_ovs,
         }
 
         self.assertEqual(actual_objects, expected_objects)

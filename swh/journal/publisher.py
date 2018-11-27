@@ -139,6 +139,7 @@ class SWHJournalPublisher(SWHConfig):
             'release': self.process_releases,
             'snapshot': self.process_snapshots,
             'origin': self.process_origins,
+            'origin_visit': self.process_origin_visits,
         }
 
         return {
@@ -178,6 +179,16 @@ class SWHJournalPublisher(SWHConfig):
 
     def process_origins(self, origin_objs):
         return origin_objs
+
+    def process_origin_visits(self, origin_visits):
+        metadata = []
+        for ov in origin_visits:
+            origin_visit = self.storage.origin_visit_get_by(
+                ov['origin'], ov['visit'])
+            if origin_visit:
+                pk = ov['origin'], ov['visit']
+                metadata.append((pk, origin_visit))
+        return metadata
 
     def process_snapshots(self, snapshot_objs):
         metadata = []
