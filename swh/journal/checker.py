@@ -9,7 +9,7 @@ Those checker goal is to send back all, or missing objects from the
 journal queues.
 
 At the moment, a first naive implementation is the
-SWHSimpleCheckerProducer.  It simply reads the objects from the
+SimpleCheckerProducer.  It simply reads the objects from the
 storage and sends every object identifier back to the journal.
 
 """
@@ -73,7 +73,7 @@ def fetch(db_conn, obj_type):
             yield dict(zip(primary_key, entry_to_bytes(o)))
 
 
-class SWHJournalSimpleCheckerProducer(SWHConfig):
+class SimpleCheckerProducer(SWHConfig):
     """Class in charge of reading the storage's objects and sends those
        back to the publisher queue.
 
@@ -134,4 +134,4 @@ class SWHJournalSimpleCheckerProducer(SWHConfig):
 
 
 if __name__ == '__main__':
-    SWHJournalSimpleCheckerProducer().run()
+    SimpleCheckerProducer().run()
