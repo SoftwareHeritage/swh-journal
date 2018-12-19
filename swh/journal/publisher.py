@@ -109,7 +109,10 @@ class JournalPublisher(SWHConfig):
             max_messages = self.max_messages
 
         for num, message in enumerate(self.consumer):
+            logging.debug('num: %s, message: %s' % (num, message))
             object_type = message.topic.split('.')[-1]
+            logging.debug('num: %s, object_type: %s, message: %s' % (
+                num, object_type, message))
             messages[object_type].append(message.value)
             if num >= max_messages:
                 break
@@ -160,6 +163,8 @@ class JournalPublisher(SWHConfig):
         for object_type, objects in messages.items():
             topic = '%s.%s' % (self.config['final_prefix'], object_type)
             for key, object in objects:
+                logging.debug('topic: %s, key: %s, value: %s' % (
+                    topic, key, object))
                 self.producer.send(topic, key=key, value=object)
 
         self.producer.flush()
@@ -201,10 +206,18 @@ class JournalPublisher(SWHConfig):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s %(process)d %(levelname)s %(message)s'
-    )
-    publisher = JournalPublisher()
-    while True:
-        publisher.poll()
+    import click
+
+    @click.command()
+    @click.option('--verbose', is_flag=True, default=False,
+                  help='Be verbose if asked.')
+    def main(verbose):
+        logging.basicConfig(
+            level=logging.DEBUG if verbose else logging.INFO,
+            format='%(asctime)s %(process)d %(levelname)s %(message)s'
+        )
+        publisher = JournalPublisher()
+        while True:
+            publisher.poll()
+
+    main()
