@@ -176,7 +176,8 @@ class JournalPublisher(SWHConfig):
 
     def process_revisions(self, revision_objs):
         metadata = self.storage.revision_get((r[b'id'] for r in revision_objs))
-        return [(revision['id'], revision) for revision in metadata]
+        return [(revision['id'], revision)
+                for revision in metadata if revision]
 
     def process_releases(self, release_objs):
         metadata = self.storage.release_get((r[b'id'] for r in release_objs))
