@@ -6,7 +6,7 @@
 import unittest
 
 from swh.model.hashutil import hash_to_bytes
-from swh.journal.publisher import SWHJournalPublisher
+from swh.journal.publisher import JournalPublisher
 from swh.storage.in_memory import Storage
 
 CONTENTS = [
@@ -88,7 +88,7 @@ ORIGIN_VISITS = [
 ]
 
 
-class JournalPublisherTest(SWHJournalPublisher):
+class JournalPublisherTest(JournalPublisher):
     def parse_config_file(self):
         return {
             'brokers': ['localhost'],

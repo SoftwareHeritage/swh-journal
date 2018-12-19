@@ -15,7 +15,7 @@ from swh.storage.algos import snapshot
 from .serializers import kafka_to_key, key_to_kafka
 
 
-class SWHJournalPublisher(SWHConfig):
+class JournalPublisher(SWHConfig):
     """The journal publisher is a layer in charge of:
 
     - consuming messages from topics (1 topic per object_type)
@@ -205,6 +205,6 @@ if __name__ == '__main__':
         level=logging.INFO,
         format='%(asctime)s %(process)d %(levelname)s %(message)s'
     )
-    publisher = SWHJournalPublisher()
+    publisher = JournalPublisher()
     while True:
         publisher.poll()
