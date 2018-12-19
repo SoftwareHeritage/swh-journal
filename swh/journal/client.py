@@ -65,7 +65,7 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
 
     CONFIG_BASE_FILENAME = 'journal/client'
 
-    ADDITIONAL_CONFIG = None
+    ADDITIONAL_CONFIG = {}
 
     def __init__(self, extra_configuration={}):
         self.config = self.parse_config_file(
