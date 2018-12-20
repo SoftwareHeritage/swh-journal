@@ -129,17 +129,18 @@ class TestPublisher(unittest.TestCase):
         self.releases = [{b'id': c['id']} for c in RELEASES]
         # those needs id generation from the storage
         # so initialization is different than other entities
-        self.origins = [{'url': o['url'],
-                         'type': o['type']}
+        self.origins = [{b'url': o['url'],
+                         b'type': o['type']}
                         for o in self.publisher.origins]
-        self.origin_visits = [{'origin': ov['origin'],
-                               'visit': ov['visit']}
+        self.origin_visits = [{b'origin': ov['origin'],
+                               b'visit': ov['visit']}
                               for ov in self.publisher.origin_visits]
         # full objects
         storage = self.publisher.storage
         ovs = []
         for ov in self.origin_visits:
-            ovs.append(storage.origin_visit_get_by(**ov))
+            ovs.append(storage.origin_visit_get_by(
+                ov[b'origin'], ov[b'visit']))
         self.expected_origin_visits = ovs
 
     def test_process_contents(self):
@@ -159,7 +160,9 @@ class TestPublisher(unittest.TestCase):
 
     def test_process_origins(self):
         actual_origins = self.publisher.process_origins(self.origins)
-        expected_origins = self.origins
+        expected_origins = [({'url': o[b'url'], 'type': o[b'type']},
+                             {'url': o[b'url'], 'type': o[b'type']})
+                            for o in self.origins]
         self.assertEqual(actual_origins, expected_origins)
 
     def test_process_origin_visits(self):
@@ -182,10 +185,9 @@ class TestPublisher(unittest.TestCase):
         expected_contents = [(c['sha1'], c) for c in CONTENTS]
         expected_revisions = [(c['id'], c) for c in REVISIONS]
         expected_releases = [(c['id'], c) for c in RELEASES]
-        expected_origins = ORIGINS
+        expected_origins = [(o, o) for o in ORIGINS]
         expected_ovs = [((ov['origin'], ov['visit']), ov)
                         for ov in self.expected_origin_visits]
-
         expected_objects = {
             'content': expected_contents,
             'revision': expected_revisions,

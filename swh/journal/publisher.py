@@ -200,9 +200,10 @@ class JournalPublisher(SWHConfig):
         metadata = []
         for ov in origin_visits:
             origin_visit = self.storage.origin_visit_get_by(
-                ov['origin'], ov['visit'])
+                ov[b'origin'], ov[b'visit'])
             if origin_visit:
-                pk = ov['origin'], ov['visit']
+                pk = ov[b'origin'], ov[b'visit']
+                origin_visit['date'] = str(origin_visit['date'])
                 metadata.append((pk, origin_visit))
         return metadata
 
