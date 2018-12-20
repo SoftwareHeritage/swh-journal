@@ -79,6 +79,8 @@ class JournalPublisher(SWHConfig):
             client_id=config['publisher_id'],
         )
 
+        logging.debug('Subscribing to object types event: %s' % (
+            config['object_types'], ))
         self.consumer.subscribe(
             topics=['%s.%s' % (config['temporary_prefix'], object_type)
                     for object_type in config['object_types']],
@@ -109,7 +111,6 @@ class JournalPublisher(SWHConfig):
             max_messages = self.max_messages
 
         for num, message in enumerate(self.consumer):
-            logging.debug('num: %s, message: %s' % (num, message))
             object_type = message.topic.split('.')[-1]
             logging.debug('num: %s, object_type: %s, message: %s' % (
                 num, object_type, message))
@@ -170,23 +171,32 @@ class JournalPublisher(SWHConfig):
         self.producer.flush()
 
     def process_contents(self, content_objs):
+        logging.debug('contents: %s' % content_objs)
         metadata = self.storage.content_get_metadata(
             (c[b'sha1'] for c in content_objs))
         return [(content['sha1'], content) for content in metadata]
 
     def process_revisions(self, revision_objs):
+        logging.debug('revisions: %s' % revision_objs)
         metadata = self.storage.revision_get((r[b'id'] for r in revision_objs))
         return [(revision['id'], revision)
                 for revision in metadata if revision]
 
     def process_releases(self, release_objs):
+        logging.debug('releases: %s' % release_objs)
         metadata = self.storage.release_get((r[b'id'] for r in release_objs))
         return [(release['id'], release) for release in metadata]
 
     def process_origins(self, origin_objs):
-        return origin_objs
+        logging.debug('origins: %s' % origin_objs)
+        r = []
+        for o in origin_objs:
+            origin = {'url': o[b'url'], 'type': o[b'type']}
+            r.append((origin, origin))
+        return r
 
     def process_origin_visits(self, origin_visits):
+        logging.debug('origin_visits: %s' % origin_visits)
         metadata = []
         for ov in origin_visits:
             origin_visit = self.storage.origin_visit_get_by(
@@ -197,6 +207,7 @@ class JournalPublisher(SWHConfig):
         return metadata
 
     def process_snapshots(self, snapshot_objs):
+        logging.debug('snapshots: %s' % snapshot_objs)
         metadata = []
         for snap in snapshot_objs:
             full_obj = snapshot.snapshot_get_all_branches(
@@ -217,6 +228,9 @@ if __name__ == '__main__':
             level=logging.DEBUG if verbose else logging.INFO,
             format='%(asctime)s %(process)d %(levelname)s %(message)s'
         )
+        _log = logging.getLogger('kafka')
+        _log.setLevel(logging.INFO)
+
         publisher = JournalPublisher()
         while True:
             publisher.poll()
