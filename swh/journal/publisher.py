@@ -115,7 +115,7 @@ class JournalPublisher(SWHConfig):
             logging.debug('num: %s, object_type: %s, message: %s' % (
                 num, object_type, message))
             messages[object_type].append(message.value)
-            if num >= max_messages:
+            if num + 1 >= self.max_messages:
                 break
 
         new_objects = self.process_objects(messages)

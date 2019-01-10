@@ -114,7 +114,7 @@ class JournalClient(SWHConfig, metaclass=ABCMeta):
             for num, message in enumerate(self.consumer):
                 object_type = message.topic.split('.')[-1]
                 messages[object_type].append(message.value)
-                if num >= self.max_messages:
+                if num + 1 >= self.max_messages:
                     break
 
             self.process_objects(messages)
