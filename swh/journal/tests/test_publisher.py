@@ -21,6 +21,17 @@ CONTENTS = [
     },
 ]
 
+COMMITTER = [
+    {
+        'id': 1,
+        'fullname': 'foo',
+    },
+    {
+        'id': 2,
+        'fullname': 'bar',
+    }
+]
+
 REVISIONS = [
     {
         'id': hash_to_bytes('7026b7c1a2af56521e951c01ed20f255fa054238'),
@@ -33,7 +44,8 @@ REVISIONS = [
             'offset': 120,
             'negative_utc': None,
         },
-        'committer': None,
+        'committer': COMMITTER[0],
+        'author':  COMMITTER[0],
         'committer_date': None,
     },
     {
@@ -47,7 +59,8 @@ REVISIONS = [
             'offset': 120,
             'negative_utc': None,
         },
-        'committer': None,
+        'committer': COMMITTER[1],
+        'author':  COMMITTER[1],
         'committer_date': None,
     },
 ]
@@ -64,6 +77,7 @@ RELEASES = [
             'offset': 120,
             'negative_utc': None,
         },
+        'author': COMMITTER[0],
     },
 ]
 
@@ -111,8 +125,10 @@ class JournalPublisherTest(JournalPublisher):
             origin_id = origins[i]['id']
             ov = self.storage.origin_visit_add(origin_id, ov['date'])
             origin_visits.append(ov)
-        self.origins = origins
-        self.origin_visits = origin_visits
+            self.origins = origins
+            self.origin_visits = origin_visits
+
+        print("publisher.origin-visits", self.origin_visits)
 
     def _prepare_journal(self, config):
         """No journal for now
@@ -139,8 +155,10 @@ class TestPublisher(unittest.TestCase):
         storage = self.publisher.storage
         ovs = []
         for ov in self.origin_visits:
-            ovs.append(storage.origin_visit_get_by(
-                ov[b'origin'], ov[b'visit']))
+            _ov = storage.origin_visit_get_by(
+                ov[b'origin'], ov[b'visit'])
+            _ov['date'] = str(_ov['date'])
+            ovs.append(_ov)
         self.expected_origin_visits = ovs
 
     def test_process_contents(self):
