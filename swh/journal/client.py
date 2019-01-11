@@ -27,7 +27,7 @@ ACCEPTED_OBJECT_TYPES = [
 ]
 
 
-class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
+class JournalClient(SWHConfig, metaclass=ABCMeta):
     """A base client for the Software Heritage journal.
 
     The current implementation of the journal uses Apache Kafka
@@ -65,7 +65,7 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
 
     CONFIG_BASE_FILENAME = 'journal/client'
 
-    ADDITIONAL_CONFIG = None
+    ADDITIONAL_CONFIG = {}
 
     def __init__(self, extra_configuration={}):
         self.config = self.parse_config_file(
@@ -73,7 +73,7 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
         if extra_configuration:
             self.config.update(extra_configuration)
 
-        self.log = logging.getLogger('swh.journal.client.SWHJournalClient')
+        self.log = logging.getLogger('swh.journal.client.JournalClient')
 
         auto_offset_reset = self.config['auto_offset_reset']
         if auto_offset_reset not in ACCEPTED_OFFSET_RESET:
@@ -114,7 +114,7 @@ class SWHJournalClient(SWHConfig, metaclass=ABCMeta):
             for num, message in enumerate(self.consumer):
                 object_type = message.topic.split('.')[-1]
                 messages[object_type].append(message.value)
-                if num >= self.max_messages:
+                if num + 1 >= self.max_messages:
                     break
 
             self.process_objects(messages)
