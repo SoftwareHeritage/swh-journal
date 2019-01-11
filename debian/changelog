@@ -1,8 +1,13 @@
-swh-journal (0.0.4-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-journal (0.0.7-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-backports.
+  * New upstream release 0.0.7     - (tagged by Antoine R. Dumont
+    (@ardumont) <antoine.romain.dumont@gmail.com> on 2019-01-11 11:53:44
+    +0100)
+  * Upstream changes:     - v0.0.7     - Fix off-by-one error when
+    checking max_messages.     - tests: Adapt tests according to latest
+    in-memory storage changes
 
- -- Nicolas Dandrimont <nicolas@dandrimont.eu>  Thu, 12 Oct 2017 19:01:53 +0200
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 11 Jan 2019 10:56:46 +0000
 
 swh-journal (0.0.4-1~swh1) unstable-swh; urgency=medium
 
