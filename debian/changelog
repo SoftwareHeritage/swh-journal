@@ -1,8 +1,8 @@
-swh-journal (0.0.7-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-journal (0.0.7-1~swh2) unstable-swh; urgency=low
 
-  * Rebuild for stretch-swh
+  * New release fixing build dependencies
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 11 Jan 2019 10:58:00 +0000
+ -- Antoine Romain Dumont (@ardumont) <antoine.romain.dumont@gmail.com>  Tue, 19 Feb 2019 14:18:06 +0100
 
 swh-journal (0.0.7-1~swh1) unstable-swh; urgency=medium
 
