@@ -28,6 +28,7 @@
 # SOFTWARE.
 
 import contextlib
+import os
 import tarfile
 import shutil
 import subprocess
@@ -73,40 +74,45 @@ def parse_requirements(name=None):
 KAFKA_URL = (
     'https://www.mirrorservice.org/sites/ftp.apache.org/kafka/1.1.1/'
     'kafka_2.11-1.1.1.tgz')
+KAFKA_EXPECTED_HASH_SHA256 = '93b6f926b10b3ba826266272e3bd9d0fe8b33046da9a2688c58d403eb0a43430'  # noqa
 KAFKA_TAR = 'kafka.tgz'
 KAFKA_TAR_ROOTDIR = 'kafka_2.11-1.1.1'
 KAFKA_DIR = 'swh/journal/tests/kafka'
 
 
 def set_up_kafka():
-    """Clean, download Kafka from an official mirror and untar it.
+    """Download Kafka from an official mirror and untar it.  The tarball
+    is checked for the right checksum.
+
+    The data are not cleaned up to allow caching.  Call specific
+    `setup.py clean` to clean up the test artefacts.
 
     """
-    clean_kafka()
+    if not os.path.exists(KAFKA_TAR):
+        print('*swh-journal-setup* Downloading Kafka', file=sys.stderr)
+        urllib.request.urlretrieve(KAFKA_URL, KAFKA_TAR)
+        import hashlib
+        h = hashlib.sha256()
+        with open(KAFKA_TAR, 'rb') as f:
+            for chunk in f:
+                h.update(chunk)
+        hash_result = h.hexdigest()
+        if hash_result != KAFKA_EXPECTED_HASH_SHA256:
+            raise ValueError(
+                "Mismatch tarball %s hash checksum: expected %s, got %s" % (
+                    KAFKA_TAR, KAFKA_EXPECTED_HASH_SHA256, hash_result, ))
 
-    print('* Downloading Kafka', file=sys.stderr)
-    urllib.request.urlretrieve(KAFKA_URL, KAFKA_TAR)
+    if not os.path.exists(KAFKA_DIR):
+        print('*swh-journal-setup* Unpacking Kafka', file=sys.stderr)
+        with tarfile.open(KAFKA_TAR, 'r') as f:
+            f.extractall()
 
-    print('* Unpacking Kafka', file=sys.stderr)
-    with tarfile.open(KAFKA_TAR, 'r') as f:
-        f.extractall()
-
-    print('* Renaming:', KAFKA_TAR_ROOTDIR, '→', KAFKA_DIR, file=sys.stderr)
-    Path(KAFKA_TAR_ROOTDIR).rename(KAFKA_DIR)
-    Path(KAFKA_TAR).unlink()
+        print('*swh-journal-setup* Renaming:', KAFKA_TAR_ROOTDIR, '→',
+              KAFKA_DIR, file=sys.stderr)
+        Path(KAFKA_TAR_ROOTDIR).rename(KAFKA_DIR)
 
 
-def clean_kafka():
-    """Clean whatever `set_up_kafka` may create.
-
-    """
-    shutil.rmtree(KAFKA_DIR, ignore_errors=True)
-    shutil.rmtree(KAFKA_TAR_ROOTDIR, ignore_errors=True)
-    with contextlib.suppress(FileNotFoundError):
-        Path(KAFKA_TAR).unlink()
-
-
-class InstallDevDependencies(develop):
+class InstallExtraDevDependencies(develop):
     """Install development dependencies and download/setup Kafka.
 
     """
@@ -114,13 +120,29 @@ class InstallDevDependencies(develop):
         """Set up the local dev environment fully.
 
         """
+        print('*swh-journal-setup* Installing dev dependencies',
+              file=sys.stderr)
         super().run()
-        print('* Installing dev dependencies', file=sys.stderr)
         subprocess.check_call(['pip', 'install', '-U', 'pip'])
         subprocess.check_call(['pip', 'install', '.[testing]'])
 
-        print('* Setting up Kafka', file=sys.stderr)
+        print('*swh-journal-setup* Setting up Kafka', file=sys.stderr)
         set_up_kafka()
+        print('*swh-journal-setup* Setting up Kafka done')
+
+
+class CleanupExtraDevDependencies(develop):
+    def run(self):
+        """Clean whatever `set_up_kafka` may create.
+
+        """
+        print('*swh-journal-setup* Cleaning up: %s, %s, %s' % (
+            KAFKA_DIR, KAFKA_TAR_ROOTDIR, KAFKA_TAR))
+        shutil.rmtree(KAFKA_DIR, ignore_errors=True)
+        shutil.rmtree(KAFKA_TAR_ROOTDIR, ignore_errors=True)
+        with contextlib.suppress(FileNotFoundError):
+            Path(KAFKA_TAR).unlink()
+        print('*swh-journal-setup* Cleaning up done')
 
 
 setup(
@@ -145,7 +167,8 @@ setup(
     vcversioner={},
     include_package_data=True,
     cmdclass={
-        'develop': InstallDevDependencies,
+        'develop': InstallExtraDevDependencies,
+        'clean': CleanupExtraDevDependencies,
     },
     classifiers=[
         "Programming Language :: Python :: 3",
