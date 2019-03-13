@@ -75,7 +75,7 @@ KAFKA_URL = (
     'kafka_2.11-1.1.1.tgz')
 KAFKA_TAR = 'kafka.tgz'
 KAFKA_TAR_ROOTDIR = 'kafka_2.11-1.1.1'
-KAFKA_DIR = 'kafka'
+KAFKA_DIR = 'swh/journal/tests/kafka'
 
 
 def set_up_kafka():
