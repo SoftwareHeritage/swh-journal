@@ -1,16 +1,23 @@
-# Copyright (C) 2018 The Software Heritage developers
+# Copyright (C) 2018-2019 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 import unittest
 
+from pathlib import Path
+from typing import Tuple
+
 from swh.model.hashutil import hash_to_bytes
 from swh.journal.publisher import JournalPublisher
 from swh.storage.in_memory import Storage
 from kafka import KafkaConsumer, KafkaProducer
 
-from swh.journal.serializers import kafka_to_key, key_to_kafka
+from subprocess import Popen
+from pytest_kafka import (
+    make_zookeeper_process, make_kafka_server, make_kafka_consumer
+)
+# from swh.journal.serializers import kafka_to_key, key_to_kafka
 
 
 class MockStorage:
@@ -288,54 +295,88 @@ class TestPublisherNoKafka(unittest.TestCase):
         self.assertEqual(actual_objects, expected_objects)
 
 
-class TestPublisher(unittest.TestCase):
-    """This tests a publisher actually speaking with kafka underneath
+# Prepare kafka
 
-    """
-    def setUp(self):
-        self.publisher = JournalPublisherTest()
-        self.contents = [{b'sha1': c['sha1']} for c in CONTENTS]
-        # self.revisions = [{b'id': c['id']} for c in REVISIONS]
-        # self.releases = [{b'id': c['id']} for c in RELEASES]
-        # producer and consumer to send and read data from publisher
-        self.producer_to_publisher = KafkaProducer(
-            bootstrap_servers=TEST_CONFIG['brokers'],
-            key_serializer=key_to_kafka,
-            value_serializer=key_to_kafka,
-            acks='all')
-        self.consumer_from_publisher = KafkaConsumer(
-            bootstrap_servers=TEST_CONFIG['brokers'],
-            value_deserializer=kafka_to_key)
-        self.consumer_from_publisher.subscribe(
-            topics=['%s.%s' % (TEST_CONFIG['temporary_prefix'], object_type)
-                    for object_type in TEST_CONFIG['object_types']])
-        import logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s %(process)d %(levelname)s %(message)s')
+ROOT = Path(__file__).parent
+KAFKA_SCRIPTS = ROOT / 'kafka/bin/'
 
-    def test_poll(self):
-        # given (send message to the publisher)
-        self.producer_to_publisher.send(
-            '%s.content' % TEST_CONFIG['temporary_prefix'],
-            self.contents[0]
-        )
+KAFKA_BIN = str(KAFKA_SCRIPTS / 'kafka-server-start.sh')
+ZOOKEEPER_BIN = str(KAFKA_SCRIPTS / 'zookeeper-server-start.sh')
 
-        nb_messages = 1
 
-        # when (the publisher poll 1 message and send 1 reified object)
-        self.publisher.poll(max_messages=nb_messages)
+zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN)
+kafka_server = make_kafka_server(KAFKA_BIN, 'zookeeper_proc')
 
-        # then (client reads from the messages from output topic)
-        msgs = []
-        for num, msg in enumerate(self.consumer_from_publisher):
-            print('#### consumed msg %s: %s ' % (num, msg))
-            msgs.append(msg)
+TOPIC = 'abc'
+kafka_consumer = make_kafka_consumer(
+    'kafka_server', seek_to_beginning=True, kafka_topics=[TOPIC])
 
-        self.assertEqual(len(msgs), nb_messages)
-        print('##### msgs: %s' % msgs)
-        # check the results
-        expected_topic = 'swh.journal.objects.content'
-        expected_object = (self.contents[0][b'sha1'], CONTENTS[0])
 
-        self.assertEqual(msgs, (expected_topic, expected_object))
+def write_to_kafka(kafka_server: Tuple[Popen, int], message: bytes) -> None:
+    """Write a message to kafka_server."""
+    _, kafka_port = kafka_server
+    producer = KafkaProducer(
+        bootstrap_servers='localhost:{}'.format(kafka_port))
+    producer.send(TOPIC, message)
+    producer.flush()
+
+
+def write_and_read(kafka_server: Tuple[Popen, int],
+                   kafka_consumer: KafkaConsumer) -> None:
+    """Write to kafka_server, consume with kafka_consumer."""
+    message = b'msg'
+    write_to_kafka(kafka_server, message)
+    consumed = list(kafka_consumer)
+    assert len(consumed) == 1
+    assert consumed[0].topic == TOPIC
+    assert consumed[0].value == message
+
+
+def test_message(kafka_server: Tuple[Popen, int],
+                 kafka_consumer: KafkaConsumer):
+    write_and_read(kafka_server, kafka_consumer)
+
+# def setUp(self):
+#     self.publisher = JournalPublisherTest()
+#     self.contents = [{b'sha1': c['sha1']} for c in CONTENTS]
+#     # self.revisions = [{b'id': c['id']} for c in REVISIONS]
+#     # self.releases = [{b'id': c['id']} for c in RELEASES]
+#     # producer and consumer to send and read data from publisher
+#     self.producer_to_publisher = KafkaProducer(
+#         bootstrap_servers=TEST_CONFIG['brokers'],
+#         key_serializer=key_to_kafka,
+#         value_serializer=key_to_kafka,
+#         acks='all')
+#     self.consumer_from_publisher = KafkaConsumer(
+#         bootstrap_servers=TEST_CONFIG['brokers'],
+#         value_deserializer=kafka_to_key)
+#     self.consumer_from_publisher.subscribe(
+#         topics=['%s.%s' % (TEST_CONFIG['temporary_prefix'], object_type)
+#                 for object_type in TEST_CONFIG['object_types']])
+
+
+# def test_poll(kafka_consumer):
+#     # given (send message to the publisher)
+#     self.producer_to_publisher.send(
+#         '%s.content' % TEST_CONFIG['temporary_prefix'],
+#         self.contents[0]
+#     )
+
+#     nb_messages = 1
+
+#     # when (the publisher poll 1 message and send 1 reified object)
+#     self.publisher.poll(max_messages=nb_messages)
+
+#     # then (client reads from the messages from output topic)
+#     msgs = []
+#     for num, msg in enumerate(self.consumer_from_publisher):
+#         print('#### consumed msg %s: %s ' % (num, msg))
+#         msgs.append(msg)
+
+#     self.assertEqual(len(msgs), nb_messages)
+#     print('##### msgs: %s' % msgs)
+#     # check the results
+#     expected_topic = 'swh.journal.objects.content'
+#     expected_object = (self.contents[0][b'sha1'], CONTENTS[0])
+
+#     self.assertEqual(msgs, (expected_topic, expected_object))
