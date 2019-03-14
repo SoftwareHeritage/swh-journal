@@ -4,16 +4,6 @@
 # See top-level LICENSE file for more information
 
 from kafka import KafkaConsumer, KafkaProducer
-from subprocess import Popen
-from typing import Tuple
-
-from swh.model.hashutil import hash_to_bytes
-from swh.journal.publisher import JournalPublisher
-from swh.storage.in_memory import Storage
-
-# from swh.journal.serializers import kafka_to_key, key_to_kafka
-
-from .conftest import TEST_CONFIG
 
 
 def write_and_read(kafka_producer: KafkaProducer,
@@ -38,6 +28,9 @@ def test_read_write(kafka_producer: KafkaProducer,
     """Independent test from the publisher so far"""
     write_and_read(kafka_producer, kafka_consumer)
 
+
+def test_poll_publisher():
+    pass
 
 # def setUp(self):
 #     self.publisher = JournalPublisherTest()

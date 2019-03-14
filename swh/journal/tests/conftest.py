@@ -19,6 +19,8 @@ from swh.journal.publisher import JournalPublisher
 from swh.storage.in_memory import Storage
 from swh.model.hashutil import hash_to_bytes
 
+from swh.journal.serializers import kafka_to_key, key_to_kafka
+
 
 TEST_CONFIG = {
     'brokers': ['localhost'],
@@ -174,6 +176,31 @@ def kafka_consumer(
     return kafka_consumer(request)
 
 
+class JournalPublisherKafkaInMemoryStorage(JournalPublisherTest):
+    """A journal publisher with:
+    - kafka dependency
+    - in-memory storage
+
+    """
+    def _prepare_journal(self, config):
+        """No journal for now
+
+        """
+        self.consumer = KafkaConsumer(
+            bootstrap_servers=config['brokers'],
+            value_deserializer=kafka_to_key,
+            auto_offset_reset='earliest',
+            enable_auto_commit=False,
+            group_id=config['consumer_id'],
+        )
+        self.producer = KafkaProducer(
+            bootstrap_servers=config['brokers'],
+            key_serializer=key_to_kafka,
+            value_serializer=key_to_kafka,
+            client_id=config['publisher_id'],
+        )
+
+
 @pytest.fixture
 def journal_publisher(request: 'SubRequest', kafka_consumer, kafka_producer):
-    pass
+    return JournalPublisherKafkaInMemoryStorage(TEST_CONFIG)
