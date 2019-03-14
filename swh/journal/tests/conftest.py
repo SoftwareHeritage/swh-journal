@@ -5,6 +5,7 @@
 
 import os
 import pytest
+import logging
 
 from kafka import KafkaConsumer, KafkaProducer
 from subprocess import Popen
@@ -18,7 +19,7 @@ from pytest_kafka import (
 from swh.journal.publisher import JournalPublisher
 from swh.model.hashutil import hash_to_bytes
 
-from swh.journal.serializers import kafka_to_key, key_to_kafka
+from swh.journal.serializers import kafka_to_key, key_to_kafka, kafka_to_value
 
 
 TEST_CONFIG = {
@@ -133,6 +134,7 @@ class JournalPublisherTest(JournalPublisher):
     def _prepare_storage(self, config):
         super()._prepare_storage(config)
         self.storage.content_add({'data': b'42', **c} for c in CONTENTS)
+        print('#### all contents: %s' % self.storage._contents)
         self.storage.revision_add(REVISIONS)
         self.storage.release_add(RELEASES)
         origins = self.storage.origin_add(ORIGINS)
@@ -157,6 +159,9 @@ ZOOKEEPER_BIN = str(KAFKA_SCRIPTS / 'zookeeper-server-start.sh')
 # Those defines fixtures
 zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN)
 kafka_server = make_kafka_server(KAFKA_BIN, 'zookeeper_proc')
+
+# logger = logging.getLogger('kafka')
+# logger.setLevel(logging.WARN)
 
 
 @pytest.fixture
@@ -185,13 +190,14 @@ def consumer_from_publisher(request: 'SubRequest') -> KafkaConsumer:  # noqa
         '%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
         for object_type in TEST_CONFIG['object_types']
     ]
-    print(subscribed_topics)
+    print('#### subscribed_topics: %s' % subscribed_topics)
     kafka_consumer = make_kafka_consumer(
         'kafka_server',
         seek_to_beginning=True,
-        value_deserializer=kafka_to_key,
+        key_deserializer=kafka_to_key,
+        value_deserializer=kafka_to_value,
         auto_offset_reset='earliest',
-        enable_auto_commit=False,
+        enable_auto_commit=True,
         client_id=TEST_CONFIG['publisher_id'],
         kafka_topics=subscribed_topics)  # Callback [..., KafkaConsumer]
     return kafka_consumer(request)
@@ -205,4 +211,4 @@ def publisher(
     # right instance
     _, port = kafka_server
     TEST_CONFIG['brokers'] = ['localhost:{}'.format(port)]
-    return JournalPublisher(TEST_CONFIG)
+    return JournalPublisherTest(TEST_CONFIG)

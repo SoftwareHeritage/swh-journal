@@ -24,24 +24,23 @@ def test_publisher(
         kafka_producer (KafkaProducer): To send data to the publisher
 
     """
-
     contents = [{b'sha1': c['sha1']} for c in CONTENTS]
-
     # revisions = [{b'id': c['id']} for c in REVISIONS]
     # releases = [{b'id': c['id']} for c in RELEASES]
 
     # read the output of the publisher
     consumer_from_publisher.subscribe(
-        topics=['%s.%s' % (TEST_CONFIG['temporary_prefix'], object_type)
+        topics=['%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
                 for object_type in TEST_CONFIG['object_types']])
 
+    print('#### producer_to_publisher: Sending: %s' % contents[0])
     # send message to the publisher
     producer_to_publisher.send(
         '%s.content' % TEST_CONFIG['temporary_prefix'],
         contents[0]
     )
 
-    nb_messages = 1
+    nb_messages = len(contents)
 
     # publisher should poll 1 message and send 1 reified object
     publisher.poll(max_messages=nb_messages)
@@ -49,14 +48,24 @@ def test_publisher(
     # then (client reads from the messages from output topic)
     msgs = []
     for num, msg in enumerate(consumer_from_publisher):
-        print('#### consumed msg %s: %s ' % (num, msg))
-        msgs.append(msg)
+        print('#### consumer_from_publisher: msg %s: %s ' % (num, msg))
+        print('#### consumer_from_publisher: msg.value %s: %s ' % (
+            num, msg.value))
+        msgs.append((msg.topic, msg.key, msg.value))
 
-    assert len(msgs) == nb_messages
+        expected_topic = '%s.content' % TEST_CONFIG['final_prefix']
+        assert expected_topic == msg.topic
 
-    print('##### msgs: %s' % msgs)
-    # check the results
-    expected_topic = '%s.content' % TEST_CONFIG['final_prefix']
-    expected_object = (contents[0][b'sha1'], CONTENTS[0])
+        expected_key = contents[num][b'sha1']
+        assert expected_key == msg.key
 
-    assert msgs == (expected_topic, expected_object)
+        expected_value = CONTENTS[num]
+        # FIXME: some transformation is needed, why?
+        value = {}
+        for k, v in msg.value.items():
+            k = k.decode()
+            if k == 'status':
+                v = v.decode()
+            value[k] = v
+
+        assert expected_value == value
