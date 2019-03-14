@@ -60,7 +60,7 @@ def test_publisher(
         assert expected_key == msg.key
 
         expected_value = CONTENTS[num]
-        # FIXME: some transformation is needed, why?
+        # Transformation is needed due to msgpack which encodes keys and values
         value = {}
         for k, v in msg.value.items():
             k = k.decode()
