@@ -27,7 +27,7 @@ TEST_CONFIG = {
     'final_prefix': 'swh.journal.objects',
     'consumer_id': 'swh.journal.publisher',
     'publisher_id': 'swh.journal.publisher',
-    'object_types': ['content', 'revision', 'release', 'origin'],
+    'object_types': ['content'],
     'max_messages': 1,  # will read 1 message and stops
     'storage': {'cls': 'memory', 'args': {}}
 }
@@ -160,47 +160,49 @@ kafka_server = make_kafka_server(KAFKA_BIN, 'zookeeper_proc')
 
 
 @pytest.fixture
-def kafka_producer(request: 'SubRequest', kafka_server: Tuple[Popen, int]) -> KafkaProducer:  # noqa
+def producer_to_publisher(
+        request: 'SubRequest',
+        kafka_server: Tuple[Popen, int]) -> KafkaProducer:  # noqa
+    """Producer to send message to the publisher's consumer.
+
+    """
     _, port = kafka_server
-    producer = KafkaProducer(bootstrap_servers='localhost:{}'.format(port))
+    producer = KafkaProducer(
+        bootstrap_servers='localhost:{}'.format(port),
+        key_serializer=key_to_kafka,
+        value_serializer=key_to_kafka,
+        client_id=TEST_CONFIG['consumer_id'],
+    )
     return producer
 
 
 @pytest.fixture
-def kafka_consumer(
-        request: 'SubRequest', kafka_server: Tuple[Popen, int]) -> KafkaConsumer:  # noqa
+def consumer_from_publisher(request: 'SubRequest') -> KafkaConsumer:  # noqa
+    """Consumer to read message from the publisher's producer message
 
-    TOPIC = 'abc'
+    """
+    subscribed_topics = [
+        '%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
+        for object_type in TEST_CONFIG['object_types']
+    ]
+    print(subscribed_topics)
     kafka_consumer = make_kafka_consumer(
-        'kafka_server', seek_to_beginning=True, kafka_topics=[TOPIC])
+        'kafka_server',
+        seek_to_beginning=True,
+        value_deserializer=kafka_to_key,
+        auto_offset_reset='earliest',
+        enable_auto_commit=False,
+        client_id=TEST_CONFIG['publisher_id'],
+        kafka_topics=subscribed_topics)  # Callback [..., KafkaConsumer]
     return kafka_consumer(request)
 
 
-class JournalPublisherKafkaInMemoryStorage(JournalPublisherTest):
-    """A journal publisher with:
-    - kafka dependency
-    - in-memory storage
-
-    """
-    def _prepare_journal(self, config):
-        """No journal for now
-
-        """
-        self.consumer = KafkaConsumer(
-            bootstrap_servers=config['brokers'],
-            value_deserializer=kafka_to_key,
-            auto_offset_reset='earliest',
-            enable_auto_commit=False,
-            group_id=config['consumer_id'],
-        )
-        self.producer = KafkaProducer(
-            bootstrap_servers=config['brokers'],
-            key_serializer=key_to_kafka,
-            value_serializer=key_to_kafka,
-            client_id=config['publisher_id'],
-        )
-
-
 @pytest.fixture
-def journal_publisher(request: 'SubRequest', kafka_consumer, kafka_producer):
-    return JournalPublisherKafkaInMemoryStorage(TEST_CONFIG)
+def publisher(
+        request: 'SubRequest',
+        kafka_server: Tuple[Popen, int]) -> JournalPublisher:
+    # consumer and producer of the publisher needs to discuss with the
+    # right instance
+    _, port = kafka_server
+    TEST_CONFIG['brokers'] = ['localhost:{}'.format(port)]
+    return JournalPublisher(TEST_CONFIG)
