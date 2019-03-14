@@ -16,7 +16,6 @@ from pytest_kafka import (
 )
 
 from swh.journal.publisher import JournalPublisher
-from swh.storage.in_memory import Storage
 from swh.model.hashutil import hash_to_bytes
 
 from swh.journal.serializers import kafka_to_key, key_to_kafka
@@ -30,6 +29,7 @@ TEST_CONFIG = {
     'publisher_id': 'swh.journal.publisher',
     'object_types': ['content', 'revision', 'release', 'origin'],
     'max_messages': 1,  # will read 1 message and stops
+    'storage': {'cls': 'memory', 'args': {}}
 }
 
 CONTENTS = [
@@ -131,7 +131,7 @@ class JournalPublisherTest(JournalPublisher):
 
     """
     def _prepare_storage(self, config):
-        self.storage = Storage()
+        super()._prepare_storage(config)
         self.storage.content_add({'data': b'42', **c} for c in CONTENTS)
         self.storage.revision_add(REVISIONS)
         self.storage.release_add(RELEASES)
