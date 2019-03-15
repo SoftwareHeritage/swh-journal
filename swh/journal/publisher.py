@@ -1,4 +1,4 @@
-# Copyright (C) 2016-2018 The Software Heritage developers
+# Copyright (C) 2016-2019 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -8,14 +8,13 @@ import logging
 
 from kafka import KafkaProducer, KafkaConsumer
 
-from swh.core.config import SWHConfig
 from swh.storage import get_storage
 from swh.storage.algos import snapshot
 
 from .serializers import kafka_to_key, key_to_kafka
 
 
-class JournalPublisher(SWHConfig):
+class JournalPublisher:
     """The journal publisher is a layer in charge of:
 
     - consuming messages from topics (1 topic per object_type)
@@ -26,37 +25,10 @@ class JournalPublisher(SWHConfig):
     The main entry point for this class is the 'poll' method.
 
     """
-    DEFAULT_CONFIG = {
-        'brokers': ('list[str]', ['getty.internal.softwareheritage.org']),
-
-        'temporary_prefix': ('str', 'swh.tmp_journal.new'),
-        'final_prefix': ('str', 'swh.journal.objects'),
-
-        'consumer_id': ('str', 'swh.journal.publisher'),
-        'publisher_id': ('str', 'swh.journal.publisher'),
-
-        'object_types': ('list[str]', ['content', 'revision', 'release']),
-
-        'storage': ('dict', {
-            'cls': 'remote',
-            'args': {
-                'url': 'http://localhost:5002/',
-            }
-        }),
-
-        'max_messages': ('int', 10000),
-    }
-
-    CONFIG_BASE_FILENAME = 'journal/publisher'
-
-    def __init__(self, extra_configuration=None):
-        self.config = config = self.parse_config_file()
-        if extra_configuration:
-            config.update(extra_configuration)
-
+    def __init__(self, config):
+        self.config = config
         self._prepare_storage(config)
         self._prepare_journal(config)
-
         self.max_messages = self.config['max_messages']
 
     def _prepare_journal(self, config):
@@ -219,21 +191,4 @@ class JournalPublisher(SWHConfig):
 
 
 if __name__ == '__main__':
-    import click
-
-    @click.command()
-    @click.option('--verbose', is_flag=True, default=False,
-                  help='Be verbose if asked.')
-    def main(verbose):
-        logging.basicConfig(
-            level=logging.DEBUG if verbose else logging.INFO,
-            format='%(asctime)s %(process)d %(levelname)s %(message)s'
-        )
-        _log = logging.getLogger('kafka')
-        _log.setLevel(logging.INFO)
-
-        publisher = JournalPublisher()
-        while True:
-            publisher.poll()
-
-    main()
+    print('Please use the "swh-journal publisher run" command')

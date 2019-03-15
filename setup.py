@@ -45,6 +45,10 @@ setup(
     url='https://forge.softwareheritage.org/diffusion/DJNL/',
     packages=find_packages(),
     scripts=[],
+    entry_points='''
+        [console_scripts]
+        swh-journal=swh.journal.cli:main
+    ''',
     install_requires=parse_requirements() + parse_requirements('swh'),
     setup_requires=['vcversioner'],
     extras_require={'testing': parse_requirements('test')},

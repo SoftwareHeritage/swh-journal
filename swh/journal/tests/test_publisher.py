@@ -101,19 +101,18 @@ ORIGIN_VISITS = [
     }
 ]
 
+TEST_CONFIG = {
+    'brokers': ['localhost'],
+    'temporary_prefix': 'swh.tmp_journal.new',
+    'final_prefix': 'swh.journal.objects',
+    'consumer_id': 'swh.journal.test.publisher',
+    'publisher_id': 'swh.journal.test.publisher',
+    'object_types': ['content'],
+    'max_messages': 3,
+}
+
 
 class JournalPublisherTest(JournalPublisher):
-    def parse_config_file(self):
-        return {
-            'brokers': ['localhost'],
-            'temporary_prefix': 'swh.tmp_journal.new',
-            'final_prefix': 'swh.journal.objects',
-            'consumer_id': 'swh.journal.test.publisher',
-            'publisher_id': 'swh.journal.test.publisher',
-            'object_types': ['content'],
-            'max_messages': 3,
-        }
-
     def _prepare_storage(self, config):
         self.storage = Storage()
         self.storage.content_add({'data': b'42', **c} for c in CONTENTS)
@@ -130,6 +129,13 @@ class JournalPublisherTest(JournalPublisher):
 
         print("publisher.origin-visits", self.origin_visits)
 
+
+class JournalPublisherNoKafkaInMemoryStorage(JournalPublisherTest):
+    """A journal publisher with:
+    - no kafka dependency
+    - in-memory storage
+    """
+
     def _prepare_journal(self, config):
         """No journal for now
 
@@ -139,7 +145,7 @@ class JournalPublisherTest(JournalPublisher):
 
 class TestPublisher(unittest.TestCase):
     def setUp(self):
-        self.publisher = JournalPublisherTest()
+        self.publisher = JournalPublisherNoKafkaInMemoryStorage(TEST_CONFIG)
         self.contents = [{b'sha1': c['sha1']} for c in CONTENTS]
         self.revisions = [{b'id': c['id']} for c in REVISIONS]
         self.releases = [{b'id': c['id']} for c in RELEASES]
