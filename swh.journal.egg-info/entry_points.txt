@@ -1,0 +1,4 @@
+
+        [console_scripts]
+        swh-journal=swh.journal.cli:main
+    
