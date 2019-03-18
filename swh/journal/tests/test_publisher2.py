@@ -5,18 +5,19 @@
 
 
 from kafka import KafkaConsumer, KafkaProducer
-from typing import Dict, Text
+from subprocess import Popen
+from typing import Tuple, Dict, Text
 
 from swh.journal.publisher import JournalPublisher
 
 from .conftest import (
-    TEST_CONFIG, CONTENTS, REVISIONS, RELEASES, ORIGINS
+    TEST_CONFIG, CONTENTS, REVISIONS, RELEASES, publisher
 )
 
 
 OBJECT_TYPE_KEYS = {
-    # 'content': (b'sha1', CONTENTS),
-    'revision': (b'id', REVISIONS),
+    'content': (b'sha1', CONTENTS),
+    # 'revision': (b'id', REVISIONS),
     # 'release': (b'id', RELEASES),
 }
 
@@ -55,12 +56,9 @@ def assert_publish(publisher: JournalPublisher,
     # then (client reads from the messages from output topic)
     msgs = []
     for num, msg in enumerate(consumer_from_publisher):
-        print('#### consumer_from_publisher: msg %s: %s ' % (num, msg))
-        print('#### consumer_from_publisher: msg.value %s: %s ' % (
-            num, msg.value))
         msgs.append((msg.topic, msg.key, msg.value))
 
-        expected_topic = '%s.content' % TEST_CONFIG['final_prefix']
+        expected_topic = '%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
         assert expected_topic == msg.topic
 
         expected_key = objects[num][object_key_id]
@@ -79,7 +77,7 @@ def assert_publish(publisher: JournalPublisher,
 
 
 def test_publish(
-        publisher: JournalPublisher,
+        kafka_server: Tuple[Popen, int],
         consumer_from_publisher: KafkaConsumer,
         producer_to_publisher: KafkaProducer):
     """
@@ -91,11 +89,22 @@ def test_publish(
         kafka_producer (KafkaProducer): To send data to the publisher
 
     """
+    # retrieve the object types we want to test
     object_types = OBJECT_TYPE_KEYS.keys()
-    # Subscribe to topics
+    # synchronize the publisher's config with the test
+    conf = TEST_CONFIG.copy()
+    conf['object_types'] = object_types
+    # instantiate the publisher (not a fixture due to initialization)
+    p = publisher(kafka_server, config=conf)
+
+    # Subscribe to the publisher's output topics
     consumer_from_publisher.subscribe(
-        topics=['%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
+        topics=['%s.%s' % (conf['final_prefix'], object_type)
                 for object_type in object_types])
+
+    # Now for each object type, we'll send data to the publisher and
+    # check that data is indeed fetched and reified in the publisher's
+    # output topics
     for object_type in object_types:
-        assert_publish(publisher, consumer_from_publisher,
+        assert_publish(p, consumer_from_publisher,
                        producer_to_publisher, object_type)

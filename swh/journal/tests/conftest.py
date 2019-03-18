@@ -9,7 +9,7 @@ import logging
 
 from kafka import KafkaProducer
 from subprocess import Popen
-from typing import Tuple
+from typing import Tuple, Dict
 
 from pathlib import Path
 from pytest_kafka import (
@@ -190,12 +190,10 @@ consumer_from_publisher = make_kafka_consumer(
     kafka_topics=['dummy'])  # will be overriden during test setup
 
 
-@pytest.fixture
-def publisher(
-        request: 'SubRequest',  # noqa F821
-        kafka_server: Tuple[Popen, int]) -> JournalPublisher:
+def publisher(kafka_server: Tuple[Popen, int],
+              config: Dict) -> JournalPublisher:
     # consumer and producer of the publisher needs to discuss with the
     # right instance
     _, port = kafka_server
-    TEST_CONFIG['brokers'] = ['localhost:{}'.format(port)]
-    return JournalPublisherTest(TEST_CONFIG)
+    config['brokers'] = ['localhost:{}'.format(port)]
+    return JournalPublisherTest(config)
