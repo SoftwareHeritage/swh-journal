@@ -7,7 +7,7 @@ from kafka import KafkaConsumer, KafkaProducer
 from swh.journal.publisher import JournalPublisher
 
 from .conftest import (
-    TEST_CONFIG, CONTENTS, REVISIONS, RELEASES, ORIGINS
+    TEST_CONFIG, CONTENTS  # , REVISIONS, RELEASES, ORIGINS
 )
 
 

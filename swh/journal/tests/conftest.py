@@ -7,7 +7,7 @@ import os
 import pytest
 import logging
 
-from kafka import KafkaConsumer, KafkaProducer
+from kafka import KafkaProducer
 from subprocess import Popen
 from typing import Tuple
 
@@ -160,13 +160,13 @@ ZOOKEEPER_BIN = str(KAFKA_SCRIPTS / 'zookeeper-server-start.sh')
 zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN)
 kafka_server = make_kafka_server(KAFKA_BIN, 'zookeeper_proc')
 
-# logger = logging.getLogger('kafka')
-# logger.setLevel(logging.WARN)
+logger = logging.getLogger('kafka')
+logger.setLevel(logging.WARN)
 
 
 @pytest.fixture
 def producer_to_publisher(
-        request: 'SubRequest',
+        request: 'SubRequest',  # noqa F821
         kafka_server: Tuple[Popen, int]) -> KafkaProducer:  # noqa
     """Producer to send message to the publisher's consumer.
 
@@ -181,31 +181,25 @@ def producer_to_publisher(
     return producer
 
 
-@pytest.fixture
-def consumer_from_publisher(request: 'SubRequest') -> KafkaConsumer:  # noqa
-    """Consumer to read message from the publisher's producer message
-
-    """
-    subscribed_topics = [
-        '%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
-        for object_type in TEST_CONFIG['object_types']
-    ]
-    print('#### subscribed_topics: %s' % subscribed_topics)
-    kafka_consumer = make_kafka_consumer(
-        'kafka_server',
-        seek_to_beginning=True,
-        key_deserializer=kafka_to_key,
-        value_deserializer=kafka_to_value,
-        auto_offset_reset='earliest',
-        enable_auto_commit=True,
-        client_id=TEST_CONFIG['publisher_id'],
-        kafka_topics=subscribed_topics)  # Callback [..., KafkaConsumer]
-    return kafka_consumer(request)
+_subscribed_topics = [
+    '%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
+    for object_type in TEST_CONFIG['object_types']
+]
+# pytest fixture (no need for the annotation though or else it breaks)
+consumer_from_publisher = make_kafka_consumer(
+    'kafka_server',
+    seek_to_beginning=True,
+    key_deserializer=kafka_to_key,
+    value_deserializer=kafka_to_value,
+    auto_offset_reset='earliest',
+    enable_auto_commit=True,
+    client_id=TEST_CONFIG['publisher_id'],
+    kafka_topics=_subscribed_topics)
 
 
 @pytest.fixture
 def publisher(
-        request: 'SubRequest',
+        request: 'SubRequest',  # noqa F821
         kafka_server: Tuple[Popen, int]) -> JournalPublisher:
     # consumer and producer of the publisher needs to discuss with the
     # right instance
