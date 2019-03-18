@@ -23,7 +23,7 @@ from swh.journal.serializers import kafka_to_key, key_to_kafka, kafka_to_value
 
 
 TEST_CONFIG = {
-    'brokers': ['localhost'],
+    'brokers': [],
     'temporary_prefix': 'swh.tmp_journal.new',
     'final_prefix': 'swh.journal.objects',
     'consumer_id': 'swh.journal.publisher',
