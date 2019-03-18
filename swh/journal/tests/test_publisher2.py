@@ -7,6 +7,7 @@
 from kafka import KafkaConsumer, KafkaProducer
 from subprocess import Popen
 from typing import Tuple, Dict, Text
+from swh.journal.serializers import value_to_kafka, kafka_to_value
 
 from swh.journal.publisher import JournalPublisher
 
@@ -17,8 +18,8 @@ from .conftest import (
 
 OBJECT_TYPE_KEYS = {
     'content': (b'sha1', CONTENTS),
-    # 'revision': (b'id', REVISIONS),
-    # 'release': (b'id', RELEASES),
+    'revision': (b'id', REVISIONS),
+    'release': (b'id', RELEASES),
 }
 
 
@@ -64,16 +65,10 @@ def assert_publish(publisher: JournalPublisher,
         expected_key = objects[num][object_key_id]
         assert expected_key == msg.key
 
-        expected_value = expected_objects[num]
-        # Transformation is needed due to msgpack which encodes keys and values
-        value = {}
-        for k, v in msg.value.items():
-            k = k.decode()
-            if k == 'status':
-                v = v.decode()
-            value[k] = v
-
-        assert expected_value == value
+        # Transformation is needed due to our back and forth
+        # serialization to kafka
+        expected_value = kafka_to_value(value_to_kafka(expected_objects[num]))
+        assert expected_value == msg.value
 
 
 def test_publish(
