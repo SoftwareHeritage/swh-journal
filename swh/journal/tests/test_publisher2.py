@@ -15,27 +15,30 @@ from .conftest import (
 
 
 OBJECT_TYPE_KEYS = {
-    'content': 'sha1',
-    'revision': 'id',
-    'release': 'id',
+    'content': (b'sha1', CONTENTS),
+    # 'revision': (b'id', REVISIONS),
+    # 'release': (b'id', RELEASES),
 }
 
 
 def assert_publish(publisher: JournalPublisher,
                    consumer_from_publisher: KafkaConsumer,
                    producer_to_publisher: KafkaProducer,
-                   expected_objects: Dict,
                    object_type: Text):
+    """Assert that publishing object in the publisher is reified and
+    published in topics.
+
+    Args:
+        journal_publisher (JournalPublisher): publisher to read and write data
+        kafka_consumer (KafkaConsumer): To read data from the publisher
+        kafka_producer (KafkaProducer): To send data to the publisher
+
+    """
     # object type's id label key
-    object_key_id = OBJECT_TYPE_KEYS[object_type].encode()
+    object_key_id, expected_objects = OBJECT_TYPE_KEYS[object_type]
     # objects to send to the publisher
     objects = [{object_key_id: c[object_key_id.decode()]}
                for c in expected_objects]
-
-    # read the output of the publisher
-    consumer_from_publisher.subscribe(
-        topics=['%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
-                for object_type in TEST_CONFIG['object_types']])
 
     # send message to the publisher
     for obj in objects:
@@ -88,7 +91,11 @@ def test_publish(
         kafka_producer (KafkaProducer): To send data to the publisher
 
     """
-    expected_objects = CONTENTS
-    object_type = 'content'
-    assert_publish(publisher, consumer_from_publisher, producer_to_publisher,
-                   expected_objects, object_type)
+    object_types = OBJECT_TYPE_KEYS.keys()
+    # Subscribe to topics
+    consumer_from_publisher.subscribe(
+        topics=['%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
+                for object_type in object_types])
+    for object_type in object_types:
+        assert_publish(publisher, consumer_from_publisher,
+                       producer_to_publisher, object_type)

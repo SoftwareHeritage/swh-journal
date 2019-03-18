@@ -181,10 +181,6 @@ def producer_to_publisher(
     return producer
 
 
-_subscribed_topics = [
-    '%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
-    for object_type in TEST_CONFIG['object_types']
-]
 # pytest fixture (no need for the annotation though or else it breaks)
 consumer_from_publisher = make_kafka_consumer(
     'kafka_server',
@@ -194,7 +190,7 @@ consumer_from_publisher = make_kafka_consumer(
     auto_offset_reset='earliest',
     enable_auto_commit=True,
     client_id=TEST_CONFIG['publisher_id'],
-    kafka_topics=_subscribed_topics)
+    kafka_topics=['dummy'])  # will be overriden during test setup
 
 
 @pytest.fixture
