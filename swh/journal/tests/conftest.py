@@ -134,7 +134,6 @@ class JournalPublisherTest(JournalPublisher):
     def _prepare_storage(self, config):
         super()._prepare_storage(config)
         self.storage.content_add({'data': b'42', **c} for c in CONTENTS)
-        print('#### all contents: %s' % self.storage._contents)
         self.storage.revision_add(REVISIONS)
         self.storage.release_add(RELEASES)
         origins = self.storage.origin_add(ORIGINS)
@@ -145,8 +144,6 @@ class JournalPublisherTest(JournalPublisher):
             origin_visits.append(ov)
             self.origins = origins
             self.origin_visits = origin_visits
-
-        print("publisher.origin-visits", self.origin_visits)
 
 
 KAFKA_ROOT = os.environ.get('SWH_KAFKA_ROOT', Path(__file__).parent)
