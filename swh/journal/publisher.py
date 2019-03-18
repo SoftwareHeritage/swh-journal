@@ -32,6 +32,7 @@ class JournalPublisher:
         self._prepare_storage(config)
         self._prepare_journal(config)
         self.max_messages = self.config['max_messages']
+        logger.setLevel(logging.DEBUG)
 
     def _prepare_journal(self, config):
         """Prepare the consumer and subscriber instances for the publisher to

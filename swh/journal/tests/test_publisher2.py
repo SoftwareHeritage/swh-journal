@@ -10,13 +10,13 @@ from typing import Dict, Text
 from swh.journal.publisher import JournalPublisher
 
 from .conftest import (
-    TEST_CONFIG, CONTENTS, REVISIONS  # , RELEASES, ORIGINS
+    TEST_CONFIG, CONTENTS, REVISIONS, RELEASES, ORIGINS
 )
 
 
 OBJECT_TYPE_KEYS = {
-    'content': (b'sha1', CONTENTS),
-    # 'revision': (b'id', REVISIONS),
+    # 'content': (b'sha1', CONTENTS),
+    'revision': (b'id', REVISIONS),
     # 'release': (b'id', RELEASES),
 }
 
