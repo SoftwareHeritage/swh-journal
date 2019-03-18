@@ -3,12 +3,14 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import pytest
 import unittest
 
 from .conftest import (
     JournalPublisherTest, TEST_CONFIG,
     CONTENTS, REVISIONS, RELEASES, ORIGINS
 )
+from swh.journal.publisher import MANDATORY_KEYS
 
 
 class JournalPublisherNoKafkaInMemoryStorage(JournalPublisherTest):
@@ -17,6 +19,12 @@ class JournalPublisherNoKafkaInMemoryStorage(JournalPublisherTest):
     - in-memory storage
 
     """
+    def check_config(self, config):
+        """No need to check the configuration here as we do not use kafka
+
+        """
+        pass
+
     def _prepare_journal(self, config):
         """No journal for now
 
@@ -105,3 +113,39 @@ class TestPublisherNoKafka(unittest.TestCase):
         }
 
         self.assertEqual(actual_objects, expected_objects)
+
+
+class JournalPublisherCheckTest(JournalPublisherTest):
+    """A journal publisher with:
+    - no kafka dependency
+    - in-memory storage
+
+    """
+    def _prepare_journal(self, config):
+        """No journal for now
+
+        """
+        pass
+
+
+def test_check_config_ok():
+    """Instantiate a publisher with the right config is fine
+
+    """
+    publisher = JournalPublisherCheckTest(TEST_CONFIG)
+    assert publisher is not None
+
+
+def test_check_config_ko():
+    """Instantiate a publisher with the wrong config should raise
+
+    """
+    for k in MANDATORY_KEYS:
+        conf = TEST_CONFIG.copy()
+        conf.pop(k)
+        with pytest.raises(ValueError) as e:
+            JournalPublisherCheckTest(conf)
+
+        error = ('Configuration error: The following keys must be'
+                 ' provided: %s' % (','.join([k]), ))
+        assert e.value.args[0] == error

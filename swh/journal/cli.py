@@ -57,22 +57,7 @@ def publisher(ctx):
     """Manipulate publisher
 
     """
-    mandatory_keys = [
-        'brokers', 'temporary_prefix', 'final_prefix', 'consumer_id',
-        'publisher_id', 'object_types', 'storage'
-    ]
-
     conf = ctx.obj['config']
-    missing_keys = []
-    for key in mandatory_keys:
-        if not conf.get(key):
-            missing_keys.append(key)
-
-    if missing_keys:
-        raise click.ClickException(
-            'Configuration error: The following keys must be'
-            ' provided: %s' % (','.join(missing_keys), ))
-
     publisher = JournalPublisher(conf)
     try:
         while True:

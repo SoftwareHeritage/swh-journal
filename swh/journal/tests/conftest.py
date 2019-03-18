@@ -23,12 +23,12 @@ from swh.journal.serializers import kafka_to_key, key_to_kafka, kafka_to_value
 
 
 TEST_CONFIG = {
-    'brokers': [],
+    'brokers': ['something'],  # this will be overriden in publisher setup
     'temporary_prefix': 'swh.tmp_journal.new',
     'final_prefix': 'swh.journal.objects',
     'consumer_id': 'swh.journal.publisher',
     'publisher_id': 'swh.journal.publisher',
-    'object_types': ['content'],
+    'object_types': ['something'],  # this will be overriden in publisher setup
     'max_messages': 1,  # will read 1 message and stops
     'storage': {'cls': 'memory', 'args': {}}
 }

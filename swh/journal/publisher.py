@@ -16,6 +16,12 @@ from .serializers import kafka_to_key, key_to_kafka
 logger = logging.getLogger(__name__)
 
 
+MANDATORY_KEYS = [
+    'brokers', 'temporary_prefix', 'final_prefix', 'consumer_id',
+    'publisher_id', 'object_types', 'storage'
+]
+
+
 class JournalPublisher:
     """The journal publisher is a layer in charge of:
 
@@ -29,10 +35,27 @@ class JournalPublisher:
     """
     def __init__(self, config):
         self.config = config
+        self.check_config(config)
         self._prepare_storage(config)
         self._prepare_journal(config)
         self.max_messages = self.config['max_messages']
         logger.setLevel(logging.DEBUG)
+
+    def check_config(self, config):
+        """Check the configuration is fine.
+
+        If not raise an error.
+
+        """
+        missing_keys = []
+        for key in MANDATORY_KEYS:
+            if not config.get(key):
+                missing_keys.append(key)
+
+        if missing_keys:
+            raise ValueError(
+                'Configuration error: The following keys must be'
+                ' provided: %s' % (','.join(missing_keys), ))
 
     def _prepare_journal(self, config):
         """Prepare the consumer and subscriber instances for the publisher to
