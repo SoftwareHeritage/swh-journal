@@ -6,7 +6,7 @@
 
 from kafka import KafkaConsumer, KafkaProducer
 from subprocess import Popen
-from typing import Tuple, Dict, Text
+from typing import Tuple, Text
 from swh.journal.serializers import value_to_kafka, kafka_to_value
 
 from swh.journal.publisher import JournalPublisher
