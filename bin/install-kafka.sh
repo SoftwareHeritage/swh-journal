@@ -15,43 +15,41 @@ KAFKA_CHECKSUM=a2e8168e8de6b45e8fca1f2883f0744d3c5a939b70d8a47a5428b72188501d4c2
 
 case $1 in
     "install")
-	echo "Kafka installation started."
-
+        echo "Kafka installation started."
         if [ ! -f $TARBALL ]; then
-          echo "Kafka download"
-          wget $URL
-          echo "${KAFKA_CHECKSUM}  ${TARBALL}" > $CHECKSUMS
-          sha512sum -c $CHECKSUMS
+            echo "Kafka download"
+            wget $URL
+            echo "${KAFKA_CHECKSUM}  ${TARBALL}" > $CHECKSUMS
+            sha512sum -c $CHECKSUMS
 
-          if [ $? -ne 0 ]; then
-            echo "Kafka download: failed to retrieve ${TARBALL}";
-            exit 1
-          fi
-          echo "Kafka download done"
+            if [ $? -ne 0 ]; then
+                echo "Kafka download: failed to retrieve ${TARBALL}";
+                exit 1
+            fi
+            echo "Kafka download done"
         fi
 
         if [ ! -d $KAFKA_DIR ]; then
-          echo "Kafka extraction"
-
-          tar xvf $TARBALL -C $KAFKA_ROOT_DIR
-          pushd $KAFKA_ROOT_DIR && ln -nsf $KAFKA_APP kafka && popd
-          echo "Kafka extraction done"
+            echo "Kafka extraction"
+            tar xvf $TARBALL -C $KAFKA_ROOT_DIR
+            pushd $KAFKA_ROOT_DIR && ln -nsf $KAFKA_APP kafka && popd
+            echo "Kafka extraction done"
         fi
-	echo "Kafka installation done. Kafka is installed at $KAFKA_DIR"
-	;;
+        echo "Kafka installation done. Kafka is installed at $KAFKA_DIR"
+        ;;
     "clean")
-	echo "Kafka cleanup started."
-	[ -d $KAFKA_DIR ] && rm -rf $KAFKA_DIR
-	[ -L $KAFKA_LINK ] && rm $KAFKA_LINK
-	echo "Kafka cleanup done."
-	;;
+        echo "Kafka cleanup started."
+        [ -d $KAFKA_DIR ] && rm -rf $KAFKA_DIR
+        [ -L $KAFKA_LINK ] && rm $KAFKA_LINK
+        echo "Kafka cleanup done."
+        ;;
     "clean-cache")
-	echo "Kafka cleanup cache started."
-	[ -f $TARBALL ] && rm $TARBALL
-	[ -f $CHECKSUMS ] && rm $CHECKSUMS
-	echo "Kafka cleanup cache done."
-	;;
+        echo "Kafka cleanup cache started."
+        [ -f $TARBALL ] && rm $TARBALL
+        [ -f $CHECKSUMS ] && rm $CHECKSUMS
+        echo "Kafka cleanup cache done."
+        ;;
     *)
-	echo "Unknown command, do nothing"
-	exit 1;
+        echo "Unknown command, do nothing"
+        exit 1;
 esac
