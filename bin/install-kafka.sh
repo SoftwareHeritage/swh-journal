@@ -45,6 +45,12 @@ case $1 in
 	[ -L $KAFKA_LINK ] && rm $KAFKA_LINK
 	echo "Kafka cleanup done."
 	;;
+    "clean-cache")
+	echo "Kafka cleanup cache started."
+	[ -f $TARBALL ] && rm $TARBALL
+	[ -f $CHECKSUMS ] && rm $CHECKSUMS
+	echo "Kafka cleanup cache done."
+	;;
     *)
 	echo "Unknown command, do nothing"
 	exit 1;
