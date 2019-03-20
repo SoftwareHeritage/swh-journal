@@ -1,0 +1,11 @@
+install:
+	bin/install-kafka.sh install
+
+clean:
+	bin/install-kafka.sh clean
+
+test-fast:
+	pytest
+
+test:
+	tox

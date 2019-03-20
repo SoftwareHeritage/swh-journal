@@ -9,10 +9,11 @@ for more details.
 
 # Local test
 
-As a pre-requisite, you need a kakfa instance.
+As a pre-requisite, you need a kakfa installation path.
+The following target will take care of this:
 
 ```
-./setup.py develop
+make install
 ```
 
 Then, provided you are in the right virtual environment as described

@@ -10,5 +10,6 @@ dist/
 version.txt
 .tox/
 kafka/
-kafka*.tgz
-kafka*.tar.gz
+kafka*.tgz*
+kafka*.tar.gz*
+swh/journal/tests/kafka*
