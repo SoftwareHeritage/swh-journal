@@ -146,8 +146,14 @@ class JournalPublisherTest(JournalPublisher):
             self.origin_visits = origin_visits
 
 
-KAFKA_ROOT = os.environ.get('SWH_KAFKA_ROOT', Path(__file__).parent)
-KAFKA_SCRIPTS = KAFKA_ROOT / 'kafka/bin/'
+KAFKA_ROOT = os.environ.get('SWH_KAFKA_ROOT')
+KAFKA_ROOT = KAFKA_ROOT if KAFKA_ROOT else os.path.dirname(__file__) + '/kafka'
+if not os.path.exists(KAFKA_ROOT):
+    msg = ('Development error: %s must exist and target an '
+           'existing kafka installation' % KAFKA_ROOT)
+    raise ValueError(msg)
+
+KAFKA_SCRIPTS = Path(KAFKA_ROOT) / 'bin'
 
 KAFKA_BIN = str(KAFKA_SCRIPTS / 'kafka-server-start.sh')
 ZOOKEEPER_BIN = str(KAFKA_SCRIPTS / 'zookeeper-server-start.sh')
