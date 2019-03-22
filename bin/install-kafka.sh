@@ -4,14 +4,15 @@ set -xe
 
 SCALA_VERSION=2.12
 KAFKA_VERSION=2.1.1
+KAFKA_CHECKSUM=a2e8168e8de6b45e8fca1f2883f0744d3c5a939b70d8a47a5428b72188501d4c2fc11bc35759f2392680d4e8ecf2fa9d0e518e77fd28393afba22194ad018b10
+
 KAFKA_APP="kafka_${SCALA_VERSION}-${KAFKA_VERSION}"
 TARBALL="${KAFKA_APP}.tgz"
+URL="http://apache.mirrors.ovh.net/ftp.apache.org/dist/kafka/${KAFKA_VERSION}/${TARBALL}"
 CHECKSUMS="${TARBALL}.sha512"
 KAFKA_ROOT_DIR=swh/journal/tests
 KAFKA_DIR="${KAFKA_ROOT_DIR}/${KAFKA_APP}"
 KAFKA_LINK="${KAFKA_ROOT_DIR}/kafka"
-URL="http://apache.mirrors.ovh.net/ftp.apache.org/dist/kafka/${KAFKA_VERSION}/${TARBALL}"
-KAFKA_CHECKSUM=a2e8168e8de6b45e8fca1f2883f0744d3c5a939b70d8a47a5428b72188501d4c2fc11bc35759f2392680d4e8ecf2fa9d0e518e77fd28393afba22194ad018b10
 
 case $1 in
     "install")
