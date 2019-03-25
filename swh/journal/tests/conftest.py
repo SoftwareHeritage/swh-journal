@@ -7,13 +7,13 @@ import os
 import pytest
 import logging
 
-from kafka import KafkaProducer
+from kafka import KafkaProducer, KafkaConsumer
 from subprocess import Popen
 from typing import Tuple, Dict
 
 from pathlib import Path
 from pytest_kafka import (
-    make_zookeeper_process, make_kafka_server, make_kafka_consumer
+    make_zookeeper_process, make_kafka_server, constants
 )
 
 from swh.journal.publisher import JournalPublisher
@@ -168,9 +168,19 @@ logger.setLevel(logging.WARN)
 
 
 @pytest.fixture
+def test_config():
+    """Test configuration needed for publisher/producer/consumer
+
+    """
+    return TEST_CONFIG
+
+
+@pytest.fixture
 def producer_to_publisher(
         request: 'SubRequest',  # noqa F821
-        kafka_server: Tuple[Popen, int]) -> KafkaProducer:  # noqa
+        kafka_server: Tuple[Popen, int],
+        test_config: Dict,
+) -> KafkaProducer:  # noqa
     """Producer to send message to the publisher's consumer.
 
     """
@@ -179,25 +189,51 @@ def producer_to_publisher(
         bootstrap_servers='localhost:{}'.format(port),
         key_serializer=key_to_kafka,
         value_serializer=key_to_kafka,
-        client_id=TEST_CONFIG['consumer_id'],
+        client_id=test_config['consumer_id'],
     )
     return producer
 
 
-# pytest fixture (no need for the annotation though or else it breaks)
-consumer_from_publisher = make_kafka_consumer(
-    'kafka_server',
-    seek_to_beginning=True,
-    key_deserializer=kafka_to_key,
-    value_deserializer=kafka_to_value,
-    auto_offset_reset='earliest',
-    enable_auto_commit=True,
-    client_id=TEST_CONFIG['publisher_id'],
-    kafka_topics=['dummy'])  # will be overriden during test setup
+@pytest.fixture
+def kafka_consumer(
+        request: 'SubRequest',   # noqa F821
+        test_config: Dict,
+) -> KafkaConsumer:
+    """Get a connected Kafka consumer.
+
+    """
+    kafka_topics = ['%s.%s' % (test_config['final_prefix'], object_type)
+                    for object_type in test_config['object_types']]
+    test_config['topics'] = kafka_topics
+
+    consumer_kwargs = dict(
+        key_deserializer=kafka_to_key,
+        value_deserializer=kafka_to_value,
+        auto_offset_reset='earliest',
+        enable_auto_commit=True,
+        client_id=test_config['publisher_id'])
+
+    _, kafka_port = request.getfixturevalue('kafka_server')
+
+    used_consumer_kwargs = consumer_kwargs.copy()
+    used_consumer_kwargs.setdefault('consumer_timeout_ms',
+                                    constants.DEFAULT_CONSUMER_TIMEOUT_MS)
+    used_consumer_kwargs.setdefault(
+        'bootstrap_servers', 'localhost:{}'.format(kafka_port))
+
+    consumer = KafkaConsumer(
+        *kafka_topics,
+        **used_consumer_kwargs,
+    )
+    return consumer
 
 
 def publisher(kafka_server: Tuple[Popen, int],
               config: Dict) -> JournalPublisher:
+    """Test Publisher factory. We cannot use a fixture here as we need to
+       modify the sample.
+
+    """
     # consumer and producer of the publisher needs to discuss with the
     # right instance
     _, port = kafka_server
