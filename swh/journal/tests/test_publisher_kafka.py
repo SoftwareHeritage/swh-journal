@@ -6,34 +6,27 @@
 
 from kafka import KafkaConsumer, KafkaProducer
 from subprocess import Popen
-from typing import Tuple, Text, Dict
+from typing import Tuple, Text
 from swh.journal.serializers import value_to_kafka, kafka_to_value
-
 from swh.journal.publisher import JournalPublisher
 
-from .conftest import (
-    TEST_CONFIG, CONTENTS, REVISIONS, RELEASES, publisher
-)
+from .conftest import TEST_CONFIG, OBJECT_TYPE_KEYS
 
 
-OBJECT_TYPE_KEYS = {
-    'content': (b'sha1', CONTENTS),
-    'revision': (b'id', REVISIONS),
-    'release': (b'id', RELEASES),
-}
-
-
-def assert_publish(publisher: JournalPublisher,
-                   consumer_from_publisher: KafkaConsumer,
-                   producer_to_publisher: KafkaProducer,
-                   object_type: Text):
+def assert_publish_ok(publisher: JournalPublisher,
+                      consumer_from_publisher: KafkaConsumer,
+                      producer_to_publisher: KafkaProducer,
+                      object_type: Text):
     """Assert that publishing object in the publisher is reified and
-    published in topics.
+    published in output topics.
 
     Args:
-        journal_publisher (JournalPublisher): publisher to read and write data
-        kafka_consumer (KafkaConsumer): To read data from the publisher
-        kafka_producer (KafkaProducer): To send data to the publisher
+        publisher (JournalPublisher): publisher to read and write data
+        consumer_from_publisher (KafkaConsumer): To read data from the
+                                                 publisher
+        producer_to_publisher (KafkaProducer): To send data to the publisher
+        object_type (str): Object type to look for (e.g content, revision,
+                                                    etc...)
 
     """
     # object type's id label key
@@ -72,34 +65,24 @@ def assert_publish(publisher: JournalPublisher,
 
 
 def test_publish(
+        publisher: JournalPublisher,
         kafka_server: Tuple[Popen, int],
         kafka_consumer: KafkaConsumer,
-        producer_to_publisher: KafkaProducer,
-        test_config: Dict):
+        producer_to_publisher: KafkaProducer):
     """
     Reading from and writing to the journal publisher should work (contents)
 
     Args:
         journal_publisher (JournalPublisher): publisher to read and write data
         kafka_consumer (KafkaConsumer): To read data from the publisher
-        kafka_producer (KafkaProducer): To send data to the publisher
+        producer_to_publisher (KafkaProducer): To send data to the publisher
 
     """
     # retrieve the object types we want to test
     object_types = OBJECT_TYPE_KEYS.keys()
-    # synchronize the publisher's config with the test
-    conf = test_config.copy()
-    conf['object_types'] = object_types
-    # instantiate the publisher (not a fixture due to initialization)
-    p = publisher(kafka_server, config=conf)
-
-    # Subscribe to the publisher's output topics
-    kafka_consumer.subscribe(
-        topics=['%s.%s' % (conf['final_prefix'], object_type)
-                for object_type in object_types])
-
     # Now for each object type, we'll send data to the publisher and
     # check that data is indeed fetched and reified in the publisher's
     # output topics
     for object_type in object_types:
-        assert_publish(p, kafka_consumer, producer_to_publisher, object_type)
+        assert_publish_ok(
+            publisher, kafka_consumer, producer_to_publisher, object_type)

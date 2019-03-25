@@ -22,17 +22,6 @@ from swh.model.hashutil import hash_to_bytes
 from swh.journal.serializers import kafka_to_key, key_to_kafka, kafka_to_value
 
 
-TEST_CONFIG = {
-    'brokers': ['something'],  # this will be overriden in publisher setup
-    'temporary_prefix': 'swh.tmp_journal.new',
-    'final_prefix': 'swh.journal.objects',
-    'consumer_id': 'swh.journal.publisher',
-    'publisher_id': 'swh.journal.publisher',
-    'object_types': ['something'],  # this will be overriden in publisher setup
-    'max_messages': 1,  # will read 1 message and stops
-    'storage': {'cls': 'memory', 'args': {}}
-}
-
 CONTENTS = [
     {
         'length': 3,
@@ -124,6 +113,24 @@ ORIGIN_VISITS = [
         'date': '2018-11-27T17:20:39.000000+00:00',
     }
 ]
+
+# From type to tuple (id, <objects instances to test>)
+OBJECT_TYPE_KEYS = {
+    'content': (b'sha1', CONTENTS),
+    'revision': (b'id', REVISIONS),
+    'release': (b'id', RELEASES),
+}
+
+
+TEST_CONFIG = {
+    'temporary_prefix': 'swh.tmp_journal.new',
+    'final_prefix': 'swh.journal.objects',
+    'consumer_id': 'swh.journal.publisher',
+    'publisher_id': 'swh.journal.publisher',
+    'object_types': OBJECT_TYPE_KEYS.keys(),
+    'max_messages': 1,  # will read 1 message and stops
+    'storage': {'cls': 'memory', 'args': {}}
+}
 
 
 class JournalPublisherTest(JournalPublisher):
@@ -228,8 +235,9 @@ def kafka_consumer(
     return consumer
 
 
+@pytest.fixture
 def publisher(kafka_server: Tuple[Popen, int],
-              config: Dict) -> JournalPublisher:
+              test_config: Dict) -> JournalPublisher:
     """Test Publisher factory. We cannot use a fixture here as we need to
        modify the sample.
 
@@ -237,5 +245,6 @@ def publisher(kafka_server: Tuple[Popen, int],
     # consumer and producer of the publisher needs to discuss with the
     # right instance
     _, port = kafka_server
-    config['brokers'] = ['localhost:{}'.format(port)]
-    return JournalPublisherTest(config)
+    test_config['brokers'] = ['localhost:{}'.format(port)]
+    publisher = JournalPublisherTest(test_config)
+    return publisher
