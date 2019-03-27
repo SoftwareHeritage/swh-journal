@@ -48,20 +48,17 @@ def assert_publish_ok(publisher: JournalPublisher,
         publisher.poll(max_messages=1)
 
     # then (client reads from the messages from output topic)
-    num = -1
-    for num, msg in enumerate(consumer_from_publisher):
-        expected_topic = '%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
-        assert expected_topic == msg.topic
+    expected_topic = '%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
+    expected_msgs = [
+        (
+            object_[object_key_id.decode()],
+            kafka_to_value(value_to_kafka(object_))
+        )
+        for object_ in expected_objects]
 
-        expected_key = objects[num][object_key_id]
-        assert expected_key == msg.key
-
-        # Transformation is needed due to our back and forth
-        # serialization to kafka
-        expected_value = kafka_to_value(value_to_kafka(expected_objects[num]))
-        assert expected_value == msg.value
-
-    assert num + 1 == len(expected_objects)
+    msgs = list(consumer_from_publisher)
+    assert all(msg.topic == expected_topic for msg in msgs)
+    assert [(msg.key, msg.value) for msg in msgs] == expected_msgs
 
 
 def test_publish(
