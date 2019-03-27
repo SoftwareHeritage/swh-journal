@@ -116,9 +116,9 @@ ORIGIN_VISITS = [
 
 # From type to tuple (id, <objects instances to test>)
 OBJECT_TYPE_KEYS = {
-    'content': (b'sha1', CONTENTS),
-    'revision': (b'id', REVISIONS),
-    'release': (b'id', RELEASES),
+    'content': ('sha1', CONTENTS),
+    'revision': ('id', REVISIONS),
+    'release': ('id', RELEASES),
 }
 
 

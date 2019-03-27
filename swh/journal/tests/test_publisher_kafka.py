@@ -6,7 +6,8 @@
 
 from kafka import KafkaConsumer, KafkaProducer
 from subprocess import Popen
-from typing import Tuple, Text
+from typing import Tuple
+
 from swh.journal.serializers import value_to_kafka, kafka_to_value
 from swh.journal.publisher import JournalPublisher
 
@@ -16,7 +17,7 @@ from .conftest import TEST_CONFIG, OBJECT_TYPE_KEYS
 def assert_publish_ok(publisher: JournalPublisher,
                       consumer_from_publisher: KafkaConsumer,
                       producer_to_publisher: KafkaProducer,
-                      object_type: Text):
+                      object_type: str):
     """Assert that publishing object in the publisher is reified and
     published in output topics.
 
@@ -32,7 +33,7 @@ def assert_publish_ok(publisher: JournalPublisher,
     # object type's id label key
     object_key_id, expected_objects = OBJECT_TYPE_KEYS[object_type]
     # objects to send to the publisher
-    objects = [{object_key_id: c[object_key_id.decode()]}
+    objects = [{object_key_id: c[object_key_id]}
                for c in expected_objects]
 
     # send message to the publisher
@@ -51,7 +52,7 @@ def assert_publish_ok(publisher: JournalPublisher,
     expected_topic = '%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
     expected_msgs = [
         (
-            object_[object_key_id.decode()],
+            object_[object_key_id],
             kafka_to_value(value_to_kafka(object_))
         )
         for object_ in expected_objects]
