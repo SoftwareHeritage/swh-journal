@@ -44,14 +44,12 @@ def assert_publish_ok(publisher: JournalPublisher,
 
     nb_messages = len(objects)
 
-    # publisher should poll 1 message and send 1 reified object
-    publisher.poll(max_messages=nb_messages)
+    for _ in range(nb_messages):
+        publisher.poll(max_messages=1)
 
     # then (client reads from the messages from output topic)
-    msgs = []
+    num = -1
     for num, msg in enumerate(consumer_from_publisher):
-        msgs.append((msg.topic, msg.key, msg.value))
-
         expected_topic = '%s.%s' % (TEST_CONFIG['final_prefix'], object_type)
         assert expected_topic == msg.topic
 
@@ -62,6 +60,8 @@ def assert_publish_ok(publisher: JournalPublisher,
         # serialization to kafka
         expected_value = kafka_to_value(value_to_kafka(expected_objects[num]))
         assert expected_value == msg.value
+
+    assert num + 1 == len(expected_objects)
 
 
 def test_publish(

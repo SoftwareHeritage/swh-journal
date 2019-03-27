@@ -218,7 +218,7 @@ def kafka_consumer(
         value_deserializer=kafka_to_value,
         auto_offset_reset='earliest',
         enable_auto_commit=True,
-        client_id=test_config['publisher_id'])
+        group_id="test-consumer")
 
     _, kafka_port = request.getfixturevalue('kafka_server')
 
@@ -232,6 +232,13 @@ def kafka_consumer(
         *kafka_topics,
         **used_consumer_kwargs,
     )
+
+    # Enforce auto_offset_reset=earliest even if the consumer was created
+    # too soon wrt the server.
+    while len(consumer.assignment()) == 0:
+        consumer.poll(timeout_ms=20)
+    consumer.seek_to_beginning()
+
     return consumer
 
 

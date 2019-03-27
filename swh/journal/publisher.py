@@ -111,12 +111,12 @@ class JournalPublisher:
         for num, message in enumerate(self.consumer):
             object_type = message.topic.split('.')[-1]
             logger.debug('num: %s, object_type: %s, message: %s' % (
-                num, object_type, message))
+                num+1, object_type, message))
             messages[object_type].append(message.value)
             if num + 1 >= self.max_messages:
                 break
 
-        logger.debug('number of messages: %s', num)
+        logger.debug('number of messages: %s', num+1)
 
         new_objects = self.process_objects(messages)
         self.produce_messages(new_objects)
