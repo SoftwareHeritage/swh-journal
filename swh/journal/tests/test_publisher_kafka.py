@@ -64,15 +64,15 @@ def assert_publish_ok(publisher: JournalPublisher,
 def test_publish(
         publisher: JournalPublisher,
         kafka_server: Tuple[Popen, int],
-        kafka_consumer: KafkaConsumer,
+        consumer_from_publisher: KafkaConsumer,
         producer_to_publisher: KafkaProducer):
     """
     Reading from and writing to the journal publisher should work (contents)
 
     Args:
         journal_publisher (JournalPublisher): publisher to read and write data
-        kafka_consumer (KafkaConsumer): To read data from the publisher
-        producer_to_publisher (KafkaProducer): To send data to the publisher
+        consumer_from_publisher (KafkaConsumer): To read data from publisher
+        producer_to_publisher (KafkaProducer): To send data to publisher
 
     """
     # retrieve the object types we want to test
@@ -82,4 +82,5 @@ def test_publish(
     # output topics
     for object_type in object_types:
         assert_publish_ok(
-            publisher, kafka_consumer, producer_to_publisher, object_type)
+            publisher, consumer_from_publisher, producer_to_publisher,
+            object_type)
