@@ -168,6 +168,9 @@ ZOOKEEPER_BIN = str(KAFKA_SCRIPTS / 'zookeeper-server-start.sh')
 
 # Those defines fixtures
 zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN)
+os.environ['KAFKA_LOG4J_OPTS'] = \
+    '-Dlog4j.configuration=file:%s/log4j.properties' % \
+    os.path.dirname(__file__)
 kafka_server = make_kafka_server(KAFKA_BIN, 'zookeeper_proc')
 
 logger = logging.getLogger('kafka')
