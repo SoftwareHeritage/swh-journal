@@ -33,8 +33,12 @@ def assert_publish_ok(publisher: JournalPublisher,
     # object type's id label key
     object_key_id, expected_objects = OBJECT_TYPE_KEYS[object_type]
     # objects to send to the publisher
-    objects = [{object_key_id: c[object_key_id]}
-               for c in expected_objects]
+    if object_key_id:
+        objects = [{object_key_id: c[object_key_id]}
+                   for c in expected_objects]
+    else:
+        # TODO: add support for origin and origin_visit
+        return
 
     # send message to the publisher
     for obj in objects:

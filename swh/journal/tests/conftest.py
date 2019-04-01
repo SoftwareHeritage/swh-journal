@@ -37,11 +37,11 @@ CONTENTS = [
 COMMITTER = [
     {
         'id': 1,
-        'fullname': 'foo',
+        'fullname': b'foo',
     },
     {
         'id': 2,
-        'fullname': 'bar',
+        'fullname': b'bar',
     }
 ]
 
@@ -107,9 +107,11 @@ ORIGINS = [
 
 ORIGIN_VISITS = [
     {
+        'origin': ORIGINS[0],
         'date': '2013-05-07T04:20:39.369271+00:00',
     },
     {
+        'origin': ORIGINS[0],
         'date': '2018-11-27T17:20:39.000000+00:00',
     }
 ]
@@ -119,6 +121,8 @@ OBJECT_TYPE_KEYS = {
     'content': ('sha1', CONTENTS),
     'revision': ('id', REVISIONS),
     'release': ('id', RELEASES),
+    'origin': (None, ORIGINS),
+    'origin_visit': (None, ORIGIN_VISITS),
 }
 
 
