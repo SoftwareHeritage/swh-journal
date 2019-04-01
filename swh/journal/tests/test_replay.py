@@ -65,14 +65,12 @@ def test_storage_play(
     for origin in origins:
         expected_visits = [
             {
+                **visit,
                 'origin': origin['id'],
                 'date': dateutil.parser.parse(visit['date']),
-                'snapshot': None,  # TODO
-                'status': 'ongoing',  # TODO
-                'metadata': None,  # TODO
             }
             for visit in OBJECT_TYPE_KEYS['origin_visit'][1]
-            if visit['origin']['url'] == origin['url'] \
+            if visit['origin']['url'] == origin['url']
             and visit['origin']['type'] == origin['type']
         ]
         actual_visits = list(storage.origin_visit_get(origin['id']))

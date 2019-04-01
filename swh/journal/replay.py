@@ -64,7 +64,9 @@ class StorageReplayer:
             method([object_])
         elif object_type == 'origin_visit':
             origin_id = storage.origin_add_one(object_.pop('origin'))
-            storage.origin_visit_add(origin=origin_id, **object_)
-            method = getattr(storage, object_type + '_add')
+            visit = storage.origin_visit_add(
+                origin=origin_id, date=object_.pop('date'))
+            storage.origin_visit_update(
+                origin_id, visit['visit'], **object_)
         else:
             assert False

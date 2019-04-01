@@ -108,11 +108,17 @@ ORIGINS = [
 ORIGIN_VISITS = [
     {
         'origin': ORIGINS[0],
-        'date': '2013-05-07T04:20:39.369271+00:00',
+        'date': '2013-05-07 04:20:39.369271+00:00',
+        'snapshot': None,  # TODO
+        'status': 'ongoing',  # TODO
+        'metadata': {'foo': 'bar'},
     },
     {
         'origin': ORIGINS[0],
-        'date': '2018-11-27T17:20:39.000000+00:00',
+        'date': '2018-11-27 17:20:39+00:00',
+        'snapshot': None,  # TODO
+        'status': 'ongoing',  # TODO
+        'metadata': {'baz': 'qux'},
     }
 ]
 
