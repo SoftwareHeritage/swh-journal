@@ -19,8 +19,10 @@ from .conftest import OBJECT_TYPE_KEYS
 
 
 def test_storage_play(
+        kafka_prefix: str,
         kafka_server: Tuple[Popen, int]):
     (_, port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
 
     storage = get_storage('memory', {})
 
@@ -34,7 +36,7 @@ def test_storage_play(
     # Fill Kafka
     nb_sent = 0
     for (object_type, (_, objects)) in OBJECT_TYPE_KEYS.items():
-        topic = 'swh.journal.objects.' + object_type
+        topic = kafka_prefix + '.' + object_type
         for object_ in objects:
             key = bytes(random.randint(0, 255) for _ in range(40))
             producer.send(topic, key=key, value=object_)
@@ -44,7 +46,7 @@ def test_storage_play(
     config = {
         'brokers': 'localhost:%d' % kafka_server[1],
         'consumer_id': 'replayer',
-        'prefix': 'swh.journal.objects',
+        'prefix': kafka_prefix,
     }
     replayer = StorageReplayer(**config)
     nb_inserted = replayer.fill(storage, max_messages=nb_sent)

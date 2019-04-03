@@ -128,20 +128,20 @@ class JournalPublisherCheckTest(JournalPublisherTest):
         pass
 
 
-def test_check_config_ok():
+def test_check_config_ok(test_config):
     """Instantiate a publisher with the right config is fine
 
     """
-    publisher = JournalPublisherCheckTest(TEST_CONFIG)
+    publisher = JournalPublisherCheckTest(test_config)
     assert publisher is not None
 
 
-def test_check_config_ko():
+def test_check_config_ko(test_config):
     """Instantiate a publisher with the wrong config should raise
 
     """
     for k in MANDATORY_KEYS:
-        conf = TEST_CONFIG.copy()
+        conf = test_config.copy()
         conf.pop(k)
         with pytest.raises(ValueError) as e:
             JournalPublisherCheckTest(conf)

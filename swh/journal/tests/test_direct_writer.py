@@ -18,7 +18,7 @@ from swh.journal.serializers import value_to_kafka, kafka_to_value
 from .conftest import OBJECT_TYPE_KEYS
 
 
-def assert_written(consumer):
+def assert_written(consumer, kafka_prefix):
     time.sleep(0.1)  # Without this, some messages are missing
 
     consumed_objects = defaultdict(list)
@@ -26,7 +26,7 @@ def assert_written(consumer):
         consumed_objects[msg.topic].append((msg.key, msg.value))
 
     for (object_type, (key_name, objects)) in OBJECT_TYPE_KEYS.items():
-        topic = 'swh.journal.objects.%s' % object_type
+        topic = kafka_prefix + '.' + object_type
         (keys, values) = zip(*consumed_objects[topic])
         if key_name:
             assert list(keys) == [object_[key_name] for object_ in objects]
@@ -42,13 +42,15 @@ def assert_written(consumer):
 
 
 def test_direct_writer(
+        kafka_prefix: str,
         kafka_server: Tuple[Popen, int],
         consumer_from_publisher: KafkaConsumer):
+    kafka_prefix += '.swh.journal.objects'
 
     config = {
         'brokers': 'localhost:%d' % kafka_server[1],
         'client_id': 'direct_writer',
-        'prefix': 'swh.journal.objects',
+        'prefix': kafka_prefix,
     }
 
     writer = DirectKafkaWriter(**config)
@@ -59,17 +61,19 @@ def test_direct_writer(
                 object_ = {**object_, 'visit': num}
             writer.write_addition(object_type, object_)
 
-    assert_written(consumer_from_publisher)
+    assert_written(consumer_from_publisher, kafka_prefix)
 
 
 def test_storage_direct_writer(
+        kafka_prefix: str,
         kafka_server: Tuple[Popen, int],
         consumer_from_publisher: KafkaConsumer):
+    kafka_prefix += '.swh.journal.objects'
 
     config = {
         'brokers': 'localhost:%d' % kafka_server[1],
         'client_id': 'direct_writer',
-        'prefix': 'swh.journal.objects',
+        'prefix': kafka_prefix,
     }
 
     storage = get_storage('memory', {'journal_writer': {
@@ -92,4 +96,4 @@ def test_storage_direct_writer(
         else:
             assert False, object_type
 
-    assert_written(consumer_from_publisher)
+    assert_written(consumer_from_publisher, kafka_prefix)

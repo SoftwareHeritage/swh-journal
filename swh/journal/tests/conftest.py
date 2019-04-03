@@ -6,6 +6,8 @@
 import os
 import pytest
 import logging
+import random
+import string
 
 from kafka import KafkaProducer, KafkaConsumer
 from subprocess import Popen
@@ -132,17 +134,6 @@ OBJECT_TYPE_KEYS = {
 }
 
 
-TEST_CONFIG = {
-    'temporary_prefix': 'swh.tmp_journal.new',
-    'final_prefix': 'swh.journal.objects',
-    'consumer_id': 'swh.journal.publisher',
-    'publisher_id': 'swh.journal.publisher',
-    'object_types': OBJECT_TYPE_KEYS.keys(),
-    'max_messages': 1,  # will read 1 message and stops
-    'storage': {'cls': 'memory', 'args': {}}
-}
-
-
 class JournalPublisherTest(JournalPublisher):
     """A journal publisher which override the default configuration
        parsing setup.
@@ -177,22 +168,45 @@ ZOOKEEPER_BIN = str(KAFKA_SCRIPTS / 'zookeeper-server-start.sh')
 
 
 # Those defines fixtures
-zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN)
+zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN, scope='session')
 os.environ['KAFKA_LOG4J_OPTS'] = \
     '-Dlog4j.configuration=file:%s/log4j.properties' % \
     os.path.dirname(__file__)
-kafka_server = make_kafka_server(KAFKA_BIN, 'zookeeper_proc')
+kafka_server = make_kafka_server(KAFKA_BIN, 'zookeeper_proc', scope='session')
 
 logger = logging.getLogger('kafka')
 logger.setLevel(logging.WARN)
 
 
+@pytest.fixture(scope='function')
+def kafka_prefix():
+    return ''.join(random.choice(string.ascii_lowercase) for _ in range(10))
+
+
+TEST_CONFIG = {
+    'temporary_prefix': 'swh.tmp_journal.new',
+    'final_prefix': 'swh.journal.objects',
+    'consumer_id': 'swh.journal.publisher',
+    'publisher_id': 'swh.journal.publisher',
+    'object_types': OBJECT_TYPE_KEYS.keys(),
+    'max_messages': 1,  # will read 1 message and stops
+    'storage': {'cls': 'memory', 'args': {}},
+}
+
+
 @pytest.fixture
-def test_config():
+def test_config(kafka_server: Tuple[Popen, int],
+                kafka_prefix: str):
     """Test configuration needed for publisher/producer/consumer
 
     """
-    return TEST_CONFIG
+    _, port = kafka_server
+    return {
+        **TEST_CONFIG,
+        'brokers': ['localhost:{}'.format(port)],
+        'temporary_prefix': kafka_prefix + '.swh.tmp_journal.new',
+        'final_prefix': kafka_prefix + '.swh.journal.objects',
+    }
 
 
 @pytest.fixture
@@ -219,8 +233,9 @@ def consumer_from_publisher(kafka_server: Tuple[Popen, int],
     """Get a connected Kafka consumer.
 
     """
-    kafka_topics = ['%s.%s' % (test_config['final_prefix'], object_type)
-                    for object_type in test_config['object_types']]
+    kafka_topics = [
+        '%s.%s' % (test_config['final_prefix'], object_type)
+        for object_type in test_config['object_types']]
     _, kafka_port = kafka_server
     consumer = KafkaConsumer(
         *kafka_topics,
@@ -251,7 +266,5 @@ def publisher(kafka_server: Tuple[Popen, int],
     """
     # consumer and producer of the publisher needs to discuss with the
     # right instance
-    _, port = kafka_server
-    test_config['brokers'] = ['localhost:{}'.format(port)]
     publisher = JournalPublisherTest(test_config)
     return publisher
