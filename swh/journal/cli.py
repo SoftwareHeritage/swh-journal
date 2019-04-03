@@ -8,7 +8,10 @@ import logging
 import os
 
 from swh.core import config
+from swh.storage import get_storage
+
 from swh.journal.publisher import JournalPublisher
+from swh.journal.replay import StorageReplayer
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
@@ -64,6 +67,32 @@ def publisher(ctx):
             publisher.poll()
     except KeyboardInterrupt:
         ctx.exit(0)
+
+
+@cli.command()
+@click.option('--max-messages', '-m', default=None, type=int,
+              help='Maximum number of objects to replay. Default is to '
+                   'run forever.')
+@click.option('--broker', 'brokers', type=str, multiple=True,
+              help='Kafka broker to connect to.')
+@click.option('--prefix', type=str, default='swh.journal.objects',
+              help='Prefix of Kafka topic names to read from.')
+@click.option('--consumer-id', type=str,
+              help='Name of the consumer/group id for reading from Kafka.')
+@click.pass_context
+def replay(ctx, brokers, prefix, consumer_id, max_messages):
+    """Fill a new storage by reading a journal.
+
+    """
+    conf = ctx.obj['config']
+    storage = get_storage(**conf.pop('storage'))
+    replayer = StorageReplayer(brokers, prefix, consumer_id)
+    try:
+        replayer.fill(storage, max_messages=max_messages)
+    except KeyboardInterrupt:
+        ctx.exit(0)
+    else:
+        print('Done.')
 
 
 def main():

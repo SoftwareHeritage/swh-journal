@@ -38,7 +38,7 @@ class StorageReplayer:
                     for object_type in object_types],
         )
 
-    def fill(self, storage, max_messages):
+    def fill(self, storage, max_messages=None):
         num = 0
         for message in self.consumer:
             object_type = message.topic.split('.')[-1]
@@ -49,13 +49,13 @@ class StorageReplayer:
             self.insert_object(storage, object_type, message.value)
 
             num += 1
-            if num >= max_messages:
+            if max_messages and num >= max_messages:
                 break
         return num
 
     def insert_object(self, storage, object_type, object_):
         if object_type in ('content', 'directory', 'revision', 'release',
-                           'origin'):
+                           'snapshot', 'origin'):
             if object_type == 'content':
                 # TODO: we don't write contents in Kafka, so we need to
                 # find a way to insert them somehow.
