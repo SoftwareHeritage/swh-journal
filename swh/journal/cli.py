@@ -11,6 +11,7 @@ from swh.core import config
 from swh.storage import get_storage
 
 from swh.journal.replay import StorageReplayer
+from swh.journal.backfill import JournalBackfiller
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
@@ -78,6 +79,20 @@ def replay(ctx, brokers, prefix, consumer_id, max_messages):
         ctx.exit(0)
     else:
         print('Done.')
+
+
+@cli.command()
+@click.pass_context
+def backfiller(ctx):
+    """Manipulate backfiller
+
+    """
+    conf = ctx.obj['config']
+    backfiller = JournalBackfiller(conf)
+    try:
+        backfiller.run()
+    except KeyboardInterrupt:
+        ctx.exit(0)
 
 
 def main():
