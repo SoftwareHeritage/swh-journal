@@ -26,6 +26,9 @@ class DirectKafkaWriter:
             client_id=client_id,
         )
 
+    def send(self, topic, key, value):
+        self.producer.send(topic=topic, key=key, value=value)
+
     def _get_key(self, object_type, object_):
         if object_type in ('revision', 'release', 'directory', 'snapshot'):
             return object_['id']
@@ -48,6 +51,8 @@ class DirectKafkaWriter:
                 **object_,
                 'date': str(object_['date']),
             }
+        elif object_type == 'origin':
+            assert 'id' not in object_
         return object_
 
     def write_addition(self, object_type, object_):
@@ -55,7 +60,7 @@ class DirectKafkaWriter:
         key = self._get_key(object_type, object_)
         object_ = self._sanitize_object(object_type, object_)
         logger.debug('topic: %s, key: %s, value: %s' % (topic, key, object_))
-        self.producer.send(topic, key=key, value=object_)
+        self.send(topic, key=key, value=object_)
 
     write_update = write_addition
 

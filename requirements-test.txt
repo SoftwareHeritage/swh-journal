@@ -1,3 +1,4 @@
 pytest
 swh.model
 pytest-kafka
+hypothesis

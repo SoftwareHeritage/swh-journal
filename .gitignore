@@ -13,3 +13,4 @@ kafka/
 kafka*.tgz*
 kafka*.tar.gz*
 swh/journal/tests/kafka*
+.hypothesis/

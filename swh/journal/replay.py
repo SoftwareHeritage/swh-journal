@@ -38,9 +38,12 @@ class StorageReplayer:
                     for object_type in object_types],
         )
 
+    def poll(self):
+        yield from self.consumer
+
     def fill(self, storage, max_messages=None):
         num = 0
-        for message in self.consumer:
+        for message in self.poll():
             object_type = message.topic.split('.')[-1]
 
             # Got a message from a topic we did not subscribe to.
