@@ -10,8 +10,8 @@ from swh.journal.backfill import JournalBackfiller, TYPE_TO_PRIMARY_KEY
 
 TEST_CONFIG = {
     'brokers': ['localhost'],
-    'temporary_prefix': 'swh.tmp_journal.new',
-    'publisher_id': 'swh.journal.publisher.test',
+    'final_prefix': 'swh.tmp_journal.new',
+    'client_id': 'swh.journal.publisher.test',
     'object_types': ['content', 'revision', 'release'],
     'storage_dbconn': 'service=swh-dev',
 }
