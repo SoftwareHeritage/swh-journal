@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import datetime
 import random
 from subprocess import Popen
 from typing import Tuple
@@ -33,12 +34,17 @@ def test_storage_play(
         client_id='test producer',
     )
 
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
     # Fill Kafka
     nb_sent = 0
     for (object_type, (_, objects)) in OBJECT_TYPE_KEYS.items():
         topic = kafka_prefix + '.' + object_type
         for object_ in objects:
             key = bytes(random.randint(0, 255) for _ in range(40))
+            object_ = object_.copy()
+            if object_type == 'content':
+                object_['ctime'] = now
             producer.send(topic, key=key, value=object_)
             nb_sent += 1
 
@@ -79,4 +85,8 @@ def test_storage_play(
         for visit in actual_visits:
             del visit['visit']  # opaque identifier
         assert expected_visits == actual_visits
-    # TODO: check for content
+
+    contents = list(storage.content_get_metadata(
+            [cont['sha1'] for cont in OBJECT_TYPE_KEYS['content'][1]]))
+    assert None not in contents
+    assert contents == OBJECT_TYPE_KEYS['content'][1]

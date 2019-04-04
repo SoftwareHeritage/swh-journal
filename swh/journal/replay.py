@@ -57,10 +57,9 @@ class StorageReplayer:
         if object_type in ('content', 'directory', 'revision', 'release',
                            'snapshot', 'origin'):
             if object_type == 'content':
-                # TODO: we don't write contents in Kafka, so we need to
-                # find a way to insert them somehow.
-                object_['status'] = 'absent'
-            method = getattr(storage, object_type + '_add')
+                method = storage.content_add_metadata
+            else:
+                method = getattr(storage, object_type + '_add')
             method([object_])
         elif object_type == 'origin_visit':
             origin_id = storage.origin_add_one(object_.pop('origin'))
