@@ -21,16 +21,15 @@ from .direct_writer import DirectKafkaWriter
 
 from swh.core.db import typecast_bytea
 
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 
 RANGE_GENERATORS = {
     'content': lambda start, end: byte_ranges(24, start, end),
     'skipped_content': lambda start, end: [(None, None)],
 }
 
-# Defining the key components per object type
-TYPE_TO_PARTITION_KEY = {
+PARTITION_KEY = {
     'content': ['sha1'],
     'skipped_content': None,  # unused
     # 'directory': ['id'],
@@ -40,8 +39,7 @@ TYPE_TO_PARTITION_KEY = {
     # 'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
 }
 
-# The columns to read per object type
-TYPE_TO_COLUMNS = {
+COLUMNS = {
     'content': [
         'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'status',
         'ctime'
@@ -161,11 +159,11 @@ def fetch(db_conn, obj_type, start, end):
         Objects in the given range
 
     """
-    columns = TYPE_TO_COLUMNS.get(obj_type)
+    columns = COLUMNS.get(obj_type)
     if not columns:
         raise ValueError('The object type %s is not supported. '
                          'Only possible values are %s' % (
-                             obj_type, TYPE_TO_PARTITION_KEY.keys()))
+                             obj_type, PARTITION_KEY.keys()))
     where = []
     where_args = []
     if start:
@@ -178,7 +176,7 @@ def fetch(db_conn, obj_type, start, end):
     where_clause = ''
     if where:
         where_clause = ('where ' + ' and '.join(where)) % {
-            'keys': '(%s)' % ','.join(TYPE_TO_PARTITION_KEY[obj_type])
+            'keys': '(%s)' % ','.join(PARTITION_KEY[obj_type])
         }
 
     columns_str = ','.join(columns)
