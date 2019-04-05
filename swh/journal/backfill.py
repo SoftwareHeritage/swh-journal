@@ -33,7 +33,7 @@ PARTITION_KEY = {
     'release': ['release.id'],
     # 'snapshot': ['id'],
     'origin': ['id'],
-    # 'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
+    'origin_visit': ['origin_visit.origin'],
 }
 
 COLUMNS = {
@@ -88,7 +88,7 @@ COLUMNS = {
     ],
     # 'snapshot': ['id'],
     'origin': ['type', 'url'],
-    # 'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
+    'origin_visit': ['type', 'url', 'date', 'snapshot', 'status'],
 }
 
 
@@ -96,6 +96,7 @@ JOINS = {
     'release': ['person a on release.author=a.id'],
     'revision': ['person a on revision.author=a.id',
                  'person c on revision.committer=c.id'],
+    'origin_visit': ['origin on origin_visit.origin=origin.id'],
 }
 
 
@@ -212,6 +213,7 @@ RANGE_GENERATORS = {
     'release': lambda start, end: byte_ranges(16, start, end),
     'snapshot': lambda start, end: byte_ranges(16, start, end),
     'origin': integer_ranges,
+    'origin_visit': integer_ranges,
 }
 
 
@@ -362,7 +364,7 @@ class JournalBackfiller:
                              'The only possible values are %s' % (
                                  object_type, ', '.join(COLUMNS.keys())))
 
-        if object_type == 'origin':
+        if object_type in ['origin', 'origin_visit']:
             if start_object:
                 start_object = int(start_object)
             else:
