@@ -17,40 +17,39 @@ storage and sends every object identifier back to the journal.
 import logging
 import psycopg2
 
-from kafka import KafkaProducer
-
-from .serializers import key_to_kafka
+from .direct_writer import DirectKafkaWriter
 
 from swh.core.db import typecast_bytea
 
+logger = logging.getLogger(__name__)
+
 
 # Defining the key components per object type
-TYPE_TO_PRIMARY_KEY = {
-    'content': ['sha1', 'sha1_git', 'sha256', 'blake2s256'],
-    'skipped_content': ['sha1', 'sha1_git', 'sha256', 'blake2s256'],
-    'origin': ['type', 'url'],
-    'directory': ['id'],
-    'revision': ['id'],
-    'release': ['id'],
-    'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
+TYPE_TO_PARTITION_KEY = {
+    'content': ['sha1'],
+    # 'skipped_content': ['sha1'],
+    # 'directory': ['id'],
+    # 'revision': ['id'],
+    # 'release': ['id'],
+    # 'origin': ['type', 'url'],
+    # 'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
 }
 
 # The columns to read per object type
 TYPE_TO_COLUMNS = {
     'content': [
         'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'status',
-        # 'ctime'  # fix the conversion
+        'ctime'  # fix the conversion
     ],
-    'skipped_content': [
-        'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'ctime',
-        'status', 'reason',
-    ],
-    'origin': ['type', 'url'],
-    'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
-    'directory': ['id'],
-    'revision': ['id'],
-    'release': ['id'],
-
+    # 'skipped_content': [
+    #     'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'ctime',
+    #     'status', 'reason',
+    # ],
+    # 'origin': ['type', 'url'],
+    # 'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
+    # 'directory': ['id'],
+    # 'revision': ['id'],
+    # 'release': ['id'],
 }
 
 
@@ -71,11 +70,12 @@ def fetch(db_conn, obj_type):
     if not columns:
         raise ValueError('The object type %s is not supported. '
                          'Only possible values are %s' % (
-                             obj_type, TYPE_TO_PRIMARY_KEY.keys()))
+                             obj_type, TYPE_TO_PARTITION_KEY.keys()))
 
     columns_str = ','.join(columns)
-    query = 'select %s from %s order by %s' % (
-        columns_str, obj_type, columns_str)
+    query = 'select %s from %s order by %s limit 1000' % (
+        columns_str, obj_type, ','.join(TYPE_TO_PARTITION_KEY[obj_type]))
+    logging.debug('query: %s', query)
     server_side_cursor_name = 'swh.journal.%s' % obj_type
 
     def cursor_setup(conn, server_side_cursor_name):
@@ -96,19 +96,15 @@ def fetch(db_conn, obj_type):
 
         return cur
 
-    logging.basicConfig(level=logging.DEBUG)
     with psycopg2.connect(db_conn) as conn:
         cursor = cursor_setup(conn, server_side_cursor_name)
+        logger.debug('Fetching data for table %s', obj_type)
         cursor.execute(query)
-        component_keys = TYPE_TO_PRIMARY_KEY[obj_type]
-        logging.debug('component_keys: %s' % component_keys)
         for row in cursor:
             record = dict(zip(columns, row))
-            logging.debug('record: %s' % record)
-            logging.debug('keys: %s' % record.keys())
-            composite_key = tuple((record[k] for k in component_keys))
-            logging.debug(composite_key)
-            yield composite_key, record
+            logger.debug('record: %s' % record)
+            logger.debug('keys: %s' % record.keys())
+            yield record
 
 
 MANDATORY_KEYS = [
@@ -130,11 +126,10 @@ class JournalBackfiller:
         self.object_types = self.config['object_types']
         self.storage_dbconn = self.config['storage_dbconn']
 
-        self.producer = KafkaProducer(
-            bootstrap_servers=config['brokers'],
-            key_serializer=key_to_kafka,
-            value_serializer=key_to_kafka,
-            client_id=config['client_id'],
+        self.writer = DirectKafkaWriter(
+            brokers=config['brokers'],
+            prefix=config['final_prefix'],
+            client_id=config['client_id']
         )
 
     def check_config(self, config):
@@ -150,11 +145,11 @@ class JournalBackfiller:
 
         object_types = config['object_types']
         for obj_type in object_types:
-            if obj_type not in TYPE_TO_PRIMARY_KEY:
+            if obj_type not in TYPE_TO_PARTITION_KEY:
                 raise ValueError('The object type %s is not supported. '
                                  'Possible values are %s' % (
                                      obj_type,
-                                     ', '.join(TYPE_TO_PRIMARY_KEY)))
+                                     ', '.join(TYPE_TO_PARTITION_KEY)))
 
     def _read_storage(self):
         """Read storage's objects and generates tuple as object_type, dict of
@@ -165,19 +160,17 @@ class JournalBackfiller:
 
         """
         for obj_type in self.object_types:
-            for obj_key, obj in fetch(self.storage_dbconn, obj_type):
-                yield obj_type, obj_key, obj
+            for obj in fetch(self.storage_dbconn, obj_type):
+                yield obj_type, obj
 
     def run(self):
         """Reads storage's subscribed object types and send them to the
            publisher's reading queue.
 
         """
-        for obj_type, obj_key, obj in self._read_storage():
-            topic = '%s.%s' % (self.config['final_prefix'], obj_type)
-            logging.debug('topic: %s, key: %s, value: %s' % (
-                topic, obj_key, obj))
-            self.producer.send(topic, key=obj_key, value=obj)
+
+        for obj_type, obj in self._read_storage():
+            self.writer.write_addition(object_type=obj_type, object_=obj)
 
 
 if __name__ == '__main__':
