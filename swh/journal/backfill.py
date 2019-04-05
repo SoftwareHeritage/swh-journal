@@ -20,6 +20,7 @@ import psycopg2
 from .direct_writer import DirectKafkaWriter
 
 from swh.core.db import typecast_bytea
+from swh.storage.converters import db_to_release
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,10 @@ logger = logging.getLogger(__name__)
 RANGE_GENERATORS = {
     'content': lambda start, end: byte_ranges(24, start, end),
     'skipped_content': lambda start, end: [(None, None)],
+    'directory': lambda start, end: byte_ranges(24, start, end),
+    'revision': lambda start, end: byte_ranges(24, start, end),
+    'release': lambda start, end: byte_ranges(16, start, end),
+    'snapshot': lambda start, end: byte_ranges(16, start, end),
 }
 
 PARTITION_KEY = {
@@ -34,7 +39,8 @@ PARTITION_KEY = {
     'skipped_content': None,  # unused
     # 'directory': ['id'],
     # 'revision': ['id'],
-    # 'release': ['id'],
+    'release': ['release.id'],
+    # 'snapshot': ['id'],
     # 'origin': ['type', 'url'],
     # 'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
 }
@@ -48,11 +54,49 @@ COLUMNS = {
         'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'ctime',
         'status', 'reason',
     ],
-    # 'origin': ['type', 'url'],
-    # 'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
     # 'directory': ['id'],
     # 'revision': ['id'],
-    # 'release': ['id'],
+    'release': [
+        ("release.id", "id"),
+        "date",
+        "date_offset",
+        "comment",
+        ("release.name", "name"),
+        "synthetic",
+        "date_neg_utc_offset",
+        "target",
+        "target_type",
+        ("a.id", "author_id"),
+        ("a.name", "author_name"),
+        ("a.email", "author_email"),
+        ("a.fullname", "author_fullname"),
+    ],
+    # 'snapshot': ['id'],
+    # 'origin': ['type', 'url'],
+    # 'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
+}
+
+
+JOINS = {
+    'release': ['person a on release.author=a.id'],
+    'revision': ['person a on revision.author=a.id',
+                 'person c on revision.committer=c.id'],
+}
+
+
+def release_converter(release):
+    """Convert release from the flat representation to swh model
+       compatible objects.
+
+    """
+    release = db_to_release(release)
+    if 'author' in release and release['author']:
+        del release['author']['id']
+    return release
+
+
+CONVERTERS = {
+    'release': release_converter,
 }
 
 
@@ -164,6 +208,10 @@ def fetch(db_conn, obj_type, start, end):
         raise ValueError('The object type %s is not supported. '
                          'Only possible values are %s' % (
                              obj_type, PARTITION_KEY.keys()))
+
+    join_specs = JOINS.get(obj_type)
+    join_clause = '\n'.join('left join %s' % clause for clause in join_specs)
+
     where = []
     where_args = []
     if start:
@@ -179,16 +227,29 @@ def fetch(db_conn, obj_type, start, end):
             'keys': '(%s)' % ','.join(PARTITION_KEY[obj_type])
         }
 
-    columns_str = ','.join(columns)
+    column_specs = []
+    column_aliases = []
+    for column in columns:
+        if isinstance(column, str):
+            column_specs.append(column)
+            column_aliases.append(column)
+        else:
+            column_specs.append('%s as %s' % column)
+            column_aliases.append(column[1])
+
     query = '''
     select %(columns)s
     from %(table)s
+    %(join)s
     %(where)s
     ''' % {
-        'columns': columns_str,
+        'columns': ','.join(column_specs),
         'table': obj_type,
+        'join': join_clause,
         'where': where_clause,
     }
+
+    converter = CONVERTERS.get(obj_type)
 
     server_side_cursor_name = 'swh.journal.%s' % obj_type
     with psycopg2.connect(db_conn) as conn:
@@ -197,7 +258,10 @@ def fetch(db_conn, obj_type, start, end):
         logger.debug('query: %s %s', query, where_args)
         cursor.execute(query, where_args)
         for row in cursor:
-            record = dict(zip(columns, row))
+            record = dict(zip(column_aliases, row))
+            if converter:
+                record = converter(record)
+
             logger.debug('record: %s' % record)
             logger.debug('keys: %s' % record.keys())
             yield record
@@ -245,11 +309,13 @@ class JournalBackfiller:
         """
         for start, end in RANGE_GENERATORS[object_type](
                 start_object, end_object):
-            logger.info('Processing %s range %s to %s', object_type, start, end)
+            logger.info('Processing %s range %s to %s', object_type,
+                        start, end)
 
             for obj in fetch(
                     self.storage_dbconn, object_type, start=start, end=end):
                 self.writer.write_addition(object_type=object_type, object_=obj)
+
 
 if __name__ == '__main__':
     print('Please use the "swh-journal backfiller run" command')
