@@ -1,4 +1,4 @@
 pytest
-swh.model
+swh.model >= 0.0.32
 pytest-kafka
 hypothesis

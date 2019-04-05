@@ -7,6 +7,8 @@ import logging
 
 from kafka import KafkaConsumer
 
+from swh.storage import HashCollision
+
 from .serializers import kafka_to_value
 
 logger = logging.getLogger(__name__)
@@ -60,15 +62,16 @@ class StorageReplayer:
         if object_type in ('content', 'directory', 'revision', 'release',
                            'snapshot', 'origin'):
             if object_type == 'content':
-                method = storage.content_add_metadata
+                try:
+                    storage.content_add_metadata([object_])
+                except HashCollision as e:
+                    logger.error('Hash collision: %s', e.args)
             else:
                 method = getattr(storage, object_type + '_add')
-            method([object_])
+                method([object_])
         elif object_type == 'origin_visit':
-            origin_id = storage.origin_add_one(object_.pop('origin'))
-            visit = storage.origin_visit_add(
-                origin=origin_id, date=object_.pop('date'))
-            storage.origin_visit_update(
-                origin_id, visit['visit'], **object_)
+            storage.origin_visit_upsert([{
+                **object_,
+                'origin': storage.origin_add_one(object_['origin'])}])
         else:
             assert False

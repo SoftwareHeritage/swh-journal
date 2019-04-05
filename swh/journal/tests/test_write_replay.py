@@ -6,12 +6,11 @@
 from collections import namedtuple
 
 from hypothesis import given, settings, HealthCheck
-from hypothesis.strategies import lists, one_of, composite
+from hypothesis.strategies import lists
 
-from swh.model.hashutil import MultiHash
+from swh.model.hypothesis_strategies import object_dicts
 from swh.storage.in_memory import Storage
-from swh.storage.tests.algos.test_snapshot import snapshots, origins
-from swh.storage.tests.generate_data_test import gen_raw_content
+from swh.storage import HashCollision
 
 from swh.journal.serializers import (
     key_to_kafka, kafka_to_key, value_to_kafka, kafka_to_value)
@@ -31,36 +30,7 @@ class MockedStorageReplayer(StorageReplayer):
         self._object_types = object_types
 
 
-@composite
-def contents(draw):
-    """Generate valid and consistent content.
-
-    Context: Test purposes
-
-    Args:
-        **draw**: Used by hypothesis to generate data
-
-    Returns:
-        dict representing a content.
-
-    """
-    raw_content = draw(gen_raw_content())
-    return {
-        'data': raw_content,
-        'length': len(raw_content),
-        'status': 'visible',
-        **MultiHash.from_data(raw_content).digest()
-    }
-
-
-objects = lists(one_of(
-    origins().map(lambda x: ('origin', x)),
-    snapshots().map(lambda x: ('snapshot', x)),
-    contents().map(lambda x: ('content', x)),
-))
-
-
-@given(objects)
+@given(lists(object_dicts()))
 @settings(suppress_health_check=[HealthCheck.too_slow])
 def test_write_replay_same_order(objects):
     queue = []
@@ -78,14 +48,28 @@ def test_write_replay_same_order(objects):
     storage1.journal_writer.send = send
 
     for (obj_type, obj) in objects:
-        method = getattr(storage1, obj_type + '_add')
-        method([obj])
+        obj = obj.copy()
+        if obj_type == 'origin_visit':
+            origin_id = storage1.origin_add_one(obj.pop('origin'))
+            if 'visit' in obj:
+                del obj['visit']
+            storage1.origin_visit_add(origin_id, **obj)
+        else:
+            method = getattr(storage1, obj_type + '_add')
+            try:
+                method([obj])
+            except HashCollision:
+                pass
 
     storage2 = Storage()
     replayer = MockedStorageReplayer()
     replayer.poll = poll
     replayer.fill(storage2)
 
-    for attr in ('_contents', '_directories', '_revisions', '_releases',
-                 '_snapshots', '_origin_visits', '_origins'):
-        assert getattr(storage1, attr) == getattr(storage2, attr), attr
+    for attr_name in ('_contents', '_directories', '_revisions', '_releases',
+                      '_snapshots', '_origin_visits', '_origins'):
+        assert getattr(storage1, attr_name) == getattr(storage2, attr_name), \
+            attr_name
+
+
+# TODO: add test for hash collision

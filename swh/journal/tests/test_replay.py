@@ -38,6 +38,7 @@ def test_storage_play(
 
     # Fill Kafka
     nb_sent = 0
+    nb_visits = 0
     for (object_type, (_, objects)) in OBJECT_TYPE_KEYS.items():
         topic = kafka_prefix + '.' + object_type
         for object_ in objects:
@@ -45,6 +46,9 @@ def test_storage_play(
             object_ = object_.copy()
             if object_type == 'content':
                 object_['ctime'] = now
+            elif object_type == 'origin_visit':
+                nb_visits += 1
+                object_['visit'] = nb_visits
             producer.send(topic, key=key, value=object_)
             nb_sent += 1
 
