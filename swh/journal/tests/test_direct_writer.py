@@ -4,6 +4,7 @@
 # See top-level LICENSE file for more information
 
 from collections import defaultdict
+import datetime
 import time
 
 from kafka import KafkaConsumer
@@ -36,6 +37,9 @@ def assert_written(consumer, kafka_prefix):
         if object_type == 'origin_visit':
             for value in values:
                 del value['visit']
+        elif object_type == 'content':
+            for value in values:
+                del value['ctime']
 
         for object_ in objects:
             assert kafka_to_value(value_to_kafka(object_)) in values
@@ -59,6 +63,8 @@ def test_direct_writer(
         for (num, object_) in enumerate(objects):
             if object_type == 'origin_visit':
                 object_ = {**object_, 'visit': num}
+            if object_type == 'content':
+                object_ = {**object_, 'ctime': datetime.datetime.now()}
             writer.write_addition(object_type, object_)
 
     assert_written(consumer_from_publisher, kafka_prefix)
