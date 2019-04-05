@@ -25,15 +25,6 @@ from swh.storage.converters import db_to_release, db_to_revision
 
 logger = logging.getLogger(__name__)
 
-RANGE_GENERATORS = {
-    'content': lambda start, end: byte_ranges(24, start, end),
-    'skipped_content': lambda start, end: [(None, None)],
-    'directory': lambda start, end: byte_ranges(24, start, end),
-    'revision': lambda start, end: byte_ranges(24, start, end),
-    'release': lambda start, end: byte_ranges(16, start, end),
-    'snapshot': lambda start, end: byte_ranges(16, start, end),
-}
-
 PARTITION_KEY = {
     'content': ['sha1'],
     'skipped_content': None,  # unused
@@ -41,7 +32,7 @@ PARTITION_KEY = {
     'revision': ['revision.id'],
     'release': ['release.id'],
     # 'snapshot': ['id'],
-    # 'origin': ['type', 'url'],
+    'origin': ['id'],
     # 'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
 }
 
@@ -96,7 +87,7 @@ COLUMNS = {
         ("a.fullname", "author_fullname"),
     ],
     # 'snapshot': ['id'],
-    # 'origin': ['type', 'url'],
+    'origin': ['type', 'url'],
     # 'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
 }
 
@@ -203,6 +194,27 @@ def byte_ranges(numbits, start_object=None, end_object=None):
             yield to_bytes(start), to_bytes(end)
 
 
+def integer_ranges(start, end, block_size=1000):
+    for start in range(start, end, block_size):
+        if start == 0:
+            yield None, block_size
+        elif start + block_size > end:
+            yield start, end
+        else:
+            yield start, start + block_size
+
+
+RANGE_GENERATORS = {
+    'content': lambda start, end: byte_ranges(24, start, end),
+    'skipped_content': lambda start, end: [(None, None)],
+    'directory': lambda start, end: byte_ranges(24, start, end),
+    'revision': lambda start, end: byte_ranges(24, start, end),
+    'release': lambda start, end: byte_ranges(16, start, end),
+    'snapshot': lambda start, end: byte_ranges(16, start, end),
+    'origin': integer_ranges,
+}
+
+
 def cursor_setup(conn, server_side_cursor_name):
     """Setup cursor to return dict of data"""
     # cur = conn.cursor(name=server_side_cursor_name)
@@ -242,12 +254,7 @@ def fetch(db_conn, obj_type, start, end):
 
     """
     columns = COLUMNS.get(obj_type)
-    if not columns:
-        raise ValueError('The object type %s is not supported. '
-                         'Only possible values are %s' % (
-                             obj_type, PARTITION_KEY.keys()))
-
-    join_specs = JOINS.get(obj_type)
+    join_specs = JOINS.get(obj_type, [])
     join_clause = '\n'.join('left join %s' % clause for clause in join_specs)
 
     where = []
@@ -301,7 +308,6 @@ def fetch(db_conn, obj_type, start, end):
                 record = converter(record)
 
             logger.debug('record: %s' % record)
-            logger.debug('keys: %s' % record.keys())
             yield record
 
 
@@ -340,18 +346,53 @@ class JournalBackfiller:
                 'Configuration error: The following keys must be'
                 ' provided: %s' % (','.join(missing_keys), ))
 
-    def run(self, object_type, start_object, end_object):
+    def parse_arguments(self, object_type, start_object, end_object):
+        """Parse arguments
+
+        Raises:
+            ValueError for unsupported object type
+            ValueError if object ids are not parseable
+
+        Returns:
+            Parsed start and end object ids
+
+        """
+        if object_type not in COLUMNS:
+            raise ValueError('Object type %s is not supported. '
+                             'The only possible values are %s' % (
+                                 object_type, ', '.join(COLUMNS.keys())))
+
+        if object_type == 'origin':
+            if start_object:
+                start_object = int(start_object)
+            else:
+                start_object = 0
+            if end_object:
+                end_object = int(end_object)
+            else:
+                end_object = 100 * 1000 * 1000  # hard-coded limit
+
+        return start_object, end_object
+
+    def run(self, object_type, start_object, end_object, dry_run=False):
         """Reads storage's subscribed object types and send them to the
            publisher's reading queue.
 
         """
-        for start, end in RANGE_GENERATORS[object_type](
+        start_object, end_object = self.parse_arguments(
+            object_type, start_object, end_object)
+
+        for range_start, range_end in RANGE_GENERATORS[object_type](
                 start_object, end_object):
             logger.info('Processing %s range %s to %s', object_type,
-                        start, end)
+                        range_start, range_end)
 
             for obj in fetch(
-                    self.storage_dbconn, object_type, start=start, end=end):
+                self.storage_dbconn, object_type,
+                start=range_start, end=range_end,
+            ):
+                if dry_run:
+                    continue
                 self.writer.write_addition(object_type=object_type,
                                            object_=obj)
 

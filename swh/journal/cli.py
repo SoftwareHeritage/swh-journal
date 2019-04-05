@@ -82,11 +82,12 @@ def replay(ctx, brokers, prefix, consumer_id, max_messages):
 
 
 @cli.command()
+@click.argument('object_type')
 @click.option('--start-object', default=None)
 @click.option('--end-object', default=None)
-@click.argument('object_type')
+@click.option('--dry-run', is_flag=True, default=False)
 @click.pass_context
-def backfiller(ctx, start_object, end_object, object_type):
+def backfiller(ctx, object_type, start_object, end_object, dry_run):
     """Manipulate backfiller
 
     """
@@ -95,7 +96,8 @@ def backfiller(ctx, start_object, end_object, object_type):
     try:
         backfiller.run(
             object_type=object_type,
-            start_object=start_object, end_object=end_object)
+            start_object=start_object, end_object=end_object,
+            dry_run=dry_run)
     except KeyboardInterrupt:
         ctx.exit(0)
 
