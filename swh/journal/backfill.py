@@ -20,7 +20,7 @@ import psycopg2
 from .direct_writer import DirectKafkaWriter
 
 from swh.core.db import typecast_bytea
-from swh.storage.converters import db_to_release
+from swh.storage.converters import db_to_release, db_to_revision
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ PARTITION_KEY = {
     'content': ['sha1'],
     'skipped_content': None,  # unused
     # 'directory': ['id'],
-    # 'revision': ['id'],
+    'revision': ['revision.id'],
     'release': ['release.id'],
     # 'snapshot': ['id'],
     # 'origin': ['type', 'url'],
@@ -55,7 +55,31 @@ COLUMNS = {
         'status', 'reason',
     ],
     # 'directory': ['id'],
-    # 'revision': ['id'],
+    'revision': [
+        ("revision.id", "id"),
+        "date",
+        "date_offset",
+        "committer_date",
+        "committer_date_offset",
+        "type",
+        "directory",
+        "message",
+        "synthetic",
+        "metadata",
+        "date_neg_utc_offset",
+        "committer_date_neg_utc_offset",
+        ("array(select parent_id::bytea from revision_history rh "
+         "where rh.id = revision.id order by rh.parent_rank asc)",
+         "parents"),
+        ("a.id", "author_id"),
+        ("a.name", "author_name"),
+        ("a.email", "author_email"),
+        ("a.fullname", "author_fullname"),
+        ("c.id", "committer_id"),
+        ("c.name", "committer_name"),
+        ("c.email", "committer_email"),
+        ("c.fullname", "committer_fullname"),
+    ],
     'release': [
         ("release.id", "id"),
         "date",
@@ -95,8 +119,22 @@ def release_converter(release):
     return release
 
 
+def revision_converter(revision):
+    """Convert revision from the flat representation to swh model
+       compatible objects.
+
+    """
+    revision = db_to_revision(revision)
+    if 'author' in revision and revision['author']:
+        del revision['author']['id']
+    if 'committer' in revision and revision['committer']:
+        del revision['committer']['id']
+    return revision
+
+
 CONVERTERS = {
     'release': release_converter,
+    'revision': revision_converter,
 }
 
 
@@ -314,7 +352,8 @@ class JournalBackfiller:
 
             for obj in fetch(
                     self.storage_dbconn, object_type, start=start, end=end):
-                self.writer.write_addition(object_type=object_type, object_=obj)
+                self.writer.write_addition(object_type=object_type,
+                                           object_=obj)
 
 
 if __name__ == '__main__':
