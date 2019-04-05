@@ -26,12 +26,13 @@ logger = logging.getLogger(__name__)
 
 RANGE_GENERATORS = {
     'content': lambda start, end: byte_ranges(24, start, end),
+    'skipped_content': lambda start, end: [(None, None)],
 }
 
 # Defining the key components per object type
 TYPE_TO_PARTITION_KEY = {
     'content': ['sha1'],
-    # 'skipped_content': ['sha1'],
+    'skipped_content': None,  # unused
     # 'directory': ['id'],
     # 'revision': ['id'],
     # 'release': ['id'],
@@ -45,10 +46,10 @@ TYPE_TO_COLUMNS = {
         'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'status',
         'ctime'
     ],
-    # 'skipped_content': [
-    #     'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'ctime',
-    #     'status', 'reason',
-    # ],
+    'skipped_content': [
+        'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'ctime',
+        'status', 'reason',
+    ],
     # 'origin': ['type', 'url'],
     # 'origin_visit': ['type', 'url', 'fetch_date', 'visit_date'],
     # 'directory': ['id'],

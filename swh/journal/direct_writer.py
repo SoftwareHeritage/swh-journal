@@ -7,6 +7,8 @@ import logging
 
 from kafka import KafkaProducer
 
+from swh.model.hashutil import DEFAULT_ALGORITHMS
+
 from .serializers import key_to_kafka, value_to_kafka
 
 logger = logging.getLogger(__name__)
@@ -34,6 +36,11 @@ class DirectKafkaWriter:
             return object_['id']
         elif object_type == 'content':
             return object_['sha1']  # TODO: use a dict of hashes
+        elif object_type == 'skipped_content':
+            return {
+                hash: object_[hash]
+                for hash in DEFAULT_ALGORITHMS
+            }
         elif object_type == 'origin':
             return {'url': object_['url'], 'type': object_['type']}
         elif object_type == 'origin_visit':
