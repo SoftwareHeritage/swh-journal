@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 PARTITION_KEY = {
     'content': ['sha1'],
     'skipped_content': None,  # unused
-    # 'directory': ['id'],
+    'directory': ['id'],
     'revision': ['revision.id'],
     'release': ['release.id'],
     'snapshot': ['id'],
@@ -44,7 +44,7 @@ COLUMNS = {
         'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'ctime',
         'status', 'reason',
     ],
-    # 'directory': ['id'],
+    'directory': ['id', 'dir_entries', 'file_entries', 'rev_entries'],
     'revision': [
         ("revision.id", "id"),
         "date",
@@ -99,6 +99,40 @@ JOINS = {
 }
 
 
+def directory_converter(db, directory):
+    """Convert directory from the flat representation to swh model
+       compatible objects.
+
+    """
+    columns = ['target', 'name', 'perms']
+    query_template = '''
+    select %(columns)s
+    from directory_entry_%(type)s
+    where id in %%s
+    '''
+
+    types = ['file', 'dir', 'rev']
+
+    entries = []
+    with db.cursor() as cur:
+        for type in types:
+            ids = directory.pop('%s_entries' % type)
+            if not ids:
+                continue
+            query = query_template % {
+                'columns': ','.join(columns),
+                'type': type,
+            }
+            cur.execute(query, (tuple(ids), ))
+            for row in cur:
+                entry = dict(zip(columns, row))
+                entry['type'] = type
+                entries.append(entry)
+
+    directory['entries'] = entries
+    return directory
+
+
 def release_converter(db, release):
     """Convert release from the flat representation to swh model
        compatible objects.
@@ -124,6 +158,10 @@ def revision_converter(db, revision):
 
 
 def snapshot_converter(db, snapshot):
+    """Convert snapshot from the flat representation to swh model
+       compatible objects.
+
+    """
     columns = ['name', 'target', 'target_type']
     query = '''
     select %s
@@ -145,6 +183,7 @@ def snapshot_converter(db, snapshot):
 
 
 CONVERTERS = {
+    'directory': directory_converter,
     'release': release_converter,
     'revision': revision_converter,
     'snapshot': snapshot_converter,
