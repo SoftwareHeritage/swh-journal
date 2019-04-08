@@ -369,12 +369,6 @@ class JournalBackfiller:
     def __init__(self, config=None):
         self.config = config
         self.check_config(config)
-        self.db = BaseDb.connect(self.config['storage_dbconn'])
-        self.writer = DirectKafkaWriter(
-            brokers=config['brokers'],
-            prefix=config['final_prefix'],
-            client_id=config['client_id']
-        )
 
     def check_config(self, config):
         missing_keys = []
@@ -423,18 +417,24 @@ class JournalBackfiller:
         start_object, end_object = self.parse_arguments(
             object_type, start_object, end_object)
 
+        db = BaseDb.connect(self.config['storage_dbconn'])
+        writer = DirectKafkaWriter(
+            brokers=self.config['brokers'],
+            prefix=self.config['final_prefix'],
+            client_id=self.config['client_id']
+        )
         for range_start, range_end in RANGE_GENERATORS[object_type](
                 start_object, end_object):
             logger.info('Processing %s range %s to %s', object_type,
                         range_start, range_end)
 
             for obj in fetch(
-                self.db, object_type, start=range_start, end=range_end,
+                db, object_type, start=range_start, end=range_end,
             ):
                 if dry_run:
                     continue
-                self.writer.write_addition(object_type=object_type,
-                                           object_=obj)
+                writer.write_addition(object_type=object_type,
+                                      object_=obj)
 
 
 if __name__ == '__main__':

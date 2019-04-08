@@ -6,7 +6,7 @@
 import pytest
 
 from swh.journal.backfill import (
-    JournalBackfiller, compute_query
+    JournalBackfiller, compute_query, PARTITION_KEY
 )
 
 
@@ -34,18 +34,18 @@ def test_config_ko_missing_mandatory_key():
         assert e.value.args[0] == error
 
 
-# def test_config_ko_unknown_object_type():
-#     """Parse arguments will fail if the object type is unknown
+def test_config_ko_unknown_object_type():
+    """Parse arguments will fail if the object type is unknown
 
-#     """
-#     backfiller = JournalBackfiller(TEST_CONFIG)
-#     with pytest.raises(ValueError) as e:
-#         backfiller.parse_arguments('unknown-object-type', 1, 2)
+    """
+    backfiller = JournalBackfiller(TEST_CONFIG)
+    with pytest.raises(ValueError) as e:
+        backfiller.parse_arguments('unknown-object-type', 1, 2)
 
-#     error = ('Object type unknown-object-type is not supported. '
-#              'The only possible values are %s' % (
-#                  ', '.join(PARTITION_KEY)))
-#     assert e.value.args[0] == error
+    error = ('Object type unknown-object-type is not supported. '
+             'The only possible values are %s' % (
+                 ', '.join(PARTITION_KEY)))
+    assert e.value.args[0] == error
 
 
 def test_compute_query_content():
