@@ -25,14 +25,14 @@ from swh.storage.converters import db_to_release, db_to_revision
 logger = logging.getLogger(__name__)
 
 PARTITION_KEY = {
-    'content': ['sha1'],
+    'content': 'sha1',
     'skipped_content': None,  # unused
-    'directory': ['id'],
-    'revision': ['revision.id'],
-    'release': ['release.id'],
-    'snapshot': ['id'],
-    'origin': ['id'],
-    'origin_visit': ['origin_visit.origin'],
+    'directory': 'id',
+    'revision': 'revision.id',
+    'release': 'release.id',
+    'snapshot': 'id',
+    'origin': 'id',
+    'origin_visit': 'origin_visit.origin',
 }
 
 COLUMNS = {
@@ -304,7 +304,7 @@ def compute_query(obj_type, start, end):
     where_clause = ''
     if where:
         where_clause = ('where ' + ' and '.join(where)) % {
-            'keys': '(%s)' % ','.join(PARTITION_KEY[obj_type])
+            'keys': '(%s)' % PARTITION_KEY[obj_type]
         }
 
     column_specs = []
