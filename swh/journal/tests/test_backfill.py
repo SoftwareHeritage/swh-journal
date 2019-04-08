@@ -65,3 +65,22 @@ from content
 
 where (sha1) >= %s and (sha1) < %s
     '''
+
+
+def test_compute_query_skipped_content():
+    query, where_args, column_aliases = compute_query(
+        'skipped_content', None, None)
+
+    assert where_args == []
+
+    assert column_aliases == [
+        'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'ctime',
+        'status', 'reason',
+    ]
+
+    assert query == '''
+select sha1,sha1_git,sha256,blake2s256,length,ctime,status,reason
+from skipped_content
+
+
+    '''
