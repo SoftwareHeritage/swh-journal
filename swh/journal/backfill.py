@@ -133,17 +133,6 @@ def directory_converter(db, directory):
     return directory
 
 
-def release_converter(db, release):
-    """Convert release from the flat representation to swh model
-       compatible objects.
-
-    """
-    release = db_to_release(release)
-    if 'author' in release and release['author']:
-        del release['author']['id']
-    return release
-
-
 def revision_converter(db, revision):
     """Convert revision from the flat representation to swh model
        compatible objects.
@@ -155,6 +144,17 @@ def revision_converter(db, revision):
     if 'committer' in revision and revision['committer']:
         del revision['committer']['id']
     return revision
+
+
+def release_converter(db, release):
+    """Convert release from the flat representation to swh model
+       compatible objects.
+
+    """
+    release = db_to_release(release)
+    if 'author' in release and release['author']:
+        del release['author']['id']
+    return release
 
 
 def snapshot_converter(db, snapshot):
@@ -182,11 +182,21 @@ def snapshot_converter(db, snapshot):
     return snapshot
 
 
+def origin_visit_converter(db, origin_visit):
+    origin = {
+        'type': origin_visit.pop('type'),
+        'url': origin_visit.pop('url'),
+    }
+    origin_visit['origin'] = origin
+    return origin_visit
+
+
 CONVERTERS = {
     'directory': directory_converter,
-    'release': release_converter,
     'revision': revision_converter,
+    'release': release_converter,
     'snapshot': snapshot_converter,
+    'origin_visit': origin_visit_converter,
 }
 
 
