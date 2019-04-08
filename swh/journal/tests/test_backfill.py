@@ -102,3 +102,22 @@ from origin_visit
 left join origin on origin_visit.origin=origin.id
 where (origin_visit.origin) >= %s and (origin_visit.origin) < %s
     '''
+
+
+def test_compute_query_release():
+    query, where_args, column_aliases = compute_query(
+        'release', '\x000002', '\x000003')
+
+    assert where_args == ['\x000002', '\x000003']
+
+    assert column_aliases == [
+        'id', 'date', 'date_offset', 'comment', 'name', 'synthetic',
+        'date_neg_utc_offset', 'target', 'target_type', 'author_id',
+        'author_name', 'author_email', 'author_fullname']
+
+    assert query == '''
+select release.id as id,date,date_offset,comment,release.name as name,synthetic,date_neg_utc_offset,target,target_type,a.id as author_id,a.name as author_name,a.email as author_email,a.fullname as author_fullname
+from release
+left join person a on release.author=a.id
+where (release.id) >= %s and (release.id) < %s
+    '''  # noqa
