@@ -15,11 +15,10 @@ storage and sends every object identifier back to the journal.
 """
 
 import logging
-import psycopg2
 
 from .direct_writer import DirectKafkaWriter
 
-from swh.core.db import typecast_bytea
+from swh.core.db import BaseDb
 from swh.storage.converters import db_to_release, db_to_revision
 
 
@@ -217,25 +216,6 @@ RANGE_GENERATORS = {
 }
 
 
-def cursor_setup(conn, server_side_cursor_name):
-    """Setup cursor to return dict of data"""
-    # cur = conn.cursor(name=server_side_cursor_name)
-    cur = conn.cursor()
-    cur.execute("SELECT null::bytea, null::bytea[]")
-    bytea_oid = cur.description[0][1]
-    bytea_array_oid = cur.description[1][1]
-
-    t_bytes = psycopg2.extensions.new_type(
-        (bytea_oid,), "bytea", typecast_bytea)
-    psycopg2.extensions.register_type(t_bytes, conn)
-
-    t_bytes_array = psycopg2.extensions.new_array_type(
-        (bytea_array_oid,), "bytea[]", t_bytes)
-    psycopg2.extensions.register_type(t_bytes_array, conn)
-
-    return cur
-
-
 def compute_query(obj_type, start, end):
     columns = COLUMNS.get(obj_type)
     join_specs = JOINS.get(obj_type, [])
@@ -281,14 +261,14 @@ from %(table)s
     return query, where_args, column_aliases
 
 
-def fetch(db_conn, obj_type, start, end):
+def fetch(db, obj_type, start, end):
     """Fetch all obj_type's identifiers from db.
 
     This opens one connection, stream objects and when done, close
     the connection.
 
     Args:
-        conn: Db connection object
+        db (BaseDb): Db connection object
         obj_type (str): Object type
         start (Union[bytes|Tuple]): Range start identifier
         end (Union[bytes|Tuple]): Range end identifier
@@ -301,12 +281,8 @@ def fetch(db_conn, obj_type, start, end):
 
     """
     query, where_args, column_aliases = compute_query(obj_type, start, end)
-
     converter = CONVERTERS.get(obj_type)
-
-    server_side_cursor_name = 'swh.journal.%s' % obj_type
-    with psycopg2.connect(db_conn) as conn:
-        cursor = cursor_setup(conn, server_side_cursor_name)
+    with db.cursor() as cursor:
         logger.debug('Fetching data for table %s', obj_type)
         logger.debug('query: %s %s', query, where_args)
         cursor.execute(query, where_args)
@@ -332,8 +308,7 @@ class JournalBackfiller:
     def __init__(self, config=None):
         self.config = config
         self.check_config(config)
-        self.storage_dbconn = self.config['storage_dbconn']
-
+        self.db = BaseDb.connect(self.config['storage_dbconn'])
         self.writer = DirectKafkaWriter(
             brokers=config['brokers'],
             prefix=config['final_prefix'],
@@ -393,8 +368,7 @@ class JournalBackfiller:
                         range_start, range_end)
 
             for obj in fetch(
-                self.storage_dbconn, object_type,
-                start=range_start, end=range_end,
+                self.db, object_type, start=range_start, end=range_end,
             ):
                 if dry_run:
                     continue
