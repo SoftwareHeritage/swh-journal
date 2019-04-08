@@ -84,3 +84,21 @@ from skipped_content
 
 
     '''
+
+
+def test_compute_query_origin_visit():
+    query, where_args, column_aliases = compute_query(
+        'origin_visit', 1, 10)
+
+    assert where_args == [1, 10]
+
+    assert column_aliases == [
+        'type', 'url', 'date', 'snapshot', 'status'
+    ]
+
+    assert query == '''
+select type,url,date,snapshot,status
+from origin_visit
+left join origin on origin_visit.origin=origin.id
+where (origin_visit.origin) >= %s and (origin_visit.origin) < %s
+    '''
