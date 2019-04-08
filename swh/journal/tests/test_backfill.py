@@ -5,19 +5,23 @@
 
 import pytest
 
-from swh.journal.backfill import JournalBackfiller, TYPE_TO_PRIMARY_KEY
+from swh.journal.backfill import (
+    JournalBackfiller, compute_query
+)
 
 
 TEST_CONFIG = {
     'brokers': ['localhost'],
     'final_prefix': 'swh.tmp_journal.new',
     'client_id': 'swh.journal.publisher.test',
-    'object_types': ['content', 'revision', 'release'],
     'storage_dbconn': 'service=swh-dev',
 }
 
 
 def test_config_ko_missing_mandatory_key():
+    """Missing configuration key will make the initialization fail
+
+    """
     for key in TEST_CONFIG.keys():
         config = TEST_CONFIG.copy()
         config.pop(key)
@@ -30,13 +34,34 @@ def test_config_ko_missing_mandatory_key():
         assert e.value.args[0] == error
 
 
-def test_config_ko_unknown_object_type():
-    wrong_config = TEST_CONFIG.copy()
-    wrong_config['object_types'] = ['something-wrong']
-    with pytest.raises(ValueError) as e:
-        JournalBackfiller(wrong_config)
+# def test_config_ko_unknown_object_type():
+#     """Parse arguments will fail if the object type is unknown
 
-    error = ('The object type something-wrong is not supported. '
-             'Possible values are %s' % (
-                 ', '.join(TYPE_TO_PRIMARY_KEY)))
-    assert e.value.args[0] == error
+#     """
+#     backfiller = JournalBackfiller(TEST_CONFIG)
+#     with pytest.raises(ValueError) as e:
+#         backfiller.parse_arguments('unknown-object-type', 1, 2)
+
+#     error = ('Object type unknown-object-type is not supported. '
+#              'The only possible values are %s' % (
+#                  ', '.join(PARTITION_KEY)))
+#     assert e.value.args[0] == error
+
+
+def test_compute_query_content():
+    query, where_args, column_aliases = compute_query(
+        'content', '\x000000', '\x000001')
+
+    assert where_args == ['\x000000', '\x000001']
+
+    assert column_aliases == [
+        'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'status',
+        'ctime'
+    ]
+
+    assert query == '''
+select sha1,sha1_git,sha256,blake2s256,length,status,ctime
+from content
+
+where (sha1) >= %s and (sha1) < %s
+    '''

@@ -236,25 +236,7 @@ def cursor_setup(conn, server_side_cursor_name):
     return cur
 
 
-def fetch(db_conn, obj_type, start, end):
-    """Fetch all obj_type's identifiers from db.
-
-    This opens one connection, stream objects and when done, close
-    the connection.
-
-    Args:
-        conn: Db connection object
-        obj_type (str): Object type
-        start (Union[bytes|Tuple]): Range start identifier
-        end (Union[bytes|Tuple]): Range end identifier
-
-    Raises:
-        ValueError if obj_type is not supported
-
-    Yields:
-        Objects in the given range
-
-    """
+def compute_query(obj_type, start, end):
     columns = COLUMNS.get(obj_type)
     join_specs = JOINS.get(obj_type, [])
     join_clause = '\n'.join('left join %s' % clause for clause in join_specs)
@@ -285,16 +267,40 @@ def fetch(db_conn, obj_type, start, end):
             column_aliases.append(column[1])
 
     query = '''
-    select %(columns)s
-    from %(table)s
-    %(join)s
-    %(where)s
+select %(columns)s
+from %(table)s
+%(join)s
+%(where)s
     ''' % {
         'columns': ','.join(column_specs),
         'table': obj_type,
         'join': join_clause,
         'where': where_clause,
     }
+
+    return query, where_args, column_aliases
+
+
+def fetch(db_conn, obj_type, start, end):
+    """Fetch all obj_type's identifiers from db.
+
+    This opens one connection, stream objects and when done, close
+    the connection.
+
+    Args:
+        conn: Db connection object
+        obj_type (str): Object type
+        start (Union[bytes|Tuple]): Range start identifier
+        end (Union[bytes|Tuple]): Range end identifier
+
+    Raises:
+        ValueError if obj_type is not supported
+
+    Yields:
+        Objects in the given range
+
+    """
+    query, where_args, column_aliases = compute_query(obj_type, start, end)
 
     converter = CONVERTERS.get(obj_type)
 
@@ -313,10 +319,7 @@ def fetch(db_conn, obj_type, start, end):
             yield record
 
 
-MANDATORY_KEYS = [
-    'brokers', 'object_types', 'storage_dbconn',
-    'final_prefix', 'client_id',
-]
+MANDATORY_KEYS = ['brokers', 'storage_dbconn', 'final_prefix', 'client_id']
 
 
 class JournalBackfiller:
