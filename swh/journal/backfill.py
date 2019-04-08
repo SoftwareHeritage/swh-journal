@@ -446,6 +446,8 @@ class JournalBackfiller:
                 writer.write_addition(object_type=object_type,
                                       object_=obj)
 
+            writer.producer.flush()
+
 
 if __name__ == '__main__':
     print('Please use the "swh-journal backfiller run" command')
