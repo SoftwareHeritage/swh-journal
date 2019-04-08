@@ -30,7 +30,7 @@ PARTITION_KEY = {
     # 'directory': ['id'],
     'revision': ['revision.id'],
     'release': ['release.id'],
-    # 'snapshot': ['id'],
+    'snapshot': ['id'],
     'origin': ['id'],
     'origin_visit': ['origin_visit.origin'],
 }
@@ -85,7 +85,7 @@ COLUMNS = {
         ("a.email", "author_email"),
         ("a.fullname", "author_fullname"),
     ],
-    # 'snapshot': ['id'],
+    'snapshot': ['id', 'object_id'],
     'origin': ['type', 'url'],
     'origin_visit': ['type', 'url', 'date', 'snapshot', 'status'],
 }
@@ -99,7 +99,7 @@ JOINS = {
 }
 
 
-def release_converter(release):
+def release_converter(db, release):
     """Convert release from the flat representation to swh model
        compatible objects.
 
@@ -110,7 +110,7 @@ def release_converter(release):
     return release
 
 
-def revision_converter(revision):
+def revision_converter(db, revision):
     """Convert revision from the flat representation to swh model
        compatible objects.
 
@@ -123,9 +123,31 @@ def revision_converter(revision):
     return revision
 
 
+def snapshot_converter(db, snapshot):
+    columns = ['name', 'target', 'target_type']
+    query = '''
+    select %s
+    from snapshot_branches sbs
+    inner join snapshot_branch sb on sb.object_id=sbs.branch_id
+    where sbs.snapshot_id=%%s
+    ''' % ', '.join(columns)
+    with db.cursor() as cur:
+        cur.execute(query, (snapshot.pop('object_id'), ))
+        branches = {}
+        for name, *row in cur:
+            branch = dict(zip(columns[1:], row))
+            if not branch['target'] and not branch['target_type']:
+                branch = None
+            branches[name] = branch
+
+    snapshot['branches'] = branches
+    return snapshot
+
+
 CONVERTERS = {
     'release': release_converter,
     'revision': revision_converter,
+    'snapshot': snapshot_converter,
 }
 
 
@@ -289,7 +311,7 @@ def fetch(db, obj_type, start, end):
         for row in cursor:
             record = dict(zip(column_aliases, row))
             if converter:
-                record = converter(record)
+                record = converter(db, record)
 
             logger.debug('record: %s' % record)
             yield record
