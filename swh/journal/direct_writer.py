@@ -59,7 +59,7 @@ class DirectKafkaWriter:
         topic = '%s.%s' % (self._prefix, object_type)
         key = self._get_key(object_type, object_)
         object_ = self._sanitize_object(object_type, object_)
-        logger.debug('topic: %s, key: %s, value: %s' % (topic, key, object_))
+        logger.debug('topic: %s, key: %s, value: %s', topic, key, object_)
         self.send(topic, key=key, value=object_)
 
     write_update = write_addition

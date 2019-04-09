@@ -48,8 +48,7 @@ def cli(ctx, config_file, log_level):
         format='%(asctime)s %(levelname)s %(name)s %(message)s',
     )
 
-    _log = logging.getLogger('kafka')
-    _log.setLevel(logging.INFO)
+    logging.getLogger('kafka').setLevel(logging.INFO)
 
     ctx.obj['config'] = conf
     ctx.obj['loglevel'] = log_level
