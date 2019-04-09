@@ -9,7 +9,7 @@ import logging
 import random
 import string
 
-from kafka import KafkaProducer, KafkaConsumer
+from kafka import KafkaConsumer
 from subprocess import Popen
 from typing import Tuple, Dict
 
@@ -18,10 +18,9 @@ from pytest_kafka import (
     make_zookeeper_process, make_kafka_server, constants
 )
 
-from swh.journal.publisher import JournalPublisher
 from swh.model.hashutil import hash_to_bytes
 
-from swh.journal.serializers import kafka_to_key, key_to_kafka, kafka_to_value
+from swh.journal.serializers import kafka_to_key, kafka_to_value
 
 
 CONTENTS = [
@@ -134,26 +133,6 @@ OBJECT_TYPE_KEYS = {
 }
 
 
-class JournalPublisherTest(JournalPublisher):
-    """A journal publisher which override the default configuration
-       parsing setup.
-
-    """
-    def _prepare_storage(self, config):
-        super()._prepare_storage(config)
-        self.storage.content_add({'data': b'42', **c} for c in CONTENTS)
-        self.storage.revision_add(REVISIONS)
-        self.storage.release_add(RELEASES)
-        origins = self.storage.origin_add(ORIGINS)
-        origin_visits = []
-        for i, ov in enumerate(ORIGIN_VISITS):
-            origin_id = origins[i]['id']
-            ov = self.storage.origin_visit_add(origin_id, ov['date'])
-            origin_visits.append(ov)
-            self.origins = origins
-            self.origin_visits = origin_visits
-
-
 KAFKA_ROOT = os.environ.get('SWH_KAFKA_ROOT')
 KAFKA_ROOT = KAFKA_ROOT if KAFKA_ROOT else os.path.dirname(__file__) + '/kafka'
 if not os.path.exists(KAFKA_ROOT):
@@ -210,26 +189,8 @@ def test_config(kafka_server: Tuple[Popen, int],
 
 
 @pytest.fixture
-def producer_to_publisher(
-        kafka_server: Tuple[Popen, int],
-        test_config: Dict,
-) -> KafkaProducer:  # noqa
-    """Producer to send message to the publisher's consumer.
-
-    """
-    _, port = kafka_server
-    producer = KafkaProducer(
-        bootstrap_servers='localhost:{}'.format(port),
-        key_serializer=key_to_kafka,
-        value_serializer=key_to_kafka,
-        client_id=test_config['consumer_id'],
-    )
-    return producer
-
-
-@pytest.fixture
-def consumer_from_publisher(kafka_server: Tuple[Popen, int],
-                            test_config: Dict) -> KafkaConsumer:
+def consumer(
+        kafka_server: Tuple[Popen, int], test_config: Dict) -> KafkaConsumer:
     """Get a connected Kafka consumer.
 
     """
@@ -255,16 +216,3 @@ def consumer_from_publisher(kafka_server: Tuple[Popen, int],
     consumer.seek_to_beginning()
 
     return consumer
-
-
-@pytest.fixture
-def publisher(kafka_server: Tuple[Popen, int],
-              test_config: Dict) -> JournalPublisher:
-    """Test Publisher factory. We cannot use a fixture here as we need to
-       modify the sample.
-
-    """
-    # consumer and producer of the publisher needs to discuss with the
-    # right instance
-    publisher = JournalPublisherTest(test_config)
-    return publisher

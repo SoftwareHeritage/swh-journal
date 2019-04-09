@@ -48,7 +48,7 @@ def assert_written(consumer, kafka_prefix):
 def test_direct_writer(
         kafka_prefix: str,
         kafka_server: Tuple[Popen, int],
-        consumer_from_publisher: KafkaConsumer):
+        consumer: KafkaConsumer):
     kafka_prefix += '.swh.journal.objects'
 
     config = {
@@ -67,13 +67,13 @@ def test_direct_writer(
                 object_ = {**object_, 'ctime': datetime.datetime.now()}
             writer.write_addition(object_type, object_)
 
-    assert_written(consumer_from_publisher, kafka_prefix)
+    assert_written(consumer, kafka_prefix)
 
 
 def test_storage_direct_writer(
         kafka_prefix: str,
         kafka_server: Tuple[Popen, int],
-        consumer_from_publisher: KafkaConsumer):
+        consumer: KafkaConsumer):
     kafka_prefix += '.swh.journal.objects'
 
     config = {
@@ -102,4 +102,4 @@ def test_storage_direct_writer(
         else:
             assert False, object_type
 
-    assert_written(consumer_from_publisher, kafka_prefix)
+    assert_written(consumer, kafka_prefix)

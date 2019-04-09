@@ -10,7 +10,6 @@ import os
 from swh.core import config
 from swh.storage import get_storage
 
-from swh.journal.publisher import JournalPublisher
 from swh.journal.replay import StorageReplayer
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -54,21 +53,6 @@ def cli(ctx, config_file, log_level):
 
     ctx.obj['config'] = conf
     ctx.obj['loglevel'] = log_level
-
-
-@cli.command()
-@click.pass_context
-def publisher(ctx):
-    """Manipulate publisher
-
-    """
-    conf = ctx.obj['config']
-    publisher = JournalPublisher(conf)
-    try:
-        while True:
-            publisher.poll()
-    except KeyboardInterrupt:
-        ctx.exit(0)
 
 
 @cli.command()
