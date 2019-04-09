@@ -53,7 +53,6 @@ class DirectKafkaWriter:
 
     def _sanitize_object(self, object_type, object_):
         if object_type == 'origin_visit':
-            # Compatibility with the publisher's format
             return {
                 **object_,
                 'date': str(object_['date']),

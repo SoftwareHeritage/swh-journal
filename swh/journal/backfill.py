@@ -371,7 +371,7 @@ MANDATORY_KEYS = ['brokers', 'storage_dbconn', 'final_prefix', 'client_id']
 
 class JournalBackfiller:
     """Class in charge of reading the storage's objects and sends those
-       back to the publisher queue.
+       back to the journal's topics.
 
        This is designed to be run periodically.
 
@@ -421,7 +421,7 @@ class JournalBackfiller:
 
     def run(self, object_type, start_object, end_object, dry_run=False):
         """Reads storage's subscribed object types and send them to the
-           publisher's reading queue.
+           journal's reading topic.
 
         """
         start_object, end_object = self.parse_arguments(

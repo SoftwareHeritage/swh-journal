@@ -13,7 +13,7 @@ from swh.journal.backfill import (
 TEST_CONFIG = {
     'brokers': ['localhost'],
     'final_prefix': 'swh.tmp_journal.new',
-    'client_id': 'swh.journal.publisher.test',
+    'client_id': 'swh.journal.client.test',
     'storage_dbconn': 'service=swh-dev',
 }
 
