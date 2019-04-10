@@ -1,3 +1,11 @@
+swh-journal (0.0.9-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.0.9     - (tagged by David Douard
+    <david.douard@sdfa3.org> on 2019-04-10 13:42:32 +0200)
+  * Upstream changes:     - v0.0.9
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 10 Apr 2019 11:48:39 +0000
+
 swh-journal (0.0.8-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.0.8     - (tagged by Antoine R. Dumont
