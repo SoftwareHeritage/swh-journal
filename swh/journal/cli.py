@@ -8,7 +8,9 @@ import logging
 import os
 
 from swh.core import config
-from swh.journal.publisher import JournalPublisher
+from swh.storage import get_storage
+
+from swh.journal.replay import StorageReplayer
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
@@ -41,44 +43,41 @@ def cli(ctx, config_file, log_level):
     conf = config.read(config_file)
     ctx.ensure_object(dict)
 
-    logger = logging.getLogger(__name__)
-    logger.setLevel(log_level)
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s %(levelname)s %(name)s %(message)s',
+    )
 
-    _log = logging.getLogger('kafka')
-    _log.setLevel(logging.INFO)
+    logging.getLogger('kafka').setLevel(logging.INFO)
 
     ctx.obj['config'] = conf
     ctx.obj['loglevel'] = log_level
 
 
 @cli.command()
+@click.option('--max-messages', '-m', default=None, type=int,
+              help='Maximum number of objects to replay. Default is to '
+                   'run forever.')
+@click.option('--broker', 'brokers', type=str, multiple=True,
+              help='Kafka broker to connect to.')
+@click.option('--prefix', type=str, default='swh.journal.objects',
+              help='Prefix of Kafka topic names to read from.')
+@click.option('--consumer-id', type=str,
+              help='Name of the consumer/group id for reading from Kafka.')
 @click.pass_context
-def publisher(ctx):
-    """Manipulate publisher
+def replay(ctx, brokers, prefix, consumer_id, max_messages):
+    """Fill a new storage by reading a journal.
 
     """
-    mandatory_keys = [
-        'brokers', 'temporary_prefix', 'final_prefix', 'consumer_id',
-        'publisher_id', 'object_types', 'storage'
-    ]
-
     conf = ctx.obj['config']
-    missing_keys = []
-    for key in mandatory_keys:
-        if not conf.get(key):
-            missing_keys.append(key)
-
-    if missing_keys:
-        raise click.ClickException(
-            'Configuration error: The following keys must be'
-            ' provided: %s' % (','.join(missing_keys), ))
-
-    publisher = JournalPublisher(conf)
+    storage = get_storage(**conf.pop('storage'))
+    replayer = StorageReplayer(brokers, prefix, consumer_id)
     try:
-        while True:
-            publisher.poll()
+        replayer.fill(storage, max_messages=max_messages)
     except KeyboardInterrupt:
         ctx.exit(0)
+    else:
+        print('Done.')
 
 
 def main():

@@ -3,15 +3,12 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import logging
-
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from kafka import KafkaConsumer
 
 from swh.core.config import SWHConfig
 from .serializers import kafka_to_key, kafka_to_value
-
 
 # Only accepted offset reset policy accepted
 ACCEPTED_OFFSET_RESET = ['earliest', 'latest']
@@ -72,8 +69,6 @@ class JournalClient(SWHConfig, metaclass=ABCMeta):
             additional_configs=[self.ADDITIONAL_CONFIG])
         if extra_configuration:
             self.config.update(extra_configuration)
-
-        self.log = logging.getLogger('swh.journal.client.JournalClient')
 
         auto_offset_reset = self.config['auto_offset_reset']
         if auto_offset_reset not in ACCEPTED_OFFSET_RESET:

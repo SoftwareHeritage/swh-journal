@@ -5,6 +5,8 @@
 
 import msgpack
 
+from swh.core.api.serializers import msgpack_dumps, msgpack_loads
+
 
 def key_to_kafka(key):
     """Serialize a key, possibly a dict, in a predictable way"""
@@ -22,9 +24,9 @@ def kafka_to_key(kafka_key):
 
 def value_to_kafka(value):
     """Serialize some data for storage in kafka"""
-    return msgpack.dumps(value, use_bin_type=True)
+    return msgpack_dumps(value)
 
 
 def kafka_to_value(kafka_value):
     """Deserialize some data stored in kafka"""
-    return msgpack.loads(kafka_value)
+    return msgpack_loads(kafka_value)
