@@ -41,22 +41,38 @@ class StorageReplayer:
         )
 
     def poll(self):
-        yield from self.consumer
+        return self.consumer.poll()
+
+    def commit(self):
+        self.consumer.commit()
 
     def fill(self, storage, max_messages=None):
-        num = 0
-        for message in self.poll():
-            object_type = message.topic.split('.')[-1]
+        nb_messages = 0
 
-            # Got a message from a topic we did not subscribe to.
-            assert object_type in self._object_types, object_type
+        def done():
+            nonlocal nb_messages
+            return max_messages and nb_messages >= max_messages
 
-            self.insert_object(storage, object_type, message.value)
+        while not done():
+            polled = self.poll()
+            for (partition, messages) in polled.items():
+                assert messages
+                for message in messages:
+                    object_type = partition.topic.split('.')[-1]
 
-            num += 1
-            if max_messages and num >= max_messages:
-                break
-        return num
+                    # Got a message from a topic we did not subscribe to.
+                    assert object_type in self._object_types, object_type
+
+                    self.insert_object(storage, object_type, message.value)
+
+                    nb_messages += 1
+                    if done():
+                        break
+                if done():
+                    break
+            self.commit()
+            logger.info('Processed %d messages.' % nb_messages)
+        return nb_messages
 
     def insert_object(self, storage, object_type, object_):
         if object_type in ('content', 'directory', 'revision', 'release',

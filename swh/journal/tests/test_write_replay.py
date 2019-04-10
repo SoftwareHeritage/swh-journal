@@ -17,7 +17,8 @@ from swh.journal.serializers import (
 from swh.journal.direct_writer import DirectKafkaWriter
 from swh.journal.replay import StorageReplayer, OBJECT_TYPES
 
-FakeKafkaMessage = namedtuple('FakeKafkaMessage', 'topic key value')
+FakeKafkaMessage = namedtuple('FakeKafkaMessage', 'key value')
+FakeKafkaPartition = namedtuple('FakeKafkaPartition', 'topic')
 
 
 class MockedDirectKafkaWriter(DirectKafkaWriter):
@@ -30,18 +31,27 @@ class MockedStorageReplayer(StorageReplayer):
         self._object_types = object_types
 
 
-@given(lists(object_dicts()))
+@given(lists(object_dicts(), min_size=1))
 @settings(suppress_health_check=[HealthCheck.too_slow])
 def test_write_replay_same_order(objects):
+    committed = False
     queue = []
 
     def send(topic, key, value):
         key = kafka_to_key(key_to_kafka(key))
         value = kafka_to_value(value_to_kafka(value))
-        queue.append(FakeKafkaMessage(topic=topic, key=key, value=value))
+        queue.append({
+            FakeKafkaPartition(topic):
+                [FakeKafkaMessage(key=key, value=value)]
+        })
 
     def poll():
-        yield from queue
+        return queue.pop(0)
+
+    def commit():
+        nonlocal committed
+        if queue == []:
+            committed = True
 
     storage1 = Storage()
     storage1.journal_writer = MockedDirectKafkaWriter()
@@ -64,7 +74,10 @@ def test_write_replay_same_order(objects):
     storage2 = Storage()
     replayer = MockedStorageReplayer()
     replayer.poll = poll
-    replayer.fill(storage2)
+    replayer.commit = commit
+    replayer.fill(storage2, max_messages=len(queue))
+
+    assert committed
 
     for attr_name in ('_contents', '_directories', '_revisions', '_releases',
                       '_snapshots', '_origin_visits', '_origins'):
