@@ -16,8 +16,13 @@ swh/journal/__init__.py
 swh/journal/checker.py
 swh/journal/cli.py
 swh/journal/client.py
-swh/journal/publisher.py
+swh/journal/direct_writer.py
+swh/journal/replay.py
 swh/journal/serializers.py
 swh/journal/tests/__init__.py
-swh/journal/tests/test_publisher.py
+swh/journal/tests/conftest.py
+swh/journal/tests/test_cli.py
+swh/journal/tests/test_direct_writer.py
+swh/journal/tests/test_replay.py
 swh/journal/tests/test_serializers.py
+swh/journal/tests/test_write_replay.py
