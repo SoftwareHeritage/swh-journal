@@ -1,8 +1,25 @@
-swh-journal (0.0.8-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-journal (0.0.10-1~swh2) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-swh
+  * Disable tests at build-time
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 15 Mar 2019 13:01:34 +0000
+ -- Nicolas Dandrimont <olasd@debian.org>  Thu, 09 May 2019 14:42:24 +0200
+
+swh-journal (0.0.10-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.0.10     - (tagged by Nicolas Dandrimont
+    <nicolas@dandrimont.eu> on 2019-05-09 14:29:52 +0200)
+  * Upstream changes:     - Release swh.journal v0.0.10     - Remove the
+    publisher component, introduce the backfiller component.
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 09 May 2019 12:34:36 +0000
+
+swh-journal (0.0.9-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.0.9     - (tagged by David Douard
+    <david.douard@sdfa3.org> on 2019-04-10 13:42:32 +0200)
+  * Upstream changes:     - v0.0.9
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 10 Apr 2019 11:48:39 +0000
 
 swh-journal (0.0.8-1~swh1) unstable-swh; urgency=medium
 

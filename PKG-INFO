@@ -1,13 +1,13 @@
 Metadata-Version: 2.1
 Name: swh.journal
-Version: 0.0.8
+Version: 0.0.10
 Summary: Software Heritage Journal utilities
 Home-page: https://forge.softwareheritage.org/diffusion/DJNL/
 Author: Software Heritage developers
 Author-email: swh-devel@inria.fr
 License: UNKNOWN
-Project-URL: Bug Reports, https://forge.softwareheritage.org/maniphest
 Project-URL: Funding, https://www.softwareheritage.org/donate
+Project-URL: Bug Reports, https://forge.softwareheritage.org/maniphest
 Project-URL: Source, https://forge.softwareheritage.org/source/swh-journal
 Description: swh-journal
         ===========
@@ -17,6 +17,48 @@ Description: swh-journal
         See the
         [documentation](https://docs.softwareheritage.org/devel/swh-journal/index.html#software-heritage-journal)
         for more details.
+        
+        # Local test
+        
+        As a pre-requisite, you need a kakfa installation path.
+        The following target will take care of this:
+        
+        ```
+        make install
+        ```
+        
+        Then, provided you are in the right virtual environment as described
+        in the [swh getting-started](https://docs.softwareheritage.org/devel/developer-setup.html#developer-setup):
+        
+        ```
+        pytest
+        ```
+        
+        or:
+        
+        ```
+        tox
+        ```
+        
+        
+        # Running
+        
+        ## publisher
+        
+        Command:
+        ```
+        $ swh-journal --config-file ~/.config/swh/journal/publisher.yml \
+                      publisher
+        ```
+        
+        # Auto-completion
+        
+        To have the completion, add the following in your
+        ~/.virtualenvs/swh/bin/postactivate:
+        
+        ```
+        eval "$(_SWH_JOURNAL_COMPLETE=$autocomplete_cmd swh-journal)"
+        ```
         
 Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
