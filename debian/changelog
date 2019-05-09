@@ -1,3 +1,12 @@
+swh-journal (0.0.10-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.0.10     - (tagged by Nicolas Dandrimont
+    <nicolas@dandrimont.eu> on 2019-05-09 14:29:52 +0200)
+  * Upstream changes:     - Release swh.journal v0.0.10     - Remove the
+    publisher component, introduce the backfiller component.
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 09 May 2019 12:34:36 +0000
+
 swh-journal (0.0.9-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.0.9     - (tagged by David Douard
