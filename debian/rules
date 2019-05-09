@@ -9,3 +9,6 @@ export PYBUILD_TEST_ARGS=-m 'not db and not fs'
 override_dh_install:
 	dh_install
 	rm -v $(CURDIR)/debian/python3-*/usr/lib/python*/dist-packages/swh/__init__.py
+
+override_dh_auto_test:
+	# pytest-kafka unavailable and painful to package

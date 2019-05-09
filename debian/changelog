@@ -1,3 +1,9 @@
+swh-journal (0.0.10-1~swh2) unstable-swh; urgency=medium
+
+  * Disable tests at build-time
+
+ -- Nicolas Dandrimont <olasd@debian.org>  Thu, 09 May 2019 14:42:24 +0200
+
 swh-journal (0.0.10-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.0.10     - (tagged by Nicolas Dandrimont
