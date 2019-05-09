@@ -165,8 +165,7 @@ def kafka_prefix():
 TEST_CONFIG = {
     'temporary_prefix': 'swh.tmp_journal.new',
     'final_prefix': 'swh.journal.objects',
-    'consumer_id': 'swh.journal.publisher',
-    'publisher_id': 'swh.journal.publisher',
+    'consumer_id': 'swh.journal.consumer',
     'object_types': OBJECT_TYPE_KEYS.keys(),
     'max_messages': 1,  # will read 1 message and stops
     'storage': {'cls': 'memory', 'args': {}},
@@ -176,7 +175,7 @@ TEST_CONFIG = {
 @pytest.fixture
 def test_config(kafka_server: Tuple[Popen, int],
                 kafka_prefix: str):
-    """Test configuration needed for publisher/producer/consumer
+    """Test configuration needed for producer/consumer
 
     """
     _, port = kafka_server

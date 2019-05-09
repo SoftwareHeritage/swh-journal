@@ -56,38 +56,41 @@ class StorageReplayer:
         while not done():
             polled = self.poll()
             for (partition, messages) in polled.items():
-                assert messages
-                for message in messages:
-                    object_type = partition.topic.split('.')[-1]
+                object_type = partition.topic.split('.')[-1]
+                # Got a message from a topic we did not subscribe to.
+                assert object_type in self._object_types, object_type
 
-                    # Got a message from a topic we did not subscribe to.
-                    assert object_type in self._object_types, object_type
+                self.insert_objects(storage, object_type,
+                                    [msg.value for msg in messages])
 
-                    self.insert_object(storage, object_type, message.value)
-
-                    nb_messages += 1
-                    if done():
-                        break
+                nb_messages += len(messages)
                 if done():
                     break
             self.commit()
             logger.info('Processed %d messages.' % nb_messages)
         return nb_messages
 
-    def insert_object(self, storage, object_type, object_):
+    def insert_objects(self, storage, object_type, objects):
         if object_type in ('content', 'directory', 'revision', 'release',
                            'snapshot', 'origin'):
             if object_type == 'content':
-                try:
-                    storage.content_add_metadata([object_])
-                except HashCollision as e:
-                    logger.error('Hash collision: %s', e.args)
+                # TODO: insert 'content' in batches
+                for object_ in objects:
+                    try:
+                        storage.content_add_metadata([object_])
+                    except HashCollision as e:
+                        logger.error('Hash collision: %s', e.args)
             else:
+                # TODO: split batches that are too large for the storage
+                # to handle?
                 method = getattr(storage, object_type + '_add')
-                method([object_])
+                method(objects)
         elif object_type == 'origin_visit':
-            storage.origin_visit_upsert([{
-                **object_,
-                'origin': storage.origin_add_one(object_['origin'])}])
+            storage.origin_visit_upsert([
+                {
+                    **obj,
+                    'origin': storage.origin_add_one(obj['origin'])
+                }
+                for obj in objects])
         else:
             assert False
