@@ -48,6 +48,8 @@ setup(
     entry_points='''
         [console_scripts]
         swh-journal=swh.journal.cli:main
+        [swh.cli.subcommands]
+        journal=swh.journal.cli:cli
     ''',
     install_requires=parse_requirements() + parse_requirements('swh'),
     setup_requires=['vcversioner'],
