@@ -56,10 +56,11 @@ def test_storage_play(
     config = {
         'brokers': 'localhost:%d' % kafka_server[1],
         'consumer_id': 'replayer',
-        'prefix': kafka_prefix,
+        'topic_prefix': kafka_prefix,
+        'max_messages': nb_sent,
     }
-    replayer = StorageReplayer(**config)
-    nb_inserted = replayer.fill(storage, max_messages=nb_sent)
+    replayer = StorageReplayer(**config, storage=storage)
+    nb_inserted = replayer.process()
     assert nb_sent == nb_inserted
 
     # Check the objects were actually inserted in the storage

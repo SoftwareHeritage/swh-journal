@@ -27,7 +27,9 @@ class MockedDirectKafkaWriter(DirectKafkaWriter):
 
 
 class MockedStorageReplayer(StorageReplayer):
-    def __init__(self, object_types=OBJECT_TYPES):
+    def __init__(self, storage, max_messages, object_types=OBJECT_TYPES):
+        self.storage = storage
+        self.max_messages = max_messages
         self._object_types = object_types
 
 
@@ -72,10 +74,10 @@ def test_write_replay_same_order(objects):
                 pass
 
     storage2 = Storage()
-    replayer = MockedStorageReplayer()
+    replayer = MockedStorageReplayer(storage2, max_messages=len(queue))
     replayer.poll = poll
     replayer.commit = commit
-    replayer.fill(storage2, max_messages=len(queue))
+    replayer.process()
 
     assert committed
 
@@ -135,10 +137,10 @@ def test_write_replay_same_order_batches(objects):
                      for partition in batch.values())
 
     storage2 = Storage()
-    replayer = MockedStorageReplayer()
+    replayer = MockedStorageReplayer(storage2, max_messages=queue_size)
     replayer.poll = poll
     replayer.commit = commit
-    replayer.fill(storage2, max_messages=queue_size)
+    replayer.process()
 
     assert committed
 

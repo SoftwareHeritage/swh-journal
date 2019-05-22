@@ -72,9 +72,10 @@ def replay(ctx, brokers, prefix, consumer_id, max_messages):
     """
     conf = ctx.obj['config']
     storage = get_storage(**conf.pop('storage'))
-    replayer = StorageReplayer(brokers, prefix, consumer_id)
+    replayer = StorageReplayer(brokers, prefix, consumer_id,
+                               storage=storage, max_messages=max_messages)
     try:
-        replayer.fill(storage, max_messages=max_messages)
+        replayer.process()
     except KeyboardInterrupt:
         ctx.exit(0)
     else:

@@ -4,11 +4,14 @@
 # See top-level LICENSE file for more information
 
 from abc import ABCMeta, abstractmethod
-from collections import defaultdict
 from kafka import KafkaConsumer
+import logging
 
-from swh.core.config import SWHConfig
 from .serializers import kafka_to_key, kafka_to_value
+
+
+logger = logging.getLogger(__name__)
+
 
 # Only accepted offset reset policy accepted
 ACCEPTED_OFFSET_RESET = ['earliest', 'latest']
@@ -16,15 +19,16 @@ ACCEPTED_OFFSET_RESET = ['earliest', 'latest']
 # Only accepted object types
 ACCEPTED_OBJECT_TYPES = [
     'content',
+    'directory',
     'revision',
     'release',
-    'occurrence',
+    'snapshot',
     'origin',
     'origin_visit'
 ]
 
 
-class JournalClient(SWHConfig, metaclass=ABCMeta):
+class JournalClient(metaclass=ABCMeta):
     """A base client for the Software Heritage journal.
 
     The current implementation of the journal uses Apache Kafka
@@ -42,41 +46,16 @@ class JournalClient(SWHConfig, metaclass=ABCMeta):
     of maximum `max_messages`.
 
     """
-    DEFAULT_CONFIG = {
-        # Broker to connect to
-        'brokers': ('list[str]', ['localhost']),
-        # Prefix topic to receive notification from
-        'topic_prefix': ('str', 'swh.journal.objects'),
-        # Consumer identifier
-        'consumer_id': ('str', 'swh.journal.client'),
-        # Object types to deal with (in a subscription manner)
-        'object_types': ('list[str]', [
-            'content', 'revision',
-            'release', 'occurrence',
-            'origin', 'origin_visit'
-        ]),
-        # Number of messages to batch process
-        'max_messages': ('int', 100),
-        'auto_offset_reset': ('str', 'earliest')
-    }
+    def __init__(
+            self, brokers, topic_prefix, consumer_id,
+            object_types=ACCEPTED_OBJECT_TYPES,
+            max_messages=0, auto_offset_reset='earliest'):
 
-    CONFIG_BASE_FILENAME = 'journal/client'
-
-    ADDITIONAL_CONFIG = {}
-
-    def __init__(self, extra_configuration={}):
-        self.config = self.parse_config_file(
-            additional_configs=[self.ADDITIONAL_CONFIG])
-        if extra_configuration:
-            self.config.update(extra_configuration)
-
-        auto_offset_reset = self.config['auto_offset_reset']
         if auto_offset_reset not in ACCEPTED_OFFSET_RESET:
             raise ValueError(
                 'Option \'auto_offset_reset\' only accept %s.' %
                 ACCEPTED_OFFSET_RESET)
 
-        object_types = self.config['object_types']
         for object_type in object_types:
             if object_type not in ACCEPTED_OBJECT_TYPES:
                 raise ValueError(
@@ -84,36 +63,46 @@ class JournalClient(SWHConfig, metaclass=ABCMeta):
                     ACCEPTED_OFFSET_RESET)
 
         self.consumer = KafkaConsumer(
-            bootstrap_servers=self.config['brokers'],
+            bootstrap_servers=brokers,
             key_deserializer=kafka_to_key,
             value_deserializer=kafka_to_value,
             auto_offset_reset=auto_offset_reset,
             enable_auto_commit=False,
-            group_id=self.config['consumer_id'],
+            group_id=consumer_id,
         )
 
         self.consumer.subscribe(
-            topics=['%s.%s' % (self.config['topic_prefix'], object_type)
+            topics=['%s.%s' % (topic_prefix, object_type)
                     for object_type in object_types],
         )
 
-        self.max_messages = self.config['max_messages']
+        self.max_messages = max_messages
+        self._object_types = object_types
 
-    def process(self):
-        """Main entry point to process event message reception.
+    def poll(self):
+        return self.consumer.poll()
 
-        """
-        while True:
-            messages = defaultdict(list)
+    def commit(self):
+        self.consumer.commit()
 
-            for num, message in enumerate(self.consumer):
-                object_type = message.topic.split('.')[-1]
-                messages[object_type].append(message.value)
-                if num + 1 >= self.max_messages:
-                    break
+    def process(self, max_messages=None):
+        nb_messages = 0
 
-            self.process_objects(messages)
-            self.consumer.commit()
+        while not self.max_messages or nb_messages < self.max_messages:
+            polled = self.poll()
+            for (partition, messages) in polled.items():
+                object_type = partition.topic.split('.')[-1]
+                # Got a message from a topic we did not subscribe to.
+                assert object_type in self._object_types, object_type
+
+                self.process_objects(
+                    {object_type: [msg.value for msg in messages]})
+
+                nb_messages += len(messages)
+
+            self.commit()
+            logger.info('Processed %d messages.' % nb_messages)
+        return nb_messages
 
     # Override the following method in the sub-classes
 
