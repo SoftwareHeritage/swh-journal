@@ -4,13 +4,15 @@
 # See top-level LICENSE file for more information
 
 import click
+import functools
 import logging
 import os
 
 from swh.core import config
 from swh.storage import get_storage
 
-from swh.journal.replay import StorageReplayer
+from swh.journal.client import JournalClient
+from swh.journal.replay import process_replay_objects
 from swh.journal.backfill import JournalBackfiller
 
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -71,11 +73,16 @@ def replay(ctx, brokers, prefix, consumer_id, max_messages):
 
     """
     conf = ctx.obj['config']
+    logger = logging.getLogger(__name__)
+    logger.setLevel(ctx.obj['loglevel'])
     storage = get_storage(**conf.pop('storage'))
-    replayer = StorageReplayer(brokers, prefix, consumer_id,
-                               storage=storage, max_messages=max_messages)
+    client = JournalClient(brokers, prefix, consumer_id)
+    worker_fn = functools.partial(process_replay_objects, storage=storage)
     try:
-        replayer.process()
+        nb_messages = 0
+        while not max_messages or nb_messages < max_messages:
+            nb_messages += client.process(worker_fn)
+            logger.info('Processed %d messages.' % nb_messages)
     except KeyboardInterrupt:
         ctx.exit(0)
     else:

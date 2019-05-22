@@ -4,6 +4,7 @@
 # See top-level LICENSE file for more information
 
 from collections import namedtuple
+import functools
 
 from hypothesis import given, settings, HealthCheck
 from hypothesis.strategies import lists
@@ -12,10 +13,11 @@ from swh.model.hypothesis_strategies import object_dicts
 from swh.storage.in_memory import Storage
 from swh.storage import HashCollision
 
+from swh.journal.client import JournalClient, ACCEPTED_OBJECT_TYPES
+from swh.journal.direct_writer import DirectKafkaWriter
+from swh.journal.replay import process_replay_objects
 from swh.journal.serializers import (
     key_to_kafka, kafka_to_key, value_to_kafka, kafka_to_value)
-from swh.journal.direct_writer import DirectKafkaWriter
-from swh.journal.replay import StorageReplayer, OBJECT_TYPES
 
 FakeKafkaMessage = namedtuple('FakeKafkaMessage', 'key value')
 FakeKafkaPartition = namedtuple('FakeKafkaPartition', 'topic')
@@ -26,10 +28,8 @@ class MockedDirectKafkaWriter(DirectKafkaWriter):
         self._prefix = 'prefix'
 
 
-class MockedStorageReplayer(StorageReplayer):
-    def __init__(self, storage, max_messages, object_types=OBJECT_TYPES):
-        self.storage = storage
-        self.max_messages = max_messages
+class MockedJournalClient(JournalClient):
+    def __init__(self, object_types=ACCEPTED_OBJECT_TYPES):
         self._object_types = object_types
 
 
@@ -74,11 +74,16 @@ def test_write_replay_same_order(objects):
                 pass
 
     storage2 = Storage()
-    replayer = MockedStorageReplayer(storage2, max_messages=len(queue))
+    worker_fn = functools.partial(process_replay_objects, storage=storage2)
+    replayer = MockedJournalClient()
     replayer.poll = poll
     replayer.commit = commit
-    replayer.process()
+    queue_size = len(queue)
+    nb_messages = 0
+    while nb_messages < queue_size:
+        nb_messages += replayer.process(worker_fn)
 
+    assert nb_messages == queue_size
     assert committed
 
     for attr_name in ('_contents', '_directories', '_revisions', '_releases',
@@ -137,10 +142,13 @@ def test_write_replay_same_order_batches(objects):
                      for partition in batch.values())
 
     storage2 = Storage()
-    replayer = MockedStorageReplayer(storage2, max_messages=queue_size)
+    worker_fn = functools.partial(process_replay_objects, storage=storage2)
+    replayer = MockedJournalClient()
     replayer.poll = poll
     replayer.commit = commit
-    replayer.process()
+    nb_messages = 0
+    while nb_messages < queue_size:
+        nb_messages += replayer.process(worker_fn)
 
     assert committed
 

@@ -3,7 +3,6 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from abc import ABCMeta, abstractmethod
 from kafka import KafkaConsumer
 import logging
 
@@ -28,7 +27,7 @@ ACCEPTED_OBJECT_TYPES = [
 ]
 
 
-class JournalClient(metaclass=ABCMeta):
+class JournalClient:
     """A base client for the Software Heritage journal.
 
     The current implementation of the journal uses Apache Kafka
@@ -85,34 +84,25 @@ class JournalClient(metaclass=ABCMeta):
     def commit(self):
         self.consumer.commit()
 
-    def process(self, max_messages=None):
-        nb_messages = 0
-
-        while not self.max_messages or nb_messages < self.max_messages:
-            polled = self.poll()
-            for (partition, messages) in polled.items():
-                object_type = partition.topic.split('.')[-1]
-                # Got a message from a topic we did not subscribe to.
-                assert object_type in self._object_types, object_type
-
-                self.process_objects(
-                    {object_type: [msg.value for msg in messages]})
-
-                nb_messages += len(messages)
-
-            self.commit()
-            logger.info('Processed %d messages.' % nb_messages)
-        return nb_messages
-
-    # Override the following method in the sub-classes
-
-    @abstractmethod
-    def process_objects(self, messages):
-        """Process the objects (store, compute, etc...)
+    def process(self, worker_fn):
+        """Polls Kafka for a batch of messages, and calls the worker_fn
+        with these messages.
 
         Args:
-            messages (dict): Dict of key object_type (as per
-            configuration) and their associated values.
-
+            worker_fn Callable[Dict[str, List[dict]]]: Function called with
+                                                       the messages as
+                                                       argument.
         """
-        pass
+        nb_messages = 0
+        polled = self.poll()
+        for (partition, messages) in polled.items():
+            object_type = partition.topic.split('.')[-1]
+            # Got a message from a topic we did not subscribe to.
+            assert object_type in self._object_types, object_type
+
+            worker_fn({object_type: [msg.value for msg in messages]})
+
+            nb_messages += len(messages)
+
+        self.commit()
+        return nb_messages

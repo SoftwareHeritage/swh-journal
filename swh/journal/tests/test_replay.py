@@ -4,6 +4,7 @@
 # See top-level LICENSE file for more information
 
 import datetime
+import functools
 import random
 from subprocess import Popen
 from typing import Tuple
@@ -13,8 +14,9 @@ from kafka import KafkaProducer
 
 from swh.storage import get_storage
 
+from swh.journal.client import JournalClient
 from swh.journal.serializers import key_to_kafka, value_to_kafka
-from swh.journal.replay import StorageReplayer
+from swh.journal.replay import process_replay_objects
 
 from .conftest import OBJECT_TYPE_KEYS
 
@@ -59,8 +61,11 @@ def test_storage_play(
         'topic_prefix': kafka_prefix,
         'max_messages': nb_sent,
     }
-    replayer = StorageReplayer(**config, storage=storage)
-    nb_inserted = replayer.process()
+    replayer = JournalClient(**config)
+    worker_fn = functools.partial(process_replay_objects, storage=storage)
+    nb_inserted = 0
+    while nb_inserted < nb_sent:
+        nb_inserted += replayer.process(worker_fn)
     assert nb_sent == nb_inserted
 
     # Check the objects were actually inserted in the storage
