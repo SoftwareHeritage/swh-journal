@@ -41,7 +41,7 @@ def invoke(catch_exceptions, args):
     with tempfile.NamedTemporaryFile('a', suffix='.yml') as config_fd:
         config_fd.write(CLI_CONFIG)
         config_fd.seek(0)
-        args = ['-C' + config_fd.name, '-l', 'DEBUG'] + args
+        args = ['-C' + config_fd.name] + args
         result = runner.invoke(cli, args)
     if not catch_exceptions and result.exception:
         print(result.output)
@@ -75,7 +75,7 @@ def test_replay(
     result = invoke(False, [
         'replay',
         '--broker', 'localhost:%d' % port,
-        '--consumer-id', 'test-cli-consumer',
+        '--group-id', 'test-cli-consumer',
         '--prefix', kafka_prefix,
         '--max-messages', '1',
     ])
