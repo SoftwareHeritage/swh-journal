@@ -7,7 +7,7 @@ from kafka import KafkaConsumer
 import logging
 
 from .serializers import kafka_to_key, kafka_to_value
-
+from swh.journal import DEFAULT_PREFIX
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class JournalClient:
 
     """
     def __init__(
-            self, brokers, topic_prefix, consumer_id,
+            self, brokers, group_id, prefix=DEFAULT_PREFIX,
             object_types=ACCEPTED_OBJECT_TYPES,
             max_messages=0, auto_offset_reset='earliest'):
 
@@ -67,11 +67,11 @@ class JournalClient:
             value_deserializer=kafka_to_value,
             auto_offset_reset=auto_offset_reset,
             enable_auto_commit=False,
-            group_id=consumer_id,
+            group_id=group_id,
         )
 
         self.consumer.subscribe(
-            topics=['%s.%s' % (topic_prefix, object_type)
+            topics=['%s.%s' % (prefix, object_type)
                     for object_type in object_types],
         )
 

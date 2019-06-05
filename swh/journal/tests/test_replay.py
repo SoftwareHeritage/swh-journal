@@ -57,8 +57,8 @@ def test_storage_play(
     # Fill the storage from Kafka
     config = {
         'brokers': 'localhost:%d' % kafka_server[1],
-        'consumer_id': 'replayer',
-        'topic_prefix': kafka_prefix,
+        'group_id': 'replayer',
+        'prefix': kafka_prefix,
         'max_messages': nb_sent,
     }
     replayer = JournalClient(**config)
