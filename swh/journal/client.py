@@ -78,12 +78,6 @@ class JournalClient:
         self.max_messages = max_messages
         self._object_types = object_types
 
-    def poll(self):
-        return self.consumer.poll()
-
-    def commit(self):
-        self.consumer.commit()
-
     def process(self, worker_fn):
         """Polls Kafka for a batch of messages, and calls the worker_fn
         with these messages.
@@ -94,7 +88,7 @@ class JournalClient:
                                                        argument.
         """
         nb_messages = 0
-        polled = self.poll()
+        polled = self.consumer.poll()
         for (partition, messages) in polled.items():
             object_type = partition.topic.split('.')[-1]
             # Got a message from a topic we did not subscribe to.
@@ -104,5 +98,5 @@ class JournalClient:
 
             nb_messages += len(messages)
 
-        self.commit()
+        self.consumer.commit()
         return nb_messages
