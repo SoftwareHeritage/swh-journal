@@ -366,7 +366,7 @@ def fetch(db, obj_type, start, end):
             yield record
 
 
-MANDATORY_KEYS = ['brokers', 'storage_dbconn', 'final_prefix', 'client_id']
+MANDATORY_KEYS = ['brokers', 'storage_dbconn', 'prefix', 'client_id']
 
 
 class JournalBackfiller:
@@ -430,7 +430,7 @@ class JournalBackfiller:
         db = BaseDb.connect(self.config['storage_dbconn'])
         writer = DirectKafkaWriter(
             brokers=self.config['brokers'],
-            prefix=self.config['final_prefix'],
+            prefix=self.config['prefix'],
             client_id=self.config['client_id']
         )
         for range_start, range_end in RANGE_GENERATORS[object_type](
