@@ -50,6 +50,24 @@ def cli(ctx, config_file):
     ctx.obj['config'] = conf
 
 
+def get_journal_client(ctx, brokers, prefix, group_id):
+    conf = ctx.obj['config']
+    if brokers is None:
+        brokers = conf.get('journal', {}).get('brokers')
+    if not brokers:
+        ctx.fail('You must specify at least one kafka broker.')
+    if not isinstance(brokers, (list, tuple)):
+        brokers = [brokers]
+
+    if prefix is None:
+        prefix = conf.get('journal', {}).get('prefix')
+
+    if group_id is None:
+        group_id = conf.get('journal', {}).get('group_id')
+
+    return JournalClient(brokers=brokers, group_id=group_id, prefix=prefix)
+
+
 @cli.command()
 @click.option('--max-messages', '-m', default=None, type=int,
               help='Maximum number of objects to replay. Default is to '
@@ -77,20 +95,7 @@ def replay(ctx, brokers, prefix, group_id, max_messages):
     except KeyError:
         ctx.fail('You must have a storage configured in your config file.')
 
-    if brokers is None:
-        brokers = conf.get('journal', {}).get('brokers')
-    if not brokers:
-        ctx.fail('You must specify at least one kafka broker.')
-    if not isinstance(brokers, (list, tuple)):
-        brokers = [brokers]
-
-    if prefix is None:
-        prefix = conf.get('journal', {}).get('prefix')
-
-    if group_id is None:
-        group_id = conf.get('journal', {}).get('group_id')
-
-    client = JournalClient(brokers=brokers, group_id=group_id, prefix=prefix)
+    client = get_journal_client(ctx, brokers, prefix, group_id)
     worker_fn = functools.partial(process_replay_objects, storage=storage)
 
     try:
@@ -173,18 +178,7 @@ def content_replay(ctx, brokers, prefix, group_id):
         ctx.fail('You must have a destination objstorage configured '
                  'in your config file.')
 
-    if brokers is None:
-        brokers = conf.get('journal', {}).get('brokers')
-    if not brokers:
-        ctx.fail('You must specify at least one kafka broker.')
-
-    if prefix is None:
-        prefix = conf.get('journal', {}).get('prefix')
-
-    if group_id is None:
-        group_id = conf.get('journal', {}).get('group_id')
-
-    client = JournalClient(brokers=brokers, group_id=group_id, prefix=prefix)
+    client = get_journal_client(ctx, brokers, prefix, group_id)
     worker_fn = functools.partial(process_replay_objects_content,
                                   src=objstorage_src,
                                   dst=objstorage_dst)
