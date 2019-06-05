@@ -11,9 +11,11 @@ import os
 from swh.core import config
 from swh.core.cli import CONTEXT_SETTINGS
 from swh.storage import get_storage
+from swh.objstorage import get_objstorage
 
 from swh.journal.client import JournalClient
 from swh.journal.replay import process_replay_objects
+from swh.journal.replay import process_replay_objects_content
 from swh.journal.backfill import JournalBackfiller
 
 
@@ -134,6 +136,68 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
             dry_run=dry_run)
     except KeyboardInterrupt:
         ctx.exit(0)
+
+
+@cli.command()
+@click.option('--broker', 'brokers', type=str, multiple=True,
+              hidden=True,  # prefer config file
+              help='Kafka broker to connect to.')
+@click.option('--prefix', type=str, default=None,
+              hidden=True,  # prefer config file
+              help='Prefix of Kafka topic names to read from.')
+@click.option('--group-id', '--consumer-id', type=str,
+              hidden=True,  # prefer config file
+              help='Name of the consumer/group id for reading from Kafka.')
+@click.pass_context
+def content_replay(ctx, brokers, prefix, group_id):
+    """Fill a destination Object Storage (typically a mirror) by reading a Journal
+    and retrieving objects from an existing source ObjStorage.
+
+    There can be several 'replayers' filling a given ObjStorage as long as they
+    use the same `group-id`.
+
+    This service retrieves object ids to copy from the 'content' topic. It will
+    only copy object's content if the object's description in the kafka
+    nmessage has the status:visible set.
+    """
+    logger = logging.getLogger(__name__)
+    conf = ctx.obj['config']
+    try:
+        objstorage_src = get_objstorage(**conf.pop('objstorage_src'))
+    except KeyError:
+        ctx.fail('You must have a source objstorage configured in '
+                 'your config file.')
+    try:
+        objstorage_dst = get_objstorage(**conf.pop('objstorage_dst'))
+    except KeyError:
+        ctx.fail('You must have a destination objstorage configured '
+                 'in your config file.')
+
+    if brokers is None:
+        brokers = conf.get('journal', {}).get('brokers')
+    if not brokers:
+        ctx.fail('You must specify at least one kafka broker.')
+
+    if prefix is None:
+        prefix = conf.get('journal', {}).get('prefix')
+
+    if group_id is None:
+        group_id = conf.get('journal', {}).get('group_id')
+
+    client = JournalClient(brokers=brokers, group_id=group_id, prefix=prefix)
+    worker_fn = functools.partial(process_replay_objects_content,
+                                  src=objstorage_src,
+                                  dst=objstorage_dst)
+
+    try:
+        nb_messages = 0
+        while True:
+            nb_messages += client.process(worker_fn)
+            logger.info('Processed %d messages.' % nb_messages)
+    except KeyboardInterrupt:
+        ctx.exit(0)
+    else:
+        print('Done.')
 
 
 def main():

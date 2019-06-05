@@ -16,6 +16,7 @@ from swh.storage import HashCollision
 from swh.journal.client import JournalClient, ACCEPTED_OBJECT_TYPES
 from swh.journal.direct_writer import DirectKafkaWriter
 from swh.journal.replay import process_replay_objects
+from swh.journal.replay import process_replay_objects_content
 from swh.journal.serializers import (
     key_to_kafka, kafka_to_key, value_to_kafka, kafka_to_value)
 
@@ -101,3 +102,32 @@ def test_write_replay_same_order_batches(objects):
 
 
 # TODO: add test for hash collision
+
+
+@given(lists(object_dicts(), min_size=1))
+@settings(suppress_health_check=[HealthCheck.too_slow])
+def test_write_replay_content(objects):
+    queue = []
+    replayer = MockedJournalClient(queue)
+
+    storage1 = Storage()
+    storage1.journal_writer = MockedKafkaWriter(queue)
+
+    for (obj_type, obj) in objects:
+        obj = obj.copy()
+        if obj_type == 'content':
+            storage1.content_add([obj])
+
+    queue_size = sum(len(partition)
+                     for batch in queue
+                     for partition in batch.values())
+
+    storage2 = Storage()
+    worker_fn = functools.partial(process_replay_objects_content,
+                                  src=storage1.objstorage,
+                                  dst=storage2.objstorage)
+    nb_messages = 0
+    while nb_messages < queue_size:
+        nb_messages += replayer.process(worker_fn)
+
+    assert storage1.objstorage.state == storage2.objstorage.state

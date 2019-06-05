@@ -85,3 +85,6 @@ def test_replay(
 
     assert storage.snapshot_get(snapshot['id']) == {
         **snapshot, 'next_branch': None}
+
+
+# TODO: write a test for the content-replay command

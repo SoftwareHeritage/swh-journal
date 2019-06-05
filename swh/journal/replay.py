@@ -6,6 +6,7 @@
 import logging
 
 from swh.storage import HashCollision
+from swh.objstorage.objstorage import ID_HASH_ALGO
 
 
 logger = logging.getLogger(__name__)
@@ -39,3 +40,16 @@ def _insert_objects(object_type, objects, storage):
             for obj in objects])
     else:
         assert False
+
+
+def process_replay_objects_content(all_objects, *, src, dst):
+    for (object_type, objects) in all_objects.items():
+        if object_type != 'content':
+            logger.warning('Received a series of %s, this should not happen',
+                           object_type)
+            continue
+        for obj in objects:
+            if obj['status'] == 'visible':
+                obj_id = obj[ID_HASH_ALGO]
+                obj = src.get(obj_id)
+                dst.add(obj, obj_id=obj_id)
