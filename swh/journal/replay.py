@@ -39,7 +39,8 @@ def _insert_objects(object_type, objects, storage):
             }
             for obj in objects])
     else:
-        assert False
+        logger.warning('Received a series of %s, this should not happen',
+                       object_type)
 
 
 def process_replay_objects_content(all_objects, *, src, dst):
