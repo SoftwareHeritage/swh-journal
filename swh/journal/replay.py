@@ -6,6 +6,7 @@
 import logging
 
 from swh.storage import HashCollision
+from swh.model.hashutil import hash_to_hex
 from swh.objstorage.objstorage import ID_HASH_ALGO
 
 
@@ -49,8 +50,16 @@ def process_replay_objects_content(all_objects, *, src, dst):
             logger.warning('Received a series of %s, this should not happen',
                            object_type)
             continue
+        logger.info('processing %s content objects', len(objects))
         for obj in objects:
+            obj_id = obj[ID_HASH_ALGO]
             if obj['status'] == 'visible':
-                obj_id = obj[ID_HASH_ALGO]
-                obj = src.get(obj_id)
-                dst.add(obj, obj_id=obj_id)
+                try:
+                    obj = src.get(obj_id)
+                    dst.add(obj, obj_id=obj_id)
+                    logger.debug('copied %s', hash_to_hex(obj_id))
+                except Exception:
+                    logger.exception('Failed to copy %s', hash_to_hex(obj_id))
+            else:
+                logger.debug('skipped %s (%s)',
+                             hash_to_hex(obj_id), obj['status'])
