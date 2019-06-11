@@ -32,24 +32,27 @@ class JournalClient:
 
     The current implementation of the journal uses Apache Kafka
     brokers to publish messages under a given topic prefix, with each
-    object type using a specific topic under that prefix.
+    object type using a specific topic under that prefix. If the 'prefix'
+    argument is None (default value), it will take the default value
+    'swh.journal.objects'.
 
     Clients subscribe to events specific to each object type by using
     the `object_types` configuration variable.
 
-    Clients can be sharded by setting the `client_id` to a common
+    Clients can be sharded by setting the `group_id` to a common
     value across instances. The journal will share the message
-    throughput across the nodes sharing the same client_id.
+    throughput across the nodes sharing the same group_id.
 
     Messages are processed by the `process_objects` method in batches
     of maximum `max_messages`.
 
     """
     def __init__(
-            self, brokers, group_id, prefix=DEFAULT_PREFIX,
+            self, brokers, group_id, prefix=None,
             object_types=ACCEPTED_OBJECT_TYPES,
             max_messages=0, auto_offset_reset='earliest'):
-
+        if prefix is None:
+            prefix = DEFAULT_PREFIX
         if auto_offset_reset not in ACCEPTED_OFFSET_RESET:
             raise ValueError(
                 'Option \'auto_offset_reset\' only accept %s.' %
