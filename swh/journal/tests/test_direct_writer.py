@@ -96,6 +96,7 @@ def test_storage_direct_writer(
             for object_ in objects:
                 object_ = object_.copy()
                 origin_id = storage.origin_add_one(object_.pop('origin'))
+                del object_['type']
                 visit = method(origin=origin_id, date=object_.pop('date'))
                 visit_id = visit['visit']
                 storage.origin_visit_update(origin_id, visit_id, **object_)

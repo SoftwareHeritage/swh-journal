@@ -113,6 +113,7 @@ ORIGIN_VISITS = [
         'snapshot': None,  # TODO
         'status': 'ongoing',  # TODO
         'metadata': {'foo': 'bar'},
+        'type': 'git',
     },
     {
         'origin': ORIGINS[0],
@@ -120,6 +121,7 @@ ORIGIN_VISITS = [
         'snapshot': None,  # TODO
         'status': 'ongoing',  # TODO
         'metadata': {'baz': 'qux'},
+        'type': 'git',
     }
 ]
 
