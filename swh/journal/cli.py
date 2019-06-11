@@ -13,7 +13,7 @@ from swh.core.cli import CONTEXT_SETTINGS
 from swh.storage import get_storage
 from swh.objstorage import get_objstorage
 
-from swh.journal.client import JournalClient, ACCEPTED_OBJECT_TYPES
+from swh.journal.client import JournalClient
 from swh.journal.replay import process_replay_objects
 from swh.journal.replay import process_replay_objects_content
 from swh.journal.backfill import JournalBackfiller
@@ -50,8 +50,7 @@ def cli(ctx, config_file):
     ctx.obj['config'] = conf
 
 
-def get_journal_client(ctx, brokers, prefix, group_id,
-                       object_types=ACCEPTED_OBJECT_TYPES):
+def get_journal_client(ctx, brokers, prefix, group_id, object_types=None):
     conf = ctx.obj['config']
     if brokers is None:
         brokers = conf.get('journal', {}).get('brokers')
@@ -66,9 +65,10 @@ def get_journal_client(ctx, brokers, prefix, group_id,
     if group_id is None:
         group_id = conf.get('journal', {}).get('group_id')
 
-    return JournalClient(
-        brokers=brokers, group_id=group_id, prefix=prefix,
-        object_types=object_types)
+    kwargs = dict(brokers=brokers, group_id=group_id, prefix=prefix)
+    if object_types:
+        kwargs['object_types'] = object_types
+    return JournalClient(**kwargs)
 
 
 @cli.command()
@@ -181,7 +181,8 @@ def content_replay(ctx, brokers, prefix, group_id):
         ctx.fail('You must have a destination objstorage configured '
                  'in your config file.')
 
-    client = get_journal_client(ctx, brokers, prefix, group_id)
+    client = get_journal_client(ctx, brokers, prefix, group_id,
+                                object_types=('content',))
     worker_fn = functools.partial(process_replay_objects_content,
                                   src=objstorage_src,
                                   dst=objstorage_dst)

@@ -36,8 +36,8 @@ class JournalClient:
     argument is None (default value), it will take the default value
     'swh.journal.objects'.
 
-    Clients subscribe to events specific to each object type by using
-    the `object_types` configuration variable.
+    Clients subscribe to events specific to each object type as listed in the
+    `object_types` argument (if unset, defaults to all accepted objet types).
 
     Clients can be sharded by setting the `group_id` to a common
     value across instances. The journal will share the message
@@ -48,11 +48,12 @@ class JournalClient:
 
     """
     def __init__(
-            self, brokers, group_id, prefix=None,
-            object_types=ACCEPTED_OBJECT_TYPES,
+            self, brokers, group_id, prefix=None, object_types=None,
             max_messages=0, auto_offset_reset='earliest'):
         if prefix is None:
             prefix = DEFAULT_PREFIX
+        if object_types is None:
+            object_types = ACCEPTED_OBJECT_TYPES
         if auto_offset_reset not in ACCEPTED_OFFSET_RESET:
             raise ValueError(
                 'Option \'auto_offset_reset\' only accept %s.' %
