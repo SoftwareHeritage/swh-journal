@@ -52,7 +52,7 @@ def cli(ctx, config_file):
 
 def get_journal_client(ctx, brokers, prefix, group_id, object_types=None):
     conf = ctx.obj['config']
-    if brokers is None:
+    if not brokers:
         brokers = conf.get('journal', {}).get('brokers')
     if not brokers:
         ctx.fail('You must specify at least one kafka broker.')
