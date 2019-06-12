@@ -113,6 +113,7 @@ ORIGIN_VISITS = [
         'snapshot': None,  # TODO
         'status': 'ongoing',  # TODO
         'metadata': {'foo': 'bar'},
+        'type': 'git',
     },
     {
         'origin': ORIGINS[0],
@@ -120,6 +121,7 @@ ORIGIN_VISITS = [
         'snapshot': None,  # TODO
         'status': 'ongoing',  # TODO
         'metadata': {'baz': 'qux'},
+        'type': 'git',
     }
 ]
 
@@ -163,8 +165,6 @@ def kafka_prefix():
 
 
 TEST_CONFIG = {
-    'temporary_prefix': 'swh.tmp_journal.new',
-    'final_prefix': 'swh.journal.objects',
     'consumer_id': 'swh.journal.consumer',
     'object_types': OBJECT_TYPE_KEYS.keys(),
     'max_messages': 1,  # will read 1 message and stops
@@ -182,8 +182,7 @@ def test_config(kafka_server: Tuple[Popen, int],
     return {
         **TEST_CONFIG,
         'brokers': ['localhost:{}'.format(port)],
-        'temporary_prefix': kafka_prefix + '.swh.tmp_journal.new',
-        'final_prefix': kafka_prefix + '.swh.journal.objects',
+        'prefix': kafka_prefix + '.swh.journal.objects',
     }
 
 
@@ -194,7 +193,7 @@ def consumer(
 
     """
     kafka_topics = [
-        '%s.%s' % (test_config['final_prefix'], object_type)
+        '%s.%s' % (test_config['prefix'], object_type)
         for object_type in test_config['object_types']]
     _, kafka_port = kafka_server
     consumer = KafkaConsumer(
