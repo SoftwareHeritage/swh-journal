@@ -5,92 +5,61 @@
 
 import logging
 
-from kafka import KafkaConsumer
-
 from swh.storage import HashCollision
+from swh.model.hashutil import hash_to_hex
+from swh.objstorage.objstorage import ID_HASH_ALGO
 
-from .serializers import kafka_to_value
 
 logger = logging.getLogger(__name__)
 
 
-OBJECT_TYPES = frozenset([
-    'origin', 'origin_visit', 'snapshot', 'release', 'revision',
-    'directory', 'content',
-])
+def process_replay_objects(all_objects, *, storage):
+    for (object_type, objects) in all_objects.items():
+        _insert_objects(object_type, objects, storage)
 
 
-class StorageReplayer:
-    def __init__(self, brokers, prefix, consumer_id,
-                 object_types=OBJECT_TYPES):
-        if not set(object_types).issubset(OBJECT_TYPES):
-            raise ValueError('Unknown object types: %s' % ', '.join(
-                set(object_types) - OBJECT_TYPES))
+def _insert_objects(object_type, objects, storage):
+    if object_type == 'content':
+        # TODO: insert 'content' in batches
+        for object_ in objects:
+            try:
+                storage.content_add_metadata([object_])
+            except HashCollision as e:
+                logger.error('Hash collision: %s', e.args)
+    elif object_type in ('directory', 'revision', 'release',
+                         'snapshot', 'origin'):
+        # TODO: split batches that are too large for the storage
+        # to handle?
+        method = getattr(storage, object_type + '_add')
+        method(objects)
+    elif object_type == 'origin_visit':
+        storage.origin_visit_upsert([
+            {
+                **obj,
+                'origin': storage.origin_add_one(obj['origin'])
+            }
+            for obj in objects])
+    else:
+        logger.warning('Received a series of %s, this should not happen',
+                       object_type)
 
-        self._object_types = object_types
-        self.consumer = KafkaConsumer(
-            bootstrap_servers=brokers,
-            value_deserializer=kafka_to_value,
-            auto_offset_reset='earliest',
-            enable_auto_commit=False,
-            group_id=consumer_id,
-        )
-        self.consumer.subscribe(
-            topics=['%s.%s' % (prefix, object_type)
-                    for object_type in object_types],
-        )
 
-    def poll(self):
-        return self.consumer.poll()
-
-    def commit(self):
-        self.consumer.commit()
-
-    def fill(self, storage, max_messages=None):
-        nb_messages = 0
-
-        def done():
-            nonlocal nb_messages
-            return max_messages and nb_messages >= max_messages
-
-        while not done():
-            polled = self.poll()
-            for (partition, messages) in polled.items():
-                object_type = partition.topic.split('.')[-1]
-                # Got a message from a topic we did not subscribe to.
-                assert object_type in self._object_types, object_type
-
-                self.insert_objects(storage, object_type,
-                                    [msg.value for msg in messages])
-
-                nb_messages += len(messages)
-                if done():
-                    break
-            self.commit()
-            logger.info('Processed %d messages.' % nb_messages)
-        return nb_messages
-
-    def insert_objects(self, storage, object_type, objects):
-        if object_type in ('content', 'directory', 'revision', 'release',
-                           'snapshot', 'origin'):
-            if object_type == 'content':
-                # TODO: insert 'content' in batches
-                for object_ in objects:
-                    try:
-                        storage.content_add_metadata([object_])
-                    except HashCollision as e:
-                        logger.error('Hash collision: %s', e.args)
+def process_replay_objects_content(all_objects, *, src, dst):
+    for (object_type, objects) in all_objects.items():
+        if object_type != 'content':
+            logger.warning('Received a series of %s, this should not happen',
+                           object_type)
+            continue
+        logger.info('processing %s content objects', len(objects))
+        for obj in objects:
+            obj_id = obj[ID_HASH_ALGO]
+            if obj['status'] == 'visible':
+                try:
+                    obj = src.get(obj_id)
+                    dst.add(obj, obj_id=obj_id)
+                    logger.debug('copied %s', hash_to_hex(obj_id))
+                except Exception:
+                    logger.exception('Failed to copy %s', hash_to_hex(obj_id))
             else:
-                # TODO: split batches that are too large for the storage
-                # to handle?
-                method = getattr(storage, object_type + '_add')
-                method(objects)
-        elif object_type == 'origin_visit':
-            storage.origin_visit_upsert([
-                {
-                    **obj,
-                    'origin': storage.origin_add_one(obj['origin'])
-                }
-                for obj in objects])
-        else:
-            assert False
+                logger.debug('skipped %s (%s)',
+                             hash_to_hex(obj_id), obj['status'])

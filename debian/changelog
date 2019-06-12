@@ -1,8 +1,10 @@
-swh-journal (0.0.10-1~swh2~bpo9+1) stretch-swh; urgency=medium
+swh-journal (0.0.11-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-swh
+  * New upstream release 0.0.11     - (tagged by David Douard
+    <david.douard@sdfa3.org> on 2019-06-12 13:58:14 +0200)
+  * Upstream changes:     - v0.0.11
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 09 May 2019 13:01:40 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 12 Jun 2019 12:10:52 +0000
 
 swh-journal (0.0.10-1~swh2) unstable-swh; urgency=medium
 
