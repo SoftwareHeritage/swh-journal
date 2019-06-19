@@ -137,6 +137,9 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
 
 
 @cli.command()
+@click.option('--concurrency', type=int,
+              default=8,
+              help='Concurrentcy level.')
 @click.option('--broker', 'brokers', type=str, multiple=True,
               hidden=True,  # prefer config file
               help='Kafka broker to connect to.')
@@ -147,7 +150,7 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
               hidden=True,  # prefer config file
               help='Name of the consumer/group id for reading from Kafka.')
 @click.pass_context
-def content_replay(ctx, brokers, prefix, group_id):
+def content_replay(ctx, concurrency, brokers, prefix, group_id):
     """Fill a destination Object Storage (typically a mirror) by reading a Journal
     and retrieving objects from an existing source ObjStorage.
 
@@ -176,7 +179,8 @@ def content_replay(ctx, brokers, prefix, group_id):
         object_types=('content',))
     worker_fn = functools.partial(process_replay_objects_content,
                                   src=objstorage_src,
-                                  dst=objstorage_dst)
+                                  dst=objstorage_dst,
+                                  concurrency=concurrency)
 
     try:
         nb_messages = 0
@@ -186,7 +190,7 @@ def content_replay(ctx, brokers, prefix, group_id):
     except KeyboardInterrupt:
         ctx.exit(0)
     else:
-        print('Done.')
+        logger.info('Done.')
 
 
 def main():
