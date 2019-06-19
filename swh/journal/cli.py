@@ -50,25 +50,14 @@ def cli(ctx, config_file):
     ctx.obj['config'] = conf
 
 
-def get_journal_client(ctx, brokers, prefix, group_id, object_types=None):
-    conf = ctx.obj['config']
-    if not brokers:
-        brokers = conf.get('journal', {}).get('brokers')
-    if not brokers:
+def get_journal_client(ctx, **kwargs):
+    conf = ctx.obj['config'].get('journal', {})
+    conf.update({k: v for (k, v) in kwargs.items() if v not in (None, ())})
+    if not conf.get('brokers'):
         ctx.fail('You must specify at least one kafka broker.')
-    if not isinstance(brokers, (list, tuple)):
-        brokers = [brokers]
-
-    if prefix is None:
-        prefix = conf.get('journal', {}).get('prefix')
-
-    if group_id is None:
-        group_id = conf.get('journal', {}).get('group_id')
-
-    kwargs = dict(brokers=brokers, group_id=group_id, prefix=prefix)
-    if object_types:
-        kwargs['object_types'] = object_types
-    return JournalClient(**kwargs)
+    if not isinstance(conf['brokers'], (list, tuple)):
+        conf['brokers'] = [conf['brokers']]
+    return JournalClient(**conf)
 
 
 @cli.command()
@@ -98,7 +87,8 @@ def replay(ctx, brokers, prefix, group_id, max_messages):
     except KeyError:
         ctx.fail('You must have a storage configured in your config file.')
 
-    client = get_journal_client(ctx, brokers, prefix, group_id)
+    client = get_journal_client(
+        ctx, brokers=brokers, prefix=prefix, group_id=group_id)
     worker_fn = functools.partial(process_replay_objects, storage=storage)
 
     try:
@@ -181,8 +171,9 @@ def content_replay(ctx, brokers, prefix, group_id):
         ctx.fail('You must have a destination objstorage configured '
                  'in your config file.')
 
-    client = get_journal_client(ctx, brokers, prefix, group_id,
-                                object_types=('content',))
+    client = get_journal_client(
+        ctx, brokers=brokers, prefix=prefix, group_id=group_id,
+        object_types=('content',))
     worker_fn = functools.partial(process_replay_objects_content,
                                   src=objstorage_src,
                                   dst=objstorage_dst)
