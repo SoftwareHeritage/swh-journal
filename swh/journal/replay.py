@@ -3,12 +3,14 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from time import time
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from swh.storage import HashCollision
 from swh.model.hashutil import hash_to_hex
 from swh.objstorage.objstorage import ID_HASH_ALGO
-
+from swh.core.statsd import statsd
 
 logger = logging.getLogger(__name__)
 
@@ -44,22 +46,45 @@ def _insert_objects(object_type, objects, storage):
                        object_type)
 
 
-def process_replay_objects_content(all_objects, *, src, dst):
-    for (object_type, objects) in all_objects.items():
-        if object_type != 'content':
-            logger.warning('Received a series of %s, this should not happen',
-                           object_type)
-            continue
-        logger.info('processing %s content objects', len(objects))
-        for obj in objects:
-            obj_id = obj[ID_HASH_ALGO]
-            if obj['status'] == 'visible':
-                try:
-                    obj = src.get(obj_id)
-                    dst.add(obj, obj_id=obj_id)
-                    logger.debug('copied %s', hash_to_hex(obj_id))
-                except Exception:
-                    logger.exception('Failed to copy %s', hash_to_hex(obj_id))
-            else:
-                logger.debug('skipped %s (%s)',
-                             hash_to_hex(obj_id), obj['status'])
+def copy_object(obj_id, src, dst):
+    statsd_name = 'swh_journal_content_replayer_%s_duration_seconds'
+    try:
+        with statsd.timed(statsd_name % 'get'):
+            obj = src.get(obj_id)
+        with statsd.timed(statsd_name % 'put'):
+            dst.add(obj, obj_id=obj_id, check_presence=False)
+            logger.debug('copied %s', hash_to_hex(obj_id))
+        statsd.increment(
+            'swh_journal_content_replayer_bytes_total',
+            len(obj))
+    except Exception:
+        obj = ''
+        logger.exception('Failed to copy %s', hash_to_hex(obj_id))
+    return len(obj)
+
+
+def process_replay_objects_content(all_objects, *, src, dst, concurrency=8):
+    vol = []
+    t0 = time()
+    with ThreadPoolExecutor(max_workers=concurrency) as executor:
+        for (object_type, objects) in all_objects.items():
+            if object_type != 'content':
+                logger.warning(
+                    'Received a series of %s, this should not happen',
+                    object_type)
+                continue
+            for obj in objects:
+                obj_id = obj[ID_HASH_ALGO]
+                if obj['status'] == 'visible':
+                    fut = executor.submit(copy_object, obj_id, src, dst)
+                    fut.add_done_callback(lambda fn: vol.append(fn.result()))
+                else:
+                    logger.debug('skipped %s (%s)',
+                                 hash_to_hex(obj_id), obj['status'])
+    dt = time() - t0
+    logger.info(
+        'processed %s content objects in %.1fsec '
+        '(%.1f obj/sec, %.1fMB/sec) - %s failures',
+        len(vol), dt,
+        len(vol)/dt,
+        sum(vol)/1024/1024/dt, len([x for x in vol if not x]))
