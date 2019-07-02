@@ -65,14 +65,14 @@ def get_journal_client(ctx, **kwargs):
               help='Maximum number of objects to replay. Default is to '
                    'run forever.')
 @click.option('--broker', 'brokers', type=str, multiple=True,
-              hidden=True,  # prefer config file
-              help='Kafka broker to connect to.')
+              help='Kafka broker to connect to. '
+                   '(deprecated, use the config file instead)')
 @click.option('--prefix', type=str, default=None,
-              hidden=True,  # prefer config file
-              help='Prefix of Kafka topic names to read from.')
+              help='Prefix of Kafka topic names to read from. '
+                   '(deprecated, use the config file instead)')
 @click.option('--group-id', '--consumer-id', type=str,
-              hidden=True,  # prefer config file
-              help='Name of the consumer/group id for reading from Kafka.')
+              help='Name of the consumer/group id for reading from Kafka. '
+                   '(deprecated, use the config file instead)')
 @click.pass_context
 def replay(ctx, brokers, prefix, group_id, max_messages):
     """Fill a Storage by reading a Journal.
