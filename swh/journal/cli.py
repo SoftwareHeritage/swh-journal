@@ -50,25 +50,14 @@ def cli(ctx, config_file):
     ctx.obj['config'] = conf
 
 
-def get_journal_client(ctx, brokers, prefix, group_id, object_types=None):
-    conf = ctx.obj['config']
-    if not brokers:
-        brokers = conf.get('journal', {}).get('brokers')
-    if not brokers:
+def get_journal_client(ctx, **kwargs):
+    conf = ctx.obj['config'].get('journal', {})
+    conf.update({k: v for (k, v) in kwargs.items() if v not in (None, ())})
+    if not conf.get('brokers'):
         ctx.fail('You must specify at least one kafka broker.')
-    if not isinstance(brokers, (list, tuple)):
-        brokers = [brokers]
-
-    if prefix is None:
-        prefix = conf.get('journal', {}).get('prefix')
-
-    if group_id is None:
-        group_id = conf.get('journal', {}).get('group_id')
-
-    kwargs = dict(brokers=brokers, group_id=group_id, prefix=prefix)
-    if object_types:
-        kwargs['object_types'] = object_types
-    return JournalClient(**kwargs)
+    if not isinstance(conf['brokers'], (list, tuple)):
+        conf['brokers'] = [conf['brokers']]
+    return JournalClient(**conf)
 
 
 @cli.command()
@@ -76,14 +65,14 @@ def get_journal_client(ctx, brokers, prefix, group_id, object_types=None):
               help='Maximum number of objects to replay. Default is to '
                    'run forever.')
 @click.option('--broker', 'brokers', type=str, multiple=True,
-              hidden=True,  # prefer config file
-              help='Kafka broker to connect to.')
+              help='Kafka broker to connect to. '
+                   '(deprecated, use the config file instead)')
 @click.option('--prefix', type=str, default=None,
-              hidden=True,  # prefer config file
-              help='Prefix of Kafka topic names to read from.')
+              help='Prefix of Kafka topic names to read from. '
+                   '(deprecated, use the config file instead)')
 @click.option('--group-id', '--consumer-id', type=str,
-              hidden=True,  # prefer config file
-              help='Name of the consumer/group id for reading from Kafka.')
+              help='Name of the consumer/group id for reading from Kafka. '
+                   '(deprecated, use the config file instead)')
 @click.pass_context
 def replay(ctx, brokers, prefix, group_id, max_messages):
     """Fill a Storage by reading a Journal.
@@ -98,7 +87,8 @@ def replay(ctx, brokers, prefix, group_id, max_messages):
     except KeyError:
         ctx.fail('You must have a storage configured in your config file.')
 
-    client = get_journal_client(ctx, brokers, prefix, group_id)
+    client = get_journal_client(
+        ctx, brokers=brokers, prefix=prefix, group_id=group_id)
     worker_fn = functools.partial(process_replay_objects, storage=storage)
 
     try:
@@ -147,6 +137,9 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
 
 
 @cli.command()
+@click.option('--concurrency', type=int,
+              default=8,
+              help='Concurrentcy level.')
 @click.option('--broker', 'brokers', type=str, multiple=True,
               hidden=True,  # prefer config file
               help='Kafka broker to connect to.')
@@ -157,7 +150,7 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
               hidden=True,  # prefer config file
               help='Name of the consumer/group id for reading from Kafka.')
 @click.pass_context
-def content_replay(ctx, brokers, prefix, group_id):
+def content_replay(ctx, concurrency, brokers, prefix, group_id):
     """Fill a destination Object Storage (typically a mirror) by reading a Journal
     and retrieving objects from an existing source ObjStorage.
 
@@ -181,11 +174,13 @@ def content_replay(ctx, brokers, prefix, group_id):
         ctx.fail('You must have a destination objstorage configured '
                  'in your config file.')
 
-    client = get_journal_client(ctx, brokers, prefix, group_id,
-                                object_types=('content',))
+    client = get_journal_client(
+        ctx, brokers=brokers, prefix=prefix, group_id=group_id,
+        object_types=('content',))
     worker_fn = functools.partial(process_replay_objects_content,
                                   src=objstorage_src,
-                                  dst=objstorage_dst)
+                                  dst=objstorage_dst,
+                                  concurrency=concurrency)
 
     try:
         nb_messages = 0
@@ -195,7 +190,7 @@ def content_replay(ctx, brokers, prefix, group_id):
     except KeyboardInterrupt:
         ctx.exit(0)
     else:
-        print('Done.')
+        logger.info('Done.')
 
 
 def main():

@@ -46,10 +46,12 @@ class JournalClient:
     Messages are processed by the `process_objects` method in batches
     of maximum `max_messages`.
 
+    Any other named argument is passed directly to KafkaConsumer().
+
     """
     def __init__(
             self, brokers, group_id, prefix=None, object_types=None,
-            max_messages=0, auto_offset_reset='earliest'):
+            max_messages=0, auto_offset_reset='earliest', **kwargs):
         if prefix is None:
             prefix = DEFAULT_PREFIX
         if object_types is None:
@@ -72,7 +74,7 @@ class JournalClient:
             auto_offset_reset=auto_offset_reset,
             enable_auto_commit=False,
             group_id=group_id,
-        )
+            **kwargs)
 
         self.consumer.subscribe(
             topics=['%s.%s' % (prefix, object_type)
