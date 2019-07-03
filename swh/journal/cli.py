@@ -141,14 +141,14 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
               default=8,
               help='Concurrentcy level.')
 @click.option('--broker', 'brokers', type=str, multiple=True,
-              hidden=True,  # prefer config file
-              help='Kafka broker to connect to.')
+              help='Kafka broker to connect to.'
+                   '(deprecated, use the config file instead)')
 @click.option('--prefix', type=str, default=None,
-              hidden=True,  # prefer config file
-              help='Prefix of Kafka topic names to read from.')
+              help='Prefix of Kafka topic names to read from.'
+                   '(deprecated, use the config file instead)')
 @click.option('--group-id', '--consumer-id', type=str,
-              hidden=True,  # prefer config file
-              help='Name of the consumer/group id for reading from Kafka.')
+              help='Name of the consumer/group id for reading from Kafka.'
+                   '(deprecated, use the config file instead)')
 @click.pass_context
 def content_replay(ctx, concurrency, brokers, prefix, group_id):
     """Fill a destination Object Storage (typically a mirror) by reading a Journal
