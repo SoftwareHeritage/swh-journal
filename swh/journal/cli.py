@@ -70,8 +70,8 @@ def get_journal_client(ctx, **kwargs):
 @click.option('--prefix', type=str, default=None,
               help='Prefix of Kafka topic names to read from. '
                    '(deprecated, use the config file instead)')
-@click.option('--group-id', '--consumer-id', type=str,
-              help='Name of the consumer/group id for reading from Kafka. '
+@click.option('--group-id', type=str,
+              help='Name of the group id for reading from Kafka. '
                    '(deprecated, use the config file instead)')
 @click.pass_context
 def replay(ctx, brokers, prefix, group_id, max_messages):
@@ -146,8 +146,8 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
 @click.option('--prefix', type=str, default=None,
               help='Prefix of Kafka topic names to read from.'
                    '(deprecated, use the config file instead)')
-@click.option('--group-id', '--consumer-id', type=str,
-              help='Name of the consumer/group id for reading from Kafka.'
+@click.option('--group-id', type=str,
+              help='Name of the group id for reading from Kafka.'
                    '(deprecated, use the config file instead)')
 @click.pass_context
 def content_replay(ctx, concurrency, brokers, prefix, group_id):

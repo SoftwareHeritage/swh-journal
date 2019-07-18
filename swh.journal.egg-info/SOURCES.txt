@@ -27,3 +27,4 @@ swh/journal/tests/test_direct_writer.py
 swh/journal/tests/test_replay.py
 swh/journal/tests/test_serializers.py
 swh/journal/tests/test_write_replay.py
+swh/journal/tests/utils.py

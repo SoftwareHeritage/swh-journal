@@ -3,8 +3,9 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from kafka import KafkaConsumer
 import logging
+
+from kafka import KafkaConsumer
 
 from .serializers import kafka_to_key, kafka_to_value
 from swh.journal import DEFAULT_PREFIX
