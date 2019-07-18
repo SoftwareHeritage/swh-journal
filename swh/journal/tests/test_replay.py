@@ -13,12 +13,14 @@ import dateutil
 from kafka import KafkaProducer
 
 from swh.storage import get_storage
+from swh.storage.in_memory import ENABLE_ORIGIN_IDS
 
 from swh.journal.client import JournalClient
 from swh.journal.serializers import key_to_kafka, value_to_kafka
 from swh.journal.replay import process_replay_objects
 
 from .conftest import OBJECT_TYPE_KEYS
+from .utils import MockedJournalClient, MockedKafkaWriter
 
 
 def test_storage_play(
@@ -100,3 +102,97 @@ def test_storage_play(
             [cont['sha1'] for cont in OBJECT_TYPE_KEYS['content'][1]]))
     assert None not in contents
     assert contents == OBJECT_TYPE_KEYS['content'][1]
+
+
+def test_write_replay_legacy_origin_visit1():
+    """Test origin_visit when the 'origin' is just a string."""
+    queue = []
+    replayer = MockedJournalClient(queue)
+    writer = MockedKafkaWriter(queue)
+
+    # Note that flipping the order of these two insertions will crash
+    # the test, because the legacy origin_format does not allow to create
+    # the origin when needed (type is missing)
+    now = datetime.datetime.now()
+    writer.send('origin', 'foo', {
+        'url': 'http://example.com/',
+        'type': 'git',
+    })
+    writer.send('origin_visit', 'foo', {
+        'visit': 1,
+        'origin': 'http://example.com/',
+        'date': now,
+    })
+
+    queue_size = sum(len(partition)
+                     for batch in queue
+                     for partition in batch.values())
+
+    storage = get_storage('memory', {})
+    worker_fn = functools.partial(process_replay_objects, storage=storage)
+    nb_messages = 0
+    while nb_messages < queue_size:
+        nb_messages += replayer.process(worker_fn)
+
+    visits = list(storage.origin_visit_get('http://example.com/'))
+
+    if ENABLE_ORIGIN_IDS:
+        assert visits == [{
+                'visit': 1,
+                'origin': 1,
+                'date': now,
+            }]
+    else:
+        assert visits == [{
+            'visit': 1,
+            'origin': {'url': 'http://example.com/'},
+            'date': now,
+        }]
+
+
+def test_write_replay_legacy_origin_visit2():
+    """Test origin_visit when 'type' is missing."""
+    queue = []
+    replayer = MockedJournalClient(queue)
+    writer = MockedKafkaWriter(queue)
+
+    now = datetime.datetime.now()
+    writer.send('origin', 'foo', {
+        'url': 'http://example.com/',
+        'type': 'git',
+    })
+    writer.send('origin_visit', 'foo', {
+        'visit': 1,
+        'origin': {
+            'url': 'http://example.com/',
+            'type': 'git',
+        },
+        'date': now,
+    })
+
+    queue_size = sum(len(partition)
+                     for batch in queue
+                     for partition in batch.values())
+
+    storage = get_storage('memory', {})
+    worker_fn = functools.partial(process_replay_objects, storage=storage)
+    nb_messages = 0
+    while nb_messages < queue_size:
+        nb_messages += replayer.process(worker_fn)
+
+    visits = list(storage.origin_visit_get('http://example.com/'))
+
+    if ENABLE_ORIGIN_IDS:
+        assert visits == [{
+            'visit': 1,
+            'origin': 1,
+            'date': now,
+            'type': 'git',
+        }]
+    else:
+        assert visits == [{
+            'visit': 1,
+            'origin': {'url': 'http://example.com/'},
+            'date': now,
+            'type': 'git',
+        }]
