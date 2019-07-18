@@ -1,8 +1,12 @@
-swh-journal (0.0.13-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-journal (0.0.14-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-swh
+  * New upstream release 0.0.14     - (tagged by David Douard
+    <david.douard@sdfa3.org> on 2019-07-18 13:38:39 +0200)
+  * Upstream changes:     - 0.0.14     - Code of conduct     - fix the
+    backfiller     - fix compatibility with click < 7     - make the
+    replayer robust against old formats
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 03 Jul 2019 08:35:26 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 18 Jul 2019 11:44:40 +0000
 
 swh-journal (0.0.13-1~swh1) unstable-swh; urgency=medium
 
