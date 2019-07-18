@@ -83,17 +83,20 @@ def test_storage_play(
     assert OBJECT_TYPE_KEYS['origin'][1] == \
         [{'url': orig['url'], 'type': orig['type']} for orig in origins]
     for origin in origins:
+        origin_id_or_url = \
+            origin['id'] if ENABLE_ORIGIN_IDS else origin['url']
         expected_visits = [
             {
                 **visit,
-                'origin': origin['id'],
+                'origin': origin_id_or_url,
                 'date': dateutil.parser.parse(visit['date']),
             }
             for visit in OBJECT_TYPE_KEYS['origin_visit'][1]
             if visit['origin']['url'] == origin['url']
             and visit['origin']['type'] == origin['type']
         ]
-        actual_visits = list(storage.origin_visit_get(origin['id']))
+        actual_visits = list(storage.origin_visit_get(
+            origin_id_or_url))
         for visit in actual_visits:
             del visit['visit']  # opaque identifier
         assert expected_visits == actual_visits
@@ -145,7 +148,7 @@ def test_write_replay_legacy_origin_visit1():
     else:
         assert visits == [{
             'visit': 1,
-            'origin': {'url': 'http://example.com/'},
+            'origin': 'http://example.com/',
             'date': now,
         }]
 
@@ -192,7 +195,7 @@ def test_write_replay_legacy_origin_visit2():
     else:
         assert visits == [{
             'visit': 1,
-            'origin': {'url': 'http://example.com/'},
+            'origin': 'http://example.com/',
             'date': now,
             'type': 'git',
         }]
