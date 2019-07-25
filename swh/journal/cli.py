@@ -137,6 +137,9 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
 
 
 @cli.command()
+@click.option('--max-messages', '-m', default=None, type=int,
+              help='Maximum number of objects to replay. Default is to '
+                   'run forever.')
 @click.option('--concurrency', type=int,
               default=8,
               help='Concurrentcy level.')
@@ -150,7 +153,7 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
               help='Name of the group id for reading from Kafka.'
                    '(deprecated, use the config file instead)')
 @click.pass_context
-def content_replay(ctx, concurrency, brokers, prefix, group_id):
+def content_replay(ctx, max_messages, concurrency, brokers, prefix, group_id):
     """Fill a destination Object Storage (typically a mirror) by reading a Journal
     and retrieving objects from an existing source ObjStorage.
 
@@ -184,13 +187,13 @@ def content_replay(ctx, concurrency, brokers, prefix, group_id):
 
     try:
         nb_messages = 0
-        while True:
+        while not max_messages or nb_messages < max_messages:
             nb_messages += client.process(worker_fn)
             logger.info('Processed %d messages.' % nb_messages)
     except KeyboardInterrupt:
         ctx.exit(0)
     else:
-        logger.info('Done.')
+        print('Done.')
 
 
 def main():
