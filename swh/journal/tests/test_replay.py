@@ -11,13 +11,14 @@ from typing import Tuple
 
 import dateutil
 from kafka import KafkaProducer
+from hypothesis import strategies, given, settings
 
 from swh.storage import get_storage
 from swh.storage.in_memory import ENABLE_ORIGIN_IDS
 
 from swh.journal.client import JournalClient
 from swh.journal.serializers import key_to_kafka, value_to_kafka
-from swh.journal.replay import process_replay_objects
+from swh.journal.replay import process_replay_objects, is_hash_in_bytearray
 
 from .conftest import OBJECT_TYPE_KEYS
 from .utils import MockedJournalClient, MockedKafkaWriter
@@ -199,3 +200,17 @@ def test_write_replay_legacy_origin_visit2():
             'date': now,
             'type': 'git',
         }]
+
+
+hash_strategy = strategies.binary(min_size=20, max_size=20)
+
+
+@settings(max_examples=500)
+@given(strategies.sets(hash_strategy, min_size=0, max_size=500),
+       strategies.sets(hash_strategy, min_size=10))
+def test_is_hash_in_bytearray(haystack, needles):
+    array = b''.join(sorted(haystack))
+    needles |= haystack  # Exhaustively test for all objects in the array
+    for needle in needles:
+        assert is_hash_in_bytearray(needle, array, len(haystack)) == \
+            (needle in haystack)
