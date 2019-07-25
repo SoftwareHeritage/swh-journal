@@ -7,15 +7,13 @@ from time import time
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from swh.storage import HashCollision
-from swh.model.hashutil import hash_to_hex
-from swh.objstorage.objstorage import ID_HASH_ALGO
 from swh.core.statsd import statsd
+from swh.model.hashutil import hash_to_hex
+from swh.model.model import SHA1_SIZE
+from swh.objstorage.objstorage import ID_HASH_ALGO
+from swh.storage import HashCollision
 
 logger = logging.getLogger(__name__)
-
-
-SHA1_SIZE = 20
 
 
 def process_replay_objects(all_objects, *, storage):
@@ -123,8 +121,54 @@ def copy_object(obj_id, src, dst):
     return len(obj)
 
 
-def process_replay_objects_content(all_objects, *, src, dst, concurrency=8):
+def process_replay_objects_content(all_objects, *, src, dst, concurrency=8,
+                                   exclude_fn=None):
+    """
+    Takes a list of records from Kafka (see
+    :py:func:`swh.journal.client.JournalClient.process`) and copies them
+    from the `src` objstorage to the `dst` objstorage, if:
+
+    * `obj['status']` is `'visible'`
+    * `exclude_fn(obj)` is `False` (if `exclude_fn` is provided)
+
+    Args:
+        all_objects Dict[str, List[dict]]: Objects passed by the Kafka client.
+            Most importantly, `all_objects['content'][*]['sha1']` is the
+            sha1 hash of each content
+        src: An object storage (see :py:func:`swh.objstorage.get_objstorage`)
+        dst: An object storage (see :py:func:`swh.objstorage.get_objstorage`)
+        exclude_fn Optional[Callable[dict, bool]]: Determines whether
+            an object should be copied.
+
+    Example:
+
+    >>> from swh.objstorage import get_objstorage
+    >>> src = get_objstorage('memory', {})
+    >>> dst = get_objstorage('memory', {})
+    >>> id1 = src.add(b'foo bar')
+    >>> id2 = src.add(b'baz qux')
+    >>> kafka_partitions = {
+    ...     'content': [
+    ...         {
+    ...             'sha1': id1,
+    ...             'status': 'visible',
+    ...         },
+    ...         {
+    ...             'sha1': id2,
+    ...             'status': 'visible',
+    ...         },
+    ...     ]
+    ... }
+    >>> process_replay_objects_content(
+    ...     kafka_partitions, src=src, dst=dst,
+    ...     exclude_fn=lambda obj: obj['sha1'] == id1)
+    >>> id1 in dst
+    False
+    >>> id2 in dst
+    True
+    """
     vol = []
+    nb_skipped = 0
     t0 = time()
     with ThreadPoolExecutor(max_workers=concurrency) as executor:
         for (object_type, objects) in all_objects.items():
@@ -135,16 +179,23 @@ def process_replay_objects_content(all_objects, *, src, dst, concurrency=8):
                 continue
             for obj in objects:
                 obj_id = obj[ID_HASH_ALGO]
-                if obj['status'] == 'visible':
+                if obj['status'] != 'visible':
+                    nb_skipped += 1
+                    logger.debug('skipped %s (status=%s)',
+                                 hash_to_hex(obj_id), obj['status'])
+                elif exclude_fn and exclude_fn(obj):
+                    nb_skipped += 1
+                    logger.debug('skipped %s (manually excluded)',
+                                 hash_to_hex(obj_id))
+                else:
                     fut = executor.submit(copy_object, obj_id, src, dst)
                     fut.add_done_callback(lambda fn: vol.append(fn.result()))
-                else:
-                    logger.debug('skipped %s (%s)',
-                                 hash_to_hex(obj_id), obj['status'])
     dt = time() - t0
     logger.info(
         'processed %s content objects in %.1fsec '
-        '(%.1f obj/sec, %.1fMB/sec) - %s failures',
+        '(%.1f obj/sec, %.1fMB/sec) - %d failures - %d skipped',
         len(vol), dt,
         len(vol)/dt,
-        sum(vol)/1024/1024/dt, len([x for x in vol if not x]))
+        sum(vol)/1024/1024/dt,
+        len([x for x in vol if not x]),
+        nb_skipped)

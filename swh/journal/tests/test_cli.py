@@ -165,3 +165,41 @@ def test_replay_content(
     for (sha1, content) in contents.items():
         assert sha1 in objstorages['dst'], sha1
         assert objstorages['dst'].get(sha1) == content
+
+
+@_patch_objstorages(['src', 'dst'])
+def test_replay_content_exclude(
+        objstorages,
+        storage: Storage,
+        kafka_prefix: str,
+        kafka_server: Tuple[Popen, int]):
+    (_, kafka_port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    contents = _fill_objstorage_and_kafka(
+        kafka_port, kafka_prefix, objstorages)
+
+    excluded_contents = list(contents)[0::2]  # picking half of them
+    with tempfile.NamedTemporaryFile(mode='w+b') as fd:
+        fd.write(b''.join(sorted(excluded_contents)))
+
+        fd.seek(0)
+
+        result = invoke(False, [
+            'content-replay',
+            '--broker', 'localhost:%d' % kafka_port,
+            '--group-id', 'test-cli-consumer',
+            '--prefix', kafka_prefix,
+            '--max-messages', '10',
+            '--exclude-sha1-file', fd.name,
+        ])
+    expected = r'Done.\n'
+    assert result.exit_code == 0, result.output
+    assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
+
+    for (sha1, content) in contents.items():
+        if sha1 in excluded_contents:
+            assert sha1 not in objstorages['dst'], sha1
+        else:
+            assert sha1 in objstorages['dst'], sha1
+            assert objstorages['dst'].get(sha1) == content
