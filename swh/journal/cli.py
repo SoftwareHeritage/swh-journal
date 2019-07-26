@@ -7,6 +7,7 @@ import functools
 import logging
 import mmap
 import os
+import time
 
 import click
 
@@ -97,9 +98,13 @@ def replay(ctx, brokers, prefix, group_id, max_messages):
 
     try:
         nb_messages = 0
+        last_log_time = 0
         while not max_messages or nb_messages < max_messages:
             nb_messages += client.process(worker_fn)
-            logger.info('Processed %d messages.' % nb_messages)
+            if time.time() - last_log_time >= 60:
+                # Log at most once per minute.
+                logger.info('Processed %d messages.' % nb_messages)
+                last_log_time = time.time()
     except KeyboardInterrupt:
         ctx.exit(0)
     else:
@@ -214,9 +219,13 @@ def content_replay(ctx, max_messages, concurrency,
 
     try:
         nb_messages = 0
+        last_log_time = 0
         while not max_messages or nb_messages < max_messages:
             nb_messages += client.process(worker_fn)
-            logger.info('Processed %d messages.' % nb_messages)
+            if time.time() - last_log_time >= 60:
+                # Log at most once per minute.
+                logger.info('Processed %d messages.' % nb_messages)
+                last_log_time = time.time()
     except KeyboardInterrupt:
         ctx.exit(0)
     else:
