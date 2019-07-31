@@ -193,6 +193,8 @@ def _insert_objects(object_type, objects, storage):
         for visit in objects:
             if 'type' in visit['origin']:
                 storage.origin_add_one(visit['origin'])
+            if 'metadata' not in visit:
+                visit['metadata'] = None
         storage.origin_visit_upsert(objects)
     else:
         logger.warning('Received a series of %s, this should not happen',

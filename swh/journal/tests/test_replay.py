@@ -156,6 +156,7 @@ def _test_write_replay_origin_visit(visits):
             assert vout.pop('origin') == 'http://example.com/'
         vin.pop('origin')
         vin.setdefault('type', 'git')
+        vin.setdefault('metadata', None)
         assert vin == vout
 
 
