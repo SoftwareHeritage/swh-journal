@@ -149,9 +149,6 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
 @click.option('--max-messages', '-m', default=None, type=int,
               help='Maximum number of objects to replay. Default is to '
                    'run forever.')
-@click.option('--concurrency', type=int,
-              default=8,
-              help='Concurrentcy level.')
 @click.option('--broker', 'brokers', type=str, multiple=True,
               help='Kafka broker to connect to.'
                    '(deprecated, use the config file instead)')
@@ -164,7 +161,7 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
 @click.option('--exclude-sha1-file', default=None, type=click.File('rb'),
               help='File containing a sorted array of hashes to be excluded.')
 @click.pass_context
-def content_replay(ctx, max_messages, concurrency,
+def content_replay(ctx, max_messages,
                    brokers, prefix, group_id, exclude_sha1_file):
     """Fill a destination Object Storage (typically a mirror) by reading a Journal
     and retrieving objects from an existing source ObjStorage.
@@ -214,7 +211,6 @@ def content_replay(ctx, max_messages, concurrency,
     worker_fn = functools.partial(process_replay_objects_content,
                                   src=objstorage_src,
                                   dst=objstorage_dst,
-                                  concurrency=concurrency,
                                   exclude_fn=exclude_fn)
 
     try:

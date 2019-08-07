@@ -5,7 +5,6 @@
 
 from time import time
 import logging
-from concurrent.futures import ThreadPoolExecutor
 
 from swh.core.statsd import statsd
 from swh.model.identifiers import normalize_timestamp
@@ -259,11 +258,12 @@ def copy_object(obj_id, src, dst):
             len(obj))
     except Exception:
         obj = ''
-        logger.exception('Failed to copy %s', hash_to_hex(obj_id))
+        logger.error('Failed to copy %s', hash_to_hex(obj_id))
+        raise
     return len(obj)
 
 
-def process_replay_objects_content(all_objects, *, src, dst, concurrency=8,
+def process_replay_objects_content(all_objects, *, src, dst,
                                    exclude_fn=None):
     """
     Takes a list of records from Kafka (see
@@ -312,26 +312,26 @@ def process_replay_objects_content(all_objects, *, src, dst, concurrency=8,
     vol = []
     nb_skipped = 0
     t0 = time()
-    with ThreadPoolExecutor(max_workers=concurrency) as executor:
-        for (object_type, objects) in all_objects.items():
-            if object_type != 'content':
-                logger.warning(
-                    'Received a series of %s, this should not happen',
-                    object_type)
-                continue
-            for obj in objects:
-                obj_id = obj[ID_HASH_ALGO]
-                if obj['status'] != 'visible':
-                    nb_skipped += 1
-                    logger.debug('skipped %s (status=%s)',
-                                 hash_to_hex(obj_id), obj['status'])
-                elif exclude_fn and exclude_fn(obj):
-                    nb_skipped += 1
-                    logger.debug('skipped %s (manually excluded)',
-                                 hash_to_hex(obj_id))
-                else:
-                    fut = executor.submit(copy_object, obj_id, src, dst)
-                    fut.add_done_callback(lambda fn: vol.append(fn.result()))
+
+    for (object_type, objects) in all_objects.items():
+        if object_type != 'content':
+            logger.warning(
+                'Received a series of %s, this should not happen',
+                object_type)
+            continue
+        for obj in objects:
+            obj_id = obj[ID_HASH_ALGO]
+            if obj['status'] != 'visible':
+                nb_skipped += 1
+                logger.debug('skipped %s (status=%s)',
+                             hash_to_hex(obj_id), obj['status'])
+            elif exclude_fn and exclude_fn(obj):
+                nb_skipped += 1
+                logger.debug('skipped %s (manually excluded)',
+                             hash_to_hex(obj_id))
+            else:
+                vol.append(copy_object(obj_id, src, dst))
+
     dt = time() - t0
     logger.info(
         'processed %s content objects in %.1fsec '
