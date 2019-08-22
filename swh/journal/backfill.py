@@ -87,8 +87,8 @@ COLUMNS = {
     ],
     'snapshot': ['id', 'object_id'],
     'origin': ['type', 'url'],
-    'origin_visit': ['visit', 'type', 'url', 'date',
-                     'snapshot', 'status', 'metadata'],
+    'origin_visit': ['visit', 'origin.type', 'origin_visit.type',
+                     'url', 'date', 'snapshot', 'status', 'metadata'],
 }
 
 
@@ -185,10 +185,11 @@ def snapshot_converter(db, snapshot):
 
 def origin_visit_converter(db, origin_visit):
     origin = {
-        'type': origin_visit.pop('type'),
+        'type': origin_visit.pop('origin.type'),
         'url': origin_visit.pop('url'),
     }
     origin_visit['origin'] = origin
+    origin_visit['type'] = origin_visit.pop('origin_visit.type')
     return origin_visit
 
 

@@ -93,11 +93,12 @@ def test_compute_query_origin_visit():
     assert where_args == [1, 10]
 
     assert column_aliases == [
-        'visit', 'type', 'url', 'date', 'snapshot', 'status', 'metadata',
+        'visit', 'origin.type', 'origin_visit.type',
+        'url', 'date', 'snapshot', 'status', 'metadata',
     ]
 
     assert query == '''
-select visit,type,url,date,snapshot,status,metadata
+select visit,origin.type,origin_visit.type,url,date,snapshot,status,metadata
 from origin_visit
 left join origin on origin_visit.origin=origin.id
 where (origin_visit.origin) >= %s and (origin_visit.origin) < %s
