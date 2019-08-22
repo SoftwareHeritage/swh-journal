@@ -8,6 +8,7 @@ import logging
 from kafka import KafkaProducer
 
 from swh.model.hashutil import DEFAULT_ALGORITHMS
+from swh.model.model import BaseModel
 
 from .serializers import key_to_kafka, value_to_kafka
 
@@ -62,6 +63,8 @@ class DirectKafkaWriter:
         return object_
 
     def write_addition(self, object_type, object_):
+        if isinstance(object_, BaseModel):
+            object_ = object_.to_dict()
         topic = '%s.%s' % (self._prefix, object_type)
         key = self._get_key(object_type, object_)
         object_ = self._sanitize_object(object_type, object_)
