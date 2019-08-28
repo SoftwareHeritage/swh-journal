@@ -145,7 +145,7 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
         ctx.exit(0)
 
 
-@cli.command()
+@cli.command('content-replay')
 @click.option('--max-messages', '-m', default=None, type=int,
               help='Maximum number of objects to replay. Default is to '
                    'run forever.')
