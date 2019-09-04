@@ -37,12 +37,14 @@ CONTENTS = [
 
 COMMITTERS = [
     {
-        'id': 1,
         'fullname': b'foo',
+        'name': b'foo',
+        'email': b'',
     },
     {
-        'id': 2,
         'fullname': b'bar',
+        'name': b'bar',
+        'email': b'',
     }
 ]
 
@@ -73,6 +75,11 @@ REVISIONS = [
         'committer': COMMITTERS[0],
         'author':  COMMITTERS[0],
         'committer_date': DATES[0],
+        'type': 'git',
+        'directory': '\x01'*20,
+        'synthetic': False,
+        'metadata': None,
+        'parents': [],
     },
     {
         'id': hash_to_bytes('368a48fe15b7db2383775f97c6b247011b3f14f4'),
@@ -81,6 +88,11 @@ REVISIONS = [
         'committer': COMMITTERS[1],
         'author':  COMMITTERS[1],
         'committer_date': DATES[1],
+        'type': 'hg',
+        'directory': '\x02'*20,
+        'synthetic': False,
+        'metadata': None,
+        'parents': [],
     },
 ]
 
@@ -97,6 +109,10 @@ RELEASES = [
             'negative_utc': None,
         },
         'author': COMMITTERS[0],
+        'target_type': 'revision',
+        'target': b'\x04'*20,
+        'message': b'foo',
+        'synthetic': False,
     },
 ]
 

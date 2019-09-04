@@ -76,7 +76,7 @@ def test_replay(
     snapshot = {'id': b'foo', 'branches': {
         b'HEAD': {
             'target_type': 'revision',
-            'target': b'bar',
+            'target': b'\x01'*20,
         }
     }}
     producer.send(

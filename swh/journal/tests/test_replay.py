@@ -167,7 +167,9 @@ def test_write_replay_legacy_origin_visit1():
         'visit': 1,
         'origin': 'http://example.com/',
         'date': now,
-        'type': 'hg'
+        'type': 'git',
+        'status': 'partial',
+        'snapshot': None,
     }]
     _test_write_replay_origin_visit(visits)
 
@@ -182,6 +184,9 @@ def test_write_replay_legacy_origin_visit2():
             'type': 'git',
         },
         'date': now,
+        'type': 'git',
+        'status': 'partial',
+        'snapshot': None,
     }]
     _test_write_replay_origin_visit(visits)
 
