@@ -87,7 +87,8 @@ COLUMNS = {
     ],
     'snapshot': ['id', 'object_id'],
     'origin': ['type', 'url'],
-    'origin_visit': ['visit', 'type', 'url', 'date', 'snapshot', 'status'],
+    'origin_visit': ['visit', 'origin.type', 'origin_visit.type',
+                     'url', 'date', 'snapshot', 'status', 'metadata'],
 }
 
 
@@ -184,10 +185,11 @@ def snapshot_converter(db, snapshot):
 
 def origin_visit_converter(db, origin_visit):
     origin = {
-        'type': origin_visit.pop('type'),
+        'type': origin_visit.pop('origin.type'),
         'url': origin_visit.pop('url'),
     }
     origin_visit['origin'] = origin
+    origin_visit['type'] = origin_visit.pop('origin_visit.type')
     return origin_visit
 
 
@@ -366,6 +368,13 @@ def fetch(db, obj_type, start, end):
             yield record
 
 
+def _format_range_bound(bound):
+    if isinstance(bound, bytes):
+        return bound.hex()
+    else:
+        return str(bound)
+
+
 MANDATORY_KEYS = ['brokers', 'storage_dbconn', 'prefix', 'client_id']
 
 
@@ -436,7 +445,8 @@ class JournalBackfiller:
         for range_start, range_end in RANGE_GENERATORS[object_type](
                 start_object, end_object):
             logger.info('Processing %s range %s to %s', object_type,
-                        range_start, range_end)
+                        _format_range_bound(range_start),
+                        _format_range_bound(range_end))
 
             for obj in fetch(
                 db, object_type, start=range_start, end=range_end,

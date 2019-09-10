@@ -35,14 +35,35 @@ CONTENTS = [
     },
 ]
 
-COMMITTER = [
+COMMITTERS = [
     {
-        'id': 1,
         'fullname': b'foo',
+        'name': b'foo',
+        'email': b'',
     },
     {
-        'id': 2,
         'fullname': b'bar',
+        'name': b'bar',
+        'email': b'',
+    }
+]
+
+DATES = [
+    {
+        'timestamp': {
+            'seconds': 1234567891,
+            'microseconds': 0,
+        },
+        'offset': 120,
+        'negative_utc': None,
+    },
+    {
+        'timestamp': {
+            'seconds': 1234567892,
+            'microseconds': 0,
+        },
+        'offset': 120,
+        'negative_utc': None,
     }
 ]
 
@@ -50,32 +71,28 @@ REVISIONS = [
     {
         'id': hash_to_bytes('7026b7c1a2af56521e951c01ed20f255fa054238'),
         'message': b'hello',
-        'date': {
-            'timestamp': {
-                'seconds': 1234567891,
-                'microseconds': 0,
-            },
-            'offset': 120,
-            'negative_utc': None,
-        },
-        'committer': COMMITTER[0],
-        'author':  COMMITTER[0],
-        'committer_date': None,
+        'date': DATES[0],
+        'committer': COMMITTERS[0],
+        'author':  COMMITTERS[0],
+        'committer_date': DATES[0],
+        'type': 'git',
+        'directory': '\x01'*20,
+        'synthetic': False,
+        'metadata': None,
+        'parents': [],
     },
     {
         'id': hash_to_bytes('368a48fe15b7db2383775f97c6b247011b3f14f4'),
         'message': b'hello again',
-        'date': {
-            'timestamp': {
-                'seconds': 1234567892,
-                'microseconds': 0,
-            },
-            'offset': 120,
-            'negative_utc': None,
-        },
-        'committer': COMMITTER[1],
-        'author':  COMMITTER[1],
-        'committer_date': None,
+        'date': DATES[1],
+        'committer': COMMITTERS[1],
+        'author':  COMMITTERS[1],
+        'committer_date': DATES[1],
+        'type': 'hg',
+        'directory': '\x02'*20,
+        'synthetic': False,
+        'metadata': None,
+        'parents': [],
     },
 ]
 
@@ -91,7 +108,11 @@ RELEASES = [
             'offset': 120,
             'negative_utc': None,
         },
-        'author': COMMITTER[0],
+        'author': COMMITTERS[0],
+        'target_type': 'revision',
+        'target': b'\x04'*20,
+        'message': b'foo',
+        'synthetic': False,
     },
 ]
 
