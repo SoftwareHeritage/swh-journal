@@ -3,17 +3,22 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import click
 import functools
 import logging
+import mmap
 import os
+import time
+
+import click
 
 from swh.core import config
 from swh.core.cli import CONTEXT_SETTINGS
+from swh.model.model import SHA1_SIZE
 from swh.storage import get_storage
 from swh.objstorage import get_objstorage
 
 from swh.journal.client import JournalClient
+from swh.journal.replay import is_hash_in_bytearray
 from swh.journal.replay import process_replay_objects
 from swh.journal.replay import process_replay_objects_content
 from swh.journal.backfill import JournalBackfiller
@@ -93,9 +98,13 @@ def replay(ctx, brokers, prefix, group_id, max_messages):
 
     try:
         nb_messages = 0
+        last_log_time = 0
         while not max_messages or nb_messages < max_messages:
             nb_messages += client.process(worker_fn)
-            logger.info('Processed %d messages.' % nb_messages)
+            if time.time() - last_log_time >= 60:
+                # Log at most once per minute.
+                logger.info('Processed %d messages.' % nb_messages)
+                last_log_time = time.time()
     except KeyboardInterrupt:
         ctx.exit(0)
     else:
@@ -136,10 +145,10 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
         ctx.exit(0)
 
 
-@cli.command()
-@click.option('--concurrency', type=int,
-              default=8,
-              help='Concurrentcy level.')
+@cli.command('content-replay')
+@click.option('--max-messages', '-m', default=None, type=int,
+              help='Maximum number of objects to replay. Default is to '
+                   'run forever.')
 @click.option('--broker', 'brokers', type=str, multiple=True,
               help='Kafka broker to connect to.'
                    '(deprecated, use the config file instead)')
@@ -149,8 +158,11 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
 @click.option('--group-id', type=str,
               help='Name of the group id for reading from Kafka.'
                    '(deprecated, use the config file instead)')
+@click.option('--exclude-sha1-file', default=None, type=click.File('rb'),
+              help='File containing a sorted array of hashes to be excluded.')
 @click.pass_context
-def content_replay(ctx, concurrency, brokers, prefix, group_id):
+def content_replay(ctx, max_messages,
+                   brokers, prefix, group_id, exclude_sha1_file):
     """Fill a destination Object Storage (typically a mirror) by reading a Journal
     and retrieving objects from an existing source ObjStorage.
 
@@ -160,6 +172,13 @@ def content_replay(ctx, concurrency, brokers, prefix, group_id):
     This service retrieves object ids to copy from the 'content' topic. It will
     only copy object's content if the object's description in the kafka
     nmessage has the status:visible set.
+
+    `--exclude-sha1-file` may be used to exclude some hashes to speed-up the
+    replay in case many of the contents are already in the destination
+    objstorage. It must contain a concatenation of all (sha1) hashes,
+    and it must be sorted.
+    This file will not be fully loaded into memory at any given time,
+    so it can be arbitrarily large.
     """
     logger = logging.getLogger(__name__)
     conf = ctx.obj['config']
@@ -174,23 +193,39 @@ def content_replay(ctx, concurrency, brokers, prefix, group_id):
         ctx.fail('You must have a destination objstorage configured '
                  'in your config file.')
 
+    if exclude_sha1_file:
+        map_ = mmap.mmap(exclude_sha1_file.fileno(), 0, prot=mmap.PROT_READ)
+        if map_.size() % SHA1_SIZE != 0:
+            ctx.fail('--exclude-sha1 must link to a file whose size is an '
+                     'exact multiple of %d bytes.' % SHA1_SIZE)
+        nb_excluded_hashes = int(map_.size()/SHA1_SIZE)
+
+        def exclude_fn(obj):
+            return is_hash_in_bytearray(obj['sha1'], map_, nb_excluded_hashes)
+    else:
+        exclude_fn = None
+
     client = get_journal_client(
         ctx, brokers=brokers, prefix=prefix, group_id=group_id,
         object_types=('content',))
     worker_fn = functools.partial(process_replay_objects_content,
                                   src=objstorage_src,
                                   dst=objstorage_dst,
-                                  concurrency=concurrency)
+                                  exclude_fn=exclude_fn)
 
     try:
         nb_messages = 0
-        while True:
+        last_log_time = 0
+        while not max_messages or nb_messages < max_messages:
             nb_messages += client.process(worker_fn)
-            logger.info('Processed %d messages.' % nb_messages)
+            if time.time() - last_log_time >= 60:
+                # Log at most once per minute.
+                logger.info('Processed %d messages.' % nb_messages)
+                last_log_time = time.time()
     except KeyboardInterrupt:
         ctx.exit(0)
     else:
-        logger.info('Done.')
+        print('Done.')
 
 
 def main():
