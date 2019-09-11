@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import copy
 from time import time
 import logging
 from contextlib import contextmanager
@@ -45,13 +46,13 @@ def _fix_revision_pypi_empty_string(rev):
 
 
 def _fix_revision_transplant_source(rev):
-    if rev.get('extra_headers'):
-        rev = rev.copy()
-        rev['extra_headers'] = [
+    if rev.get('metadata') and rev['metadata'].get('extra_headers'):
+        rev = copy.deepcopy(rev)
+        rev['metadata']['extra_headers'] = [
             [key, value.encode('ascii')]
             if key == 'transplant_source' and isinstance(value, str)
             else [key, value]
-            for (key, value) in rev['extra_headers']]
+            for (key, value) in rev['metadata']['extra_headers']]
     return rev
 
 
@@ -138,11 +139,13 @@ def fix_objects(object_type, objects):
     ...     'committer': {'email': '', 'fullname': b'', 'name': ''},
     ...     'date': date,
     ...     'committer_date': date,
-    ...     'extra_headers': [
-    ...         ['time_offset_seconds', b'-3600'],
-    ...         ['transplant_source', '29c154a012a70f49df983625090434587622b39e']]
+    ...     'metadata': {
+    ...         'extra_headers': [
+    ...             ['time_offset_seconds', b'-3600'],
+    ...             ['transplant_source', '29c154a012a70f49df983625090434587622b39e']
+    ...     ]}
     ... }])
-    >>> pprint(revs[0]['extra_headers'])
+    >>> pprint(revs[0]['metadata']['extra_headers'])
     [['time_offset_seconds', b'-3600'],
      ['transplant_source', b'29c154a012a70f49df983625090434587622b39e']]
 
