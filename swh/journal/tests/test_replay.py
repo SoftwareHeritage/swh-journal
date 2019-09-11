@@ -10,7 +10,7 @@ from subprocess import Popen
 from typing import Tuple
 
 import dateutil
-from kafka import KafkaProducer
+from confluent_kafka import Producer
 from hypothesis import strategies, given, settings
 
 from swh.storage import get_storage
@@ -32,12 +32,11 @@ def test_storage_play(
 
     storage = get_storage('memory', {})
 
-    producer = KafkaProducer(
-        bootstrap_servers='localhost:{}'.format(port),
-        key_serializer=key_to_kafka,
-        value_serializer=value_to_kafka,
-        client_id='test producer',
-    )
+    producer = Producer({
+        'bootstrap.servers': 'localhost:{}'.format(port),
+        'client.id': 'test producer',
+        'enable.idempotence': 'true',
+    })
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
 
@@ -54,8 +53,13 @@ def test_storage_play(
             elif object_type == 'origin_visit':
                 nb_visits += 1
                 object_['visit'] = nb_visits
-            producer.send(topic, key=key, value=object_)
+            producer.produce(
+                topic=topic, key=key_to_kafka(key),
+                value=value_to_kafka(object_),
+            )
             nb_sent += 1
+
+    producer.flush()
 
     # Fill the storage from Kafka
     config = {
@@ -133,9 +137,7 @@ def _test_write_replay_origin_visit(visits):
     for visit in visits:
         writer.send('origin_visit', 'foo', visit)
 
-    queue_size = sum(len(partition)
-                     for batch in queue
-                     for partition in batch.values())
+    queue_size = len(queue)
 
     storage = get_storage('memory', {})
     worker_fn = functools.partial(process_replay_objects, storage=storage)
