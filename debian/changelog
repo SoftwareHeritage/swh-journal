@@ -1,3 +1,12 @@
+swh-journal (0.0.16-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.0.16     - (tagged by Nicolas Dandrimont
+    <nicolas@dandrimont.eu> on 2019-09-13 14:28:50 +0200)
+  * Upstream changes:     - Release swh.journal v0.0.16:     - Migrate
+    to confluent-kafka from python-kafka
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 13 Sep 2019 12:34:35 +0000
+
 swh-journal (0.0.15-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.0.15     - (tagged by David Douard
