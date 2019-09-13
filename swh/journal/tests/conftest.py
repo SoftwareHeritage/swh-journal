@@ -9,18 +9,19 @@ import logging
 import random
 import string
 
-from kafka import KafkaConsumer
+from confluent_kafka import Consumer
 from subprocess import Popen
 from typing import Tuple, Dict
 
 from pathlib import Path
 from pytest_kafka import (
-    make_zookeeper_process, make_kafka_server, constants
+    make_zookeeper_process, make_kafka_server
 )
 
 from swh.model.hashutil import hash_to_bytes
 
-from swh.journal.serializers import kafka_to_key, kafka_to_value
+
+logger = logging.getLogger(__name__)
 
 
 CONTENTS = [
@@ -176,8 +177,8 @@ os.environ['KAFKA_LOG4J_OPTS'] = \
     os.path.dirname(__file__)
 kafka_server = make_kafka_server(KAFKA_BIN, 'zookeeper_proc', scope='session')
 
-logger = logging.getLogger('kafka')
-logger.setLevel(logging.WARN)
+kafka_logger = logging.getLogger('kafka')
+kafka_logger.setLevel(logging.WARN)
 
 
 @pytest.fixture(scope='function')
@@ -202,36 +203,33 @@ def test_config(kafka_server: Tuple[Popen, int],
     _, port = kafka_server
     return {
         **TEST_CONFIG,
-        'brokers': ['localhost:{}'.format(port)],
+        'brokers': ['127.0.0.1:{}'.format(port)],
         'prefix': kafka_prefix + '.swh.journal.objects',
     }
 
 
 @pytest.fixture
 def consumer(
-        kafka_server: Tuple[Popen, int], test_config: Dict) -> KafkaConsumer:
+    kafka_server: Tuple[Popen, int],
+    test_config: Dict,
+    kafka_prefix: str,
+) -> Consumer:
     """Get a connected Kafka consumer.
 
     """
+    _, kafka_port = kafka_server
+    consumer = Consumer({
+        'bootstrap.servers': '127.0.0.1:{}'.format(kafka_port),
+        'auto.offset.reset': 'earliest',
+        'enable.auto.commit': True,
+        'group.id': "test-consumer-%s" % kafka_prefix,
+    })
+
     kafka_topics = [
         '%s.%s' % (test_config['prefix'], object_type)
-        for object_type in test_config['object_types']]
-    _, kafka_port = kafka_server
-    consumer = KafkaConsumer(
-        *kafka_topics,
-        bootstrap_servers='localhost:{}'.format(kafka_port),
-        consumer_timeout_ms=constants.DEFAULT_CONSUMER_TIMEOUT_MS,
-        key_deserializer=kafka_to_key,
-        value_deserializer=kafka_to_value,
-        auto_offset_reset='earliest',
-        enable_auto_commit=True,
-        group_id="test-consumer"
-    )
+        for object_type in test_config['object_types']
+    ]
 
-    # Enforce auto_offset_reset=earliest even if the consumer was created
-    # too soon wrt the server.
-    while len(consumer.assignment()) == 0:
-        consumer.poll(timeout_ms=20)
-    consumer.seek_to_beginning()
+    consumer.subscribe(kafka_topics)
 
     return consumer

@@ -5,26 +5,48 @@
 
 from collections import defaultdict
 import datetime
-import time
 
-from kafka import KafkaConsumer
+from confluent_kafka import Consumer, KafkaException
 from subprocess import Popen
 from typing import Tuple
 
 from swh.storage import get_storage
 
 from swh.journal.direct_writer import DirectKafkaWriter
-from swh.journal.serializers import value_to_kafka, kafka_to_value
+from swh.journal.serializers import (
+    kafka_to_key, kafka_to_value
+)
 
 from .conftest import OBJECT_TYPE_KEYS
 
 
-def assert_written(consumer, kafka_prefix):
-    time.sleep(0.1)  # Without this, some messages are missing
-
+def assert_written(consumer, kafka_prefix, expected_messages):
     consumed_objects = defaultdict(list)
-    for msg in consumer:
-        consumed_objects[msg.topic].append((msg.key, msg.value))
+
+    fetched_messages = 0
+    retries_left = 1000
+
+    while fetched_messages < expected_messages:
+        if retries_left == 0:
+            raise ValueError('Timed out fetching messages from kafka')
+
+        msg = consumer.poll(timeout=0.01)
+
+        if not msg:
+            retries_left -= 1
+            continue
+
+        error = msg.error()
+        if error is not None:
+            if error.fatal():
+                raise KafkaException(error)
+            retries_left -= 1
+            continue
+
+        fetched_messages += 1
+        consumed_objects[msg.topic()].append(
+            (kafka_to_key(msg.key()), kafka_to_value(msg.value()))
+        )
 
     for (object_type, (key_name, objects)) in OBJECT_TYPE_KEYS.items():
         topic = kafka_prefix + '.' + object_type
@@ -42,13 +64,13 @@ def assert_written(consumer, kafka_prefix):
                 del value['ctime']
 
         for object_ in objects:
-            assert kafka_to_value(value_to_kafka(object_)) in values
+            assert object_ in values
 
 
 def test_direct_writer(
         kafka_prefix: str,
         kafka_server: Tuple[Popen, int],
-        consumer: KafkaConsumer):
+        consumer: Consumer):
     kafka_prefix += '.swh.journal.objects'
 
     config = {
@@ -59,6 +81,8 @@ def test_direct_writer(
 
     writer = DirectKafkaWriter(**config)
 
+    expected_messages = 0
+
     for (object_type, (_, objects)) in OBJECT_TYPE_KEYS.items():
         for (num, object_) in enumerate(objects):
             if object_type == 'origin_visit':
@@ -66,14 +90,15 @@ def test_direct_writer(
             if object_type == 'content':
                 object_ = {**object_, 'ctime': datetime.datetime.now()}
             writer.write_addition(object_type, object_)
+            expected_messages += 1
 
-    assert_written(consumer, kafka_prefix)
+    assert_written(consumer, kafka_prefix, expected_messages)
 
 
 def test_storage_direct_writer(
         kafka_prefix: str,
         kafka_server: Tuple[Popen, int],
-        consumer: KafkaConsumer):
+        consumer: Consumer):
     kafka_prefix += '.swh.journal.objects'
 
     config = {
@@ -85,6 +110,8 @@ def test_storage_direct_writer(
     storage = get_storage('memory', {'journal_writer': {
         'cls': 'kafka', 'args': config}})
 
+    expected_messages = 0
+
     for (object_type, (_, objects)) in OBJECT_TYPE_KEYS.items():
         method = getattr(storage, object_type + '_add')
         if object_type in ('content', 'directory', 'revision', 'release',
@@ -92,15 +119,18 @@ def test_storage_direct_writer(
             if object_type == 'content':
                 objects = [{**obj, 'data': b''} for obj in objects]
             method(objects)
+            expected_messages += len(objects)
         elif object_type in ('origin_visit',):
             for object_ in objects:
                 object_ = object_.copy()
                 origin_id = storage.origin_add_one(object_.pop('origin'))
                 del object_['type']
                 visit = method(origin=origin_id, date=object_.pop('date'))
+                expected_messages += 1
                 visit_id = visit['visit']
                 storage.origin_visit_update(origin_id, visit_id, **object_)
+                expected_messages += 1
         else:
             assert False, object_type
 
-    assert_written(consumer, kafka_prefix)
+    assert_written(consumer, kafka_prefix, expected_messages)

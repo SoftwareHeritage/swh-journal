@@ -5,7 +5,7 @@
 
 import logging
 
-from kafka import KafkaProducer
+from confluent_kafka import Producer
 
 from swh.model.hashutil import DEFAULT_ALGORITHMS
 from swh.model.model import BaseModel
@@ -22,15 +22,23 @@ class DirectKafkaWriter:
     def __init__(self, brokers, prefix, client_id):
         self._prefix = prefix
 
-        self.producer = KafkaProducer(
-            bootstrap_servers=brokers,
-            key_serializer=key_to_kafka,
-            value_serializer=value_to_kafka,
-            client_id=client_id,
-        )
+        self.producer = Producer({
+            'bootstrap.servers': brokers,
+            'client.id': client_id,
+            'enable.idempotence': 'true',
+        })
 
     def send(self, topic, key, value):
-        self.producer.send(topic=topic, key=key, value=value)
+        self.producer.produce(
+            topic=topic,
+            key=key_to_kafka(key),
+            value=value_to_kafka(value),
+        )
+
+    def flush(self):
+        self.producer.flush()
+        # Need to service the callbacks regularly by calling poll
+        self.producer.poll(0)
 
     def _get_key(self, object_type, object_):
         if object_type in ('revision', 'release', 'directory', 'snapshot'):
@@ -62,7 +70,8 @@ class DirectKafkaWriter:
             assert 'id' not in object_
         return object_
 
-    def write_addition(self, object_type, object_):
+    def write_addition(self, object_type, object_, flush=True):
+        """Write a single object to the journal"""
         if isinstance(object_, BaseModel):
             object_ = object_.to_dict()
         topic = '%s.%s' % (self._prefix, object_type)
@@ -71,8 +80,15 @@ class DirectKafkaWriter:
         logger.debug('topic: %s, key: %s, value: %s', topic, key, object_)
         self.send(topic, key=key, value=object_)
 
+        if flush:
+            self.flush()
+
     write_update = write_addition
 
-    def write_additions(self, object_type, objects):
+    def write_additions(self, object_type, objects, flush=True):
+        """Write a set of objects to the journal"""
         for object_ in objects:
-            self.write_addition(object_type, object_)
+            self.write_addition(object_type, object_, flush=False)
+
+        if flush:
+            self.flush()
