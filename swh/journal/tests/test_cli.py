@@ -4,6 +4,7 @@
 # See top-level LICENSE file for more information
 
 import functools
+import logging
 import re
 import tempfile
 from subprocess import Popen
@@ -11,7 +12,7 @@ from typing import Tuple
 from unittest.mock import patch
 
 from click.testing import CliRunner
-from kafka import KafkaProducer
+from confluent_kafka import Producer
 import pytest
 
 from swh.objstorage.backends.in_memory import InMemoryObjStorage
@@ -19,6 +20,9 @@ from swh.storage.in_memory import Storage
 
 from swh.journal.cli import cli
 from swh.journal.serializers import key_to_kafka, value_to_kafka
+
+
+logger = logging.getLogger(__name__)
 
 
 CLI_CONFIG = '''
@@ -52,7 +56,7 @@ def invoke(catch_exceptions, args):
         config_fd.write(CLI_CONFIG)
         config_fd.seek(0)
         args = ['-C' + config_fd.name] + args
-        result = runner.invoke(cli, args)
+        result = runner.invoke(cli, args, obj={'log_level': logging.DEBUG})
     if not catch_exceptions and result.exception:
         print(result.output)
         raise result.exception
@@ -66,12 +70,11 @@ def test_replay(
     (_, port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
 
-    producer = KafkaProducer(
-        bootstrap_servers='localhost:{}'.format(port),
-        key_serializer=key_to_kafka,
-        value_serializer=value_to_kafka,
-        client_id='test-producer',
-    )
+    producer = Producer({
+        'bootstrap.servers': 'localhost:{}'.format(port),
+        'client.id': 'test-producer',
+        'enable.idempotence': 'true',
+    })
 
     snapshot = {'id': b'foo', 'branches': {
         b'HEAD': {
@@ -79,12 +82,18 @@ def test_replay(
             'target': b'\x01'*20,
         }
     }}
-    producer.send(
-        topic=kafka_prefix+'.snapshot', key=snapshot['id'], value=snapshot)
+    producer.produce(
+        topic=kafka_prefix+'.snapshot',
+        key=key_to_kafka(snapshot['id']),
+        value=value_to_kafka(snapshot),
+    )
+    producer.flush()
+
+    logger.debug('Flushed producer')
 
     result = invoke(False, [
         'replay',
-        '--broker', 'localhost:%d' % port,
+        '--broker', '127.0.0.1:%d' % port,
         '--group-id', 'test-cli-consumer',
         '--prefix', kafka_prefix,
         '--max-messages', '1',
@@ -117,22 +126,25 @@ def _patch_objstorages(names):
 
 
 def _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages):
-    producer = KafkaProducer(
-        bootstrap_servers='localhost:{}'.format(kafka_port),
-        key_serializer=key_to_kafka,
-        value_serializer=value_to_kafka,
-        client_id='test-producer',
-    )
+    producer = Producer({
+        'bootstrap.servers': '127.0.0.1:{}'.format(kafka_port),
+        'client.id': 'test-producer',
+        'enable.idempotence': 'true',
+    })
 
     contents = {}
     for i in range(10):
         content = b'\x00'*19 + bytes([i])
         sha1 = objstorages['src'].add(content)
         contents[sha1] = content
-        producer.send(topic=kafka_prefix+'.content', key=sha1, value={
-            'sha1': sha1,
-            'status': 'visible',
-        })
+        producer.produce(
+            topic=kafka_prefix+'.content',
+            key=key_to_kafka(sha1),
+            value=key_to_kafka({
+                'sha1': sha1,
+                'status': 'visible',
+            }),
+        )
 
     producer.flush()
 
@@ -153,7 +165,7 @@ def test_replay_content(
 
     result = invoke(False, [
         'content-replay',
-        '--broker', 'localhost:%d' % kafka_port,
+        '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', 'test-cli-consumer',
         '--prefix', kafka_prefix,
         '--max-messages', '10',
@@ -187,7 +199,7 @@ def test_replay_content_exclude(
 
         result = invoke(False, [
             'content-replay',
-            '--broker', 'localhost:%d' % kafka_port,
+            '--broker', '127.0.0.1:%d' % kafka_port,
             '--group-id', 'test-cli-consumer',
             '--prefix', kafka_prefix,
             '--max-messages', '10',
