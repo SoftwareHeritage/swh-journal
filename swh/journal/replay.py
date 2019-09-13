@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import copy
 from time import time
 import logging
 from contextlib import contextmanager
@@ -44,6 +45,17 @@ def _fix_revision_pypi_empty_string(rev):
     return rev
 
 
+def _fix_revision_transplant_source(rev):
+    if rev.get('metadata') and rev['metadata'].get('extra_headers'):
+        rev = copy.deepcopy(rev)
+        rev['metadata']['extra_headers'] = [
+            [key, value.encode('ascii')]
+            if key == 'transplant_source' and isinstance(value, str)
+            else [key, value]
+            for (key, value) in rev['metadata']['extra_headers']]
+    return rev
+
+
 def _check_date(date):
     """Returns whether the date can be represented in backends with sane
     limits on timestamps and timezeones (resp. signed 64-bits and
@@ -65,6 +77,7 @@ def _fix_revisions(revisions):
     good_revisions = []
     for rev in revisions:
         rev = _fix_revision_pypi_empty_string(rev)
+        rev = _fix_revision_transplant_source(rev)
         if not _check_revision_date(rev):
             logging.warning('Excluding revision (invalid date): %r', rev)
             continue
@@ -118,6 +131,23 @@ def fix_objects(object_type, objects):
                          'timestamp': {'microseconds': 0, 'seconds': 1565096932}},
       'date': {'offset': 0,
                'timestamp': {'microseconds': 0, 'seconds': 1565096932}}}]
+
+    Fix type of 'transplant_source' extra headers:
+
+    >>> revs = fix_objects('revision', [{
+    ...     'author': {'email': '', 'fullname': b'', 'name': ''},
+    ...     'committer': {'email': '', 'fullname': b'', 'name': ''},
+    ...     'date': date,
+    ...     'committer_date': date,
+    ...     'metadata': {
+    ...         'extra_headers': [
+    ...             ['time_offset_seconds', b'-3600'],
+    ...             ['transplant_source', '29c154a012a70f49df983625090434587622b39e']
+    ...     ]}
+    ... }])
+    >>> pprint(revs[0]['metadata']['extra_headers'])
+    [['time_offset_seconds', b'-3600'],
+     ['transplant_source', b'29c154a012a70f49df983625090434587622b39e']]
 
     Filter out revisions with invalid dates:
 

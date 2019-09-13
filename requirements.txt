@@ -1,6 +1,6 @@
 # Add here external Python modules dependencies, one per line. Module names
 # should match https://pypi.python.org/pypi names. For the full spec or
 # dependency lines, see https://pip.readthedocs.org/en/1.1/requirements.html
-kafka-python >= 1.3
+confluent-kafka
 msgpack
 vcversioner
