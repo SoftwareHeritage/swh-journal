@@ -3,11 +3,13 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from collections import defaultdict
 import logging
+import time
 
-from kafka import KafkaConsumer
+from confluent_kafka import Consumer, KafkaException
 
-from .serializers import kafka_to_key, kafka_to_value
+from .serializers import kafka_to_value
 from swh.journal import DEFAULT_PREFIX
 
 logger = logging.getLogger(__name__)
@@ -52,7 +54,8 @@ class JournalClient:
     """
     def __init__(
             self, brokers, group_id, prefix=None, object_types=None,
-            max_messages=0, auto_offset_reset='earliest', **kwargs):
+            max_messages=0, process_timeout=0, auto_offset_reset='earliest',
+            **kwargs):
         if prefix is None:
             prefix = DEFAULT_PREFIX
         if object_types is None:
@@ -68,21 +71,35 @@ class JournalClient:
                     'Option \'object_types\' only accepts %s.' %
                     ACCEPTED_OFFSET_RESET)
 
-        self.consumer = KafkaConsumer(
-            bootstrap_servers=brokers,
-            key_deserializer=kafka_to_key,
-            value_deserializer=kafka_to_value,
-            auto_offset_reset=auto_offset_reset,
-            enable_auto_commit=False,
-            group_id=group_id,
-            **kwargs)
+        self.value_deserializer = kafka_to_value
 
-        self.consumer.subscribe(
-            topics=['%s.%s' % (prefix, object_type)
-                    for object_type in object_types],
-        )
+        if isinstance(brokers, str):
+            brokers = [brokers]
+
+        consumer_settings = {
+            **kwargs,
+            'bootstrap.servers': ','.join(brokers),
+            'auto.offset.reset': auto_offset_reset,
+            'group.id': group_id,
+            'enable.auto.commit': False,
+        }
+
+        logger.debug('Consumer settings: %s', consumer_settings)
+
+        self.consumer = Consumer(consumer_settings, logger=logger)
+
+        topics = ['%s.%s' % (prefix, object_type)
+                  for object_type in object_types]
+
+        logger.debug('Upstream topics: %s',
+                     self.consumer.list_topics(timeout=1))
+        logger.debug('Subscribing to: %s', topics)
+
+        self.consumer.subscribe(topics=topics)
 
         self.max_messages = max_messages
+        self.process_timeout = process_timeout
+
         self._object_types = object_types
 
     def process(self, worker_fn):
@@ -94,16 +111,47 @@ class JournalClient:
                                                        the messages as
                                                        argument.
         """
+        start_time = time.monotonic()
         nb_messages = 0
-        polled = self.consumer.poll()
-        for (partition, messages) in polled.items():
-            object_type = partition.topic.split('.')[-1]
+
+        objects = defaultdict(list)
+
+        while True:
+            # timeout for message poll
+            timeout = 1.0
+
+            elapsed = time.monotonic() - start_time
+            if self.process_timeout:
+                if elapsed >= self.process_timeout:
+                    break
+
+                timeout = self.process_timeout - elapsed
+
+            message = self.consumer.poll(timeout=timeout)
+            if not message:
+                continue
+
+            error = message.error()
+            if error is not None:
+                if error.fatal():
+                    raise KafkaException(error)
+                logger.info('Received non-fatal kafka error: %s', error)
+                continue
+
+            nb_messages += 1
+
+            object_type = message.topic().split('.')[-1]
             # Got a message from a topic we did not subscribe to.
             assert object_type in self._object_types, object_type
 
-            worker_fn({object_type: [msg.value for msg in messages]})
+            objects[object_type].append(
+                self.value_deserializer(message.value())
+            )
 
-            nb_messages += len(messages)
+            if nb_messages >= self.max_messages:
+                break
+
+        worker_fn(dict(objects))
 
         self.consumer.commit()
         return nb_messages

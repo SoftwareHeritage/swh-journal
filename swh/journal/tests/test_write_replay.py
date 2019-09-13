@@ -39,9 +39,7 @@ def test_write_replay_same_order_batches(objects):
             except HashCollision:
                 pass
 
-    queue_size = sum(len(partition)
-                     for batch in queue
-                     for partition in batch.values())
+    queue_size = len(queue)
 
     storage2 = Storage()
     worker_fn = functools.partial(process_replay_objects, storage=storage2)
@@ -74,9 +72,7 @@ def test_write_replay_content(objects):
         if obj_type == 'content':
             storage1.content_add([obj])
 
-    queue_size = sum(len(partition)
-                     for batch in queue
-                     for partition in batch.values())
+    queue_size = len(queue)
 
     storage2 = Storage()
     worker_fn = functools.partial(process_replay_objects_content,
