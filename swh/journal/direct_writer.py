@@ -4,4 +4,4 @@
 # See top-level LICENSE file for more information
 
 # for BW compat
-from .writer.direct import DirectKafkaWriter  # noqa
+from .writer.kafka import KafkaJournalWriter as DirectKafkaWriter  # noqa

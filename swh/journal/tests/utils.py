@@ -1,5 +1,5 @@
 from swh.journal.client import JournalClient, ACCEPTED_OBJECT_TYPES
-from swh.journal.direct_writer import DirectKafkaWriter
+from swh.journal.writer.kafka import KafkaJournalWriter
 from swh.journal.serializers import (kafka_to_value, key_to_kafka,
                                      value_to_kafka)
 
@@ -23,7 +23,7 @@ class FakeKafkaMessage:
         return None
 
 
-class MockedKafkaWriter(DirectKafkaWriter):
+class MockedKafkaWriter(KafkaJournalWriter):
     def __init__(self, queue):
         self._prefix = 'prefix'
         self.queue = queue

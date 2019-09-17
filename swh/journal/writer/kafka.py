@@ -15,7 +15,7 @@ from swh.journal.serializers import key_to_kafka, value_to_kafka
 logger = logging.getLogger(__name__)
 
 
-class DirectKafkaWriter:
+class KafkaJournalWriter:
     """This class is instantiated and used by swh-storage to write incoming
     new objects to Kafka before adding them to the storage backend
     (eg. postgresql) itself."""

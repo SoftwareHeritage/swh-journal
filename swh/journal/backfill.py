@@ -16,7 +16,7 @@ storage and sends every object identifier back to the journal.
 
 import logging
 
-from .direct_writer import DirectKafkaWriter
+from .writer.kafka import KafkaJournalWriter
 
 from swh.core.db import BaseDb
 from swh.storage.converters import db_to_release, db_to_revision
@@ -437,7 +437,7 @@ class JournalBackfiller:
             object_type, start_object, end_object)
 
         db = BaseDb.connect(self.config['storage_dbconn'])
-        writer = DirectKafkaWriter(
+        writer = KafkaJournalWriter(
             brokers=self.config['brokers'],
             prefix=self.config['prefix'],
             client_id=self.config['client_id']
