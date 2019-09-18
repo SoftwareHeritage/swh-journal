@@ -40,14 +40,14 @@ class JournalClient:
     'swh.journal.objects'.
 
     Clients subscribe to events specific to each object type as listed in the
-    `object_types` argument (if unset, defaults to all accepted objet types).
+    `object_types` argument (if unset, defaults to all accepted object types).
 
     Clients can be sharded by setting the `group_id` to a common
     value across instances. The journal will share the message
     throughput across the nodes sharing the same group_id.
 
-    Messages are processed by the `process_objects` method in batches
-    of maximum `max_messages`.
+    Messages are processed by the `worker_fn` callback passed to the
+    `process` method, in batches of maximum `max_messages`.
 
     Any other named argument is passed directly to KafkaConsumer().
 
@@ -62,14 +62,14 @@ class JournalClient:
             object_types = ACCEPTED_OBJECT_TYPES
         if auto_offset_reset not in ACCEPTED_OFFSET_RESET:
             raise ValueError(
-                'Option \'auto_offset_reset\' only accept %s.' %
-                ACCEPTED_OFFSET_RESET)
+                'Option \'auto_offset_reset\' only accept %s, not %s' %
+                (ACCEPTED_OFFSET_RESET, auto_offset_reset))
 
         for object_type in object_types:
             if object_type not in ACCEPTED_OBJECT_TYPES:
                 raise ValueError(
-                    'Option \'object_types\' only accepts %s.' %
-                    ACCEPTED_OFFSET_RESET)
+                    'Option \'object_types\' only accepts %s, not %s.' %
+                    (ACCEPTED_OBJECT_TYPES, object_type))
 
         self.value_deserializer = kafka_to_value
 
