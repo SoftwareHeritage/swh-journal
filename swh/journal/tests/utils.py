@@ -37,6 +37,12 @@ class MockedKafkaWriter(KafkaJournalWriter):
 
 
 class MockedKafkaConsumer:
+    """Mimic the confluent_kafka.Consumer API, producing the messages stored
+       in `queue`.
+
+       You're only allowed to subscribe to topics in which the queue has
+       messages.
+    """
     def __init__(self, queue):
         self.queue = queue
         self.committed = False
@@ -47,6 +53,14 @@ class MockedKafkaConsumer:
     def commit(self):
         if self.queue == []:
             self.committed = True
+
+    def list_topics(self, timeout=None):
+        return set(message.topic() for message in self.queue)
+
+    def subscribe(self, topics):
+        unknown_topics = set(topics) - self.list_topics()
+        if unknown_topics:
+            raise ValueError('Unknown topics %s' % ', '.join(unknown_topics))
 
 
 class MockedJournalClient(JournalClient):
