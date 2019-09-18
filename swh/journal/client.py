@@ -46,8 +46,8 @@ class JournalClient:
     value across instances. The journal will share the message
     throughput across the nodes sharing the same group_id.
 
-    Messages are processed by the `process_objects` method in batches
-    of maximum `max_messages`.
+    Messages are processed by the `worker_fn` callback passed to the
+    `process` method, in batches of maximum `max_messages`.
 
     Any other named argument is passed directly to KafkaConsumer().
 
