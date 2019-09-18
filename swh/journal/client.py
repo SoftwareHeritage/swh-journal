@@ -40,7 +40,7 @@ class JournalClient:
     'swh.journal.objects'.
 
     Clients subscribe to events specific to each object type as listed in the
-    `object_types` argument (if unset, defaults to all accepted objet types).
+    `object_types` argument (if unset, defaults to all accepted object types).
 
     Clients can be sharded by setting the `group_id` to a common
     value across instances. The journal will share the message
