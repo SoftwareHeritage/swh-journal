@@ -12,7 +12,7 @@ from typing import Tuple
 
 from swh.storage import get_storage
 
-from swh.journal.direct_writer import DirectKafkaWriter
+from swh.journal.writer.kafka import KafkaJournalWriter
 from swh.journal.serializers import (
     kafka_to_key, kafka_to_value
 )
@@ -67,19 +67,19 @@ def assert_written(consumer, kafka_prefix, expected_messages):
             assert object_ in values
 
 
-def test_direct_writer(
+def test_kafka_writer(
         kafka_prefix: str,
         kafka_server: Tuple[Popen, int],
         consumer: Consumer):
     kafka_prefix += '.swh.journal.objects'
 
     config = {
-        'brokers': 'localhost:%d' % kafka_server[1],
-        'client_id': 'direct_writer',
+        'brokers': ['localhost:%d' % kafka_server[1]],
+        'client_id': 'kafka_writer',
         'prefix': kafka_prefix,
     }
 
-    writer = DirectKafkaWriter(**config)
+    writer = KafkaJournalWriter(**config)
 
     expected_messages = 0
 
@@ -102,8 +102,8 @@ def test_storage_direct_writer(
     kafka_prefix += '.swh.journal.objects'
 
     config = {
-        'brokers': 'localhost:%d' % kafka_server[1],
-        'client_id': 'direct_writer',
+        'brokers': ['localhost:%d' % kafka_server[1]],
+        'client_id': 'kafka_writer',
         'prefix': kafka_prefix,
     }
 

@@ -16,7 +16,7 @@ storage and sends every object identifier back to the journal.
 
 import logging
 
-from .direct_writer import DirectKafkaWriter
+from .writer.kafka import KafkaJournalWriter
 
 from swh.core.db import BaseDb
 from swh.storage.converters import db_to_release, db_to_revision
@@ -139,12 +139,7 @@ def revision_converter(db, revision):
        compatible objects.
 
     """
-    revision = db_to_revision(revision)
-    if 'author' in revision and revision['author']:
-        del revision['author']['id']
-    if 'committer' in revision and revision['committer']:
-        del revision['committer']['id']
-    return revision
+    return db_to_revision(revision)
 
 
 def release_converter(db, release):
@@ -437,7 +432,7 @@ class JournalBackfiller:
             object_type, start_object, end_object)
 
         db = BaseDb.connect(self.config['storage_dbconn'])
-        writer = DirectKafkaWriter(
+        writer = KafkaJournalWriter(
             brokers=self.config['brokers'],
             prefix=self.config['prefix'],
             client_id=self.config['client_id']
