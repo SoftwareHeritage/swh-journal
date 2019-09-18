@@ -139,12 +139,7 @@ def revision_converter(db, revision):
        compatible objects.
 
     """
-    revision = db_to_revision(revision)
-    if 'author' in revision and revision['author']:
-        del revision['author']['id']
-    if 'committer' in revision and revision['committer']:
-        del revision['committer']['id']
-    return revision
+    return db_to_revision(revision)
 
 
 def release_converter(db, release):
