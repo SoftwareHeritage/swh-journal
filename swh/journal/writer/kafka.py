@@ -38,10 +38,11 @@ class KafkaJournalWriter:
             value=value_to_kafka(value),
         )
 
-    def flush(self):
-        self.producer.flush()
         # Need to service the callbacks regularly by calling poll
         self.producer.poll(0)
+
+    def flush(self):
+        self.producer.flush()
 
     def _get_key(self, object_type, object_):
         if object_type in ('revision', 'release', 'directory', 'snapshot'):
