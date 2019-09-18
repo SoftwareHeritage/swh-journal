@@ -1,5 +1,5 @@
 from swh.journal.client import JournalClient, ACCEPTED_OBJECT_TYPES
-from swh.journal.direct_writer import DirectKafkaWriter
+from swh.journal.writer.kafka import KafkaJournalWriter
 from swh.journal.serializers import (kafka_to_value, key_to_kafka,
                                      value_to_kafka)
 
@@ -23,7 +23,7 @@ class FakeKafkaMessage:
         return None
 
 
-class MockedKafkaWriter(DirectKafkaWriter):
+class MockedKafkaWriter(KafkaJournalWriter):
     def __init__(self, queue):
         self._prefix = 'prefix'
         self.queue = queue
@@ -37,6 +37,12 @@ class MockedKafkaWriter(DirectKafkaWriter):
 
 
 class MockedKafkaConsumer:
+    """Mimic the confluent_kafka.Consumer API, producing the messages stored
+       in `queue`.
+
+       You're only allowed to subscribe to topics in which the queue has
+       messages.
+    """
     def __init__(self, queue):
         self.queue = queue
         self.committed = False
@@ -47,6 +53,14 @@ class MockedKafkaConsumer:
     def commit(self):
         if self.queue == []:
             self.committed = True
+
+    def list_topics(self, timeout=None):
+        return set(message.topic() for message in self.queue)
+
+    def subscribe(self, topics):
+        unknown_topics = set(topics) - self.list_topics()
+        if unknown_topics:
+            raise ValueError('Unknown topics %s' % ', '.join(unknown_topics))
 
 
 class MockedJournalClient(JournalClient):
