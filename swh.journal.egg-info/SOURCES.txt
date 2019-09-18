@@ -23,8 +23,11 @@ swh/journal/tests/__init__.py
 swh/journal/tests/conftest.py
 swh/journal/tests/test_backfill.py
 swh/journal/tests/test_cli.py
-swh/journal/tests/test_direct_writer.py
+swh/journal/tests/test_kafka_writer.py
 swh/journal/tests/test_replay.py
 swh/journal/tests/test_serializers.py
 swh/journal/tests/test_write_replay.py
 swh/journal/tests/utils.py
+swh/journal/writer/__init__.py
+swh/journal/writer/inmemory.py
+swh/journal/writer/kafka.py
