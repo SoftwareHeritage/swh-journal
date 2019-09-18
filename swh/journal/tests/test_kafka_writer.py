@@ -74,7 +74,7 @@ def test_kafka_writer(
     kafka_prefix += '.swh.journal.objects'
 
     config = {
-        'brokers': 'localhost:%d' % kafka_server[1],
+        'brokers': ['localhost:%d' % kafka_server[1]],
         'client_id': 'kafka_writer',
         'prefix': kafka_prefix,
     }
@@ -102,7 +102,7 @@ def test_storage_direct_writer(
     kafka_prefix += '.swh.journal.objects'
 
     config = {
-        'brokers': 'localhost:%d' % kafka_server[1],
+        'brokers': ['localhost:%d' % kafka_server[1]],
         'client_id': 'kafka_writer',
         'prefix': kafka_prefix,
     }

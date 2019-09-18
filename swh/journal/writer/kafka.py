@@ -22,8 +22,11 @@ class KafkaJournalWriter:
     def __init__(self, brokers, prefix, client_id):
         self._prefix = prefix
 
+        if isinstance(brokers, str):
+            brokers = [brokers]
+
         self.producer = Producer({
-            'bootstrap.servers': brokers,
+            'bootstrap.servers': ','.join(brokers),
             'client.id': client_id,
             'enable.idempotence': 'true',
         })
