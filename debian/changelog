@@ -1,8 +1,15 @@
-swh-journal (0.0.17-1~swh1~bpo9+1) stretch-swh; urgency=medium
+swh-journal (0.0.18-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for stretch-swh
+  * New upstream release 0.0.18     - (tagged by Stefano Zacchiroli
+    <zack@upsilon.cc> on 2019-10-01 10:19:26 +0200)
+  * Upstream changes:     - v0.0.18     - * tox: anticipate mypy run to
+    just after flake8     - * init.py: switch to documented way of
+    extending path     - * typing: minimal changes to make a no-op mypy
+    run pass     - * writer: Normalize 'cls' value to 'memory' for in-
+    memory instantiation     - * Add a test directly for the journal
+    client.
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 18 Sep 2019 16:09:33 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Tue, 01 Oct 2019 11:12:03 +0000
 
 swh-journal (0.0.17-1~swh1) unstable-swh; urgency=medium
 

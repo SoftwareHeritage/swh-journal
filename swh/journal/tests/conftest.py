@@ -11,7 +11,7 @@ import string
 
 from confluent_kafka import Consumer
 from subprocess import Popen
-from typing import Tuple, Dict
+from typing import Any, Dict, List, Optional, Tuple
 
 from pathlib import Path
 from pytest_kafka import (
@@ -154,7 +154,7 @@ OBJECT_TYPE_KEYS = {
     'release': ('id', RELEASES),
     'origin': (None, ORIGINS),
     'origin_visit': (None, ORIGIN_VISITS),
-}
+}  # type: Dict[str, Tuple[Optional[str], List[Dict[str, Any]]]]
 
 
 KAFKA_ROOT = os.environ.get('SWH_KAFKA_ROOT')
