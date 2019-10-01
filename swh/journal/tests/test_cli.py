@@ -8,7 +8,7 @@ import logging
 import re
 import tempfile
 from subprocess import Popen
-from typing import Tuple
+from typing import Any, Dict, Tuple
 from unittest.mock import patch
 
 from click.testing import CliRunner
@@ -81,7 +81,7 @@ def test_replay(
             'target_type': 'revision',
             'target': b'\x01'*20,
         }
-    }}
+    }}  # type: Dict[str, Any]
     producer.produce(
         topic=kafka_prefix+'.snapshot',
         key=key_to_kafka(snapshot['id']),

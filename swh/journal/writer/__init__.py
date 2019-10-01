@@ -5,7 +5,12 @@
 
 
 def get_journal_writer(cls, args={}):
-    if cls == 'inmemory':
+    if cls == 'inmemory':  # FIXME: Remove inmemory in due time
+        import warnings
+        warnings.warn("cls = 'inmemory' is deprecated, use 'memory' instead",
+                      DeprecationWarning)
+        cls = 'memory'
+    if cls == 'memory':
         from .inmemory import InMemoryJournalWriter as JournalWriter
     elif cls == 'kafka':
         from .kafka import KafkaJournalWriter as JournalWriter
