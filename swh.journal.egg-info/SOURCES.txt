@@ -17,12 +17,14 @@ swh/journal/backfill.py
 swh/journal/cli.py
 swh/journal/client.py
 swh/journal/direct_writer.py
+swh/journal/py.typed
 swh/journal/replay.py
 swh/journal/serializers.py
 swh/journal/tests/__init__.py
 swh/journal/tests/conftest.py
 swh/journal/tests/test_backfill.py
 swh/journal/tests/test_cli.py
+swh/journal/tests/test_client.py
 swh/journal/tests/test_kafka_writer.py
 swh/journal/tests/test_replay.py
 swh/journal/tests/test_serializers.py
