@@ -232,4 +232,6 @@ def consumer(
 
     consumer.subscribe(kafka_topics)
 
-    return consumer
+    yield consumer
+
+    consumer.close()
