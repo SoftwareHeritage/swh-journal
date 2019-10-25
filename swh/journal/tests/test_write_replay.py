@@ -61,16 +61,21 @@ def test_write_replay_same_order_batches(objects):
 @given(lists(object_dicts(), min_size=1))
 @settings(suppress_health_check=[HealthCheck.too_slow])
 def test_write_replay_content(objects):
+
     queue = []
     replayer = MockedJournalClient(queue)
 
     storage1 = Storage()
     storage1.journal_writer = MockedKafkaWriter(queue)
 
+    contents = []
     for (obj_type, obj) in objects:
         obj = obj.copy()
         if obj_type == 'content':
-            storage1.content_add([obj])
+            # avoid hash collision
+            if not storage1.content_find(obj):
+                storage1.content_add([obj])
+                contents.append(obj)
 
     queue_size = len(queue)
 
@@ -82,4 +87,9 @@ def test_write_replay_content(objects):
     while nb_messages < queue_size:
         nb_messages += replayer.process(worker_fn)
 
-    assert storage1.objstorage.state == storage2.objstorage.state
+    # only content with status visible will be copied in storage2
+    expected_objstorage_state = {
+        c['sha1']: c['data'] for c in contents if c['status'] == 'visible'
+    }
+
+    assert expected_objstorage_state == storage2.objstorage.state
