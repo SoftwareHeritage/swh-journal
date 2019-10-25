@@ -86,7 +86,7 @@ def test_storage_play(
     origins = list(storage.origin_get(
             [orig for orig in OBJECT_TYPE_KEYS['origin'][1]]))
     assert OBJECT_TYPE_KEYS['origin'][1] == \
-        [{'url': orig['url'], 'type': orig['type']} for orig in origins]
+        [{'url': orig['url']} for orig in origins]
     for origin in origins:
         origin_id_or_url = \
             origin['id'] if ENABLE_ORIGIN_IDS else origin['url']
@@ -98,7 +98,6 @@ def test_storage_play(
             }
             for visit in OBJECT_TYPE_KEYS['origin_visit'][1]
             if visit['origin']['url'] == origin['url']
-            and visit['origin']['type'] == origin['type']
         ]
         actual_visits = list(storage.origin_visit_get(
             origin_id_or_url))

@@ -67,7 +67,7 @@ class KafkaJournalWriter:
                 for hash in DEFAULT_ALGORITHMS
             }
         elif object_type == 'origin':
-            return {'url': object_['url'], 'type': object_['type']}
+            return {'url': object_['url']}
         elif object_type == 'origin_visit':
             return {
                 'origin': object_['origin'],

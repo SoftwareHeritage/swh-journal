@@ -205,7 +205,6 @@ def fix_objects(object_type, objects):
 
 def _insert_objects(object_type, objects, storage):
     objects = fix_objects(object_type, objects)
-
     if object_type == 'content':
         # TODO: insert 'content' in batches
         for object_ in objects:
@@ -221,8 +220,7 @@ def _insert_objects(object_type, objects, storage):
         method(objects)
     elif object_type == 'origin_visit':
         for visit in objects:
-            if 'type' in visit['origin']:
-                storage.origin_add_one(visit['origin'])
+            storage.origin_add_one(visit['origin'])
             if 'metadata' not in visit:
                 visit['metadata'] = None
         storage.origin_visit_upsert(objects)

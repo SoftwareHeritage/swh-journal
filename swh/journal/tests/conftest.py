@@ -120,11 +120,9 @@ RELEASES = [
 ORIGINS = [
     {
         'url': 'https://somewhere.org/den/fox',
-        'type': 'git',
     },
     {
         'url': 'https://overtherainbow.org/fox/den',
-        'type': 'svn',
     }
 ]
 
