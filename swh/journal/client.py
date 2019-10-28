@@ -176,3 +176,6 @@ class JournalClient:
 
             self.consumer.commit()
         return nb_messages
+
+    def close(self):
+        self.consumer.close()

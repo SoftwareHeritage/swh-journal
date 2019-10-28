@@ -110,6 +110,8 @@ def replay(ctx, brokers, prefix, group_id, max_messages):
         ctx.exit(0)
     else:
         print('Done.')
+    finally:
+        client.close()
 
 
 @cli.command()
