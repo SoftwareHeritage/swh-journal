@@ -134,7 +134,7 @@ class JournalClient:
 
             elapsed = time.monotonic() - start_time
             if self.process_timeout:
-                if elapsed >= self.process_timeout:
+                if elapsed + 0.01 >= self.process_timeout:
                     break
 
                 timeout = self.process_timeout - elapsed
