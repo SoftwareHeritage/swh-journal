@@ -93,7 +93,8 @@ def replay(ctx, brokers, prefix, group_id, max_messages):
         ctx.fail('You must have a storage configured in your config file.')
 
     client = get_journal_client(
-        ctx, brokers=brokers, prefix=prefix, group_id=group_id)
+        ctx, brokers=brokers, prefix=prefix, group_id=group_id,
+        max_messages=max_messages)
     worker_fn = functools.partial(process_replay_objects, storage=storage)
 
     try:
@@ -207,7 +208,7 @@ def content_replay(ctx, max_messages,
 
     client = get_journal_client(
         ctx, brokers=brokers, prefix=prefix, group_id=group_id,
-        object_types=('content',))
+        max_messages=max_messages, object_types=('content',))
     worker_fn = functools.partial(process_replay_objects_content,
                                   src=objstorage_src,
                                   dst=objstorage_dst,

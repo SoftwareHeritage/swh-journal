@@ -136,6 +136,8 @@ def _test_write_replay_origin_visit(visits):
         writer.send('origin_visit', 'foo', visit)
 
     queue_size = len(queue)
+    assert replayer.max_messages == 0
+    replayer.max_messages = queue_size
 
     storage = get_storage('memory', {})
     worker_fn = functools.partial(process_replay_objects, storage=storage)
