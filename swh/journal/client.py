@@ -95,7 +95,7 @@ class JournalClient:
                   for object_type in object_types]
 
         logger.debug('Upstream topics: %s',
-                     self.consumer.list_topics(timeout=1))
+                     self.consumer.list_topics(timeout=10))
         logger.debug('Subscribing to: %s', topics)
 
         self.consumer.subscribe(topics=topics)
