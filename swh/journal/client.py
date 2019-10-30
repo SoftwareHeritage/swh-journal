@@ -171,10 +171,11 @@ class JournalClient:
                     self.value_deserializer(message.value())
                 )
 
-        if nb_messages:
-            worker_fn(dict(objects))
+            if objects:
+                worker_fn(dict(objects))
+                objects.clear()
 
-            self.consumer.commit()
+                self.consumer.commit()
         return nb_messages
 
     def close(self):
