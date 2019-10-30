@@ -128,7 +128,7 @@ ORIGINS = [
 
 ORIGIN_VISITS = [
     {
-        'origin': ORIGINS[0],
+        'origin': ORIGINS[0]['url'],
         'date': '2013-05-07 04:20:39.369271+00:00',
         'snapshot': None,  # TODO
         'status': 'ongoing',  # TODO
@@ -136,7 +136,7 @@ ORIGIN_VISITS = [
         'type': 'git',
     },
     {
-        'origin': ORIGINS[0],
+        'origin': ORIGINS[0]['url'],
         'date': '2018-11-27 17:20:39+00:00',
         'snapshot': None,  # TODO
         'status': 'ongoing',  # TODO

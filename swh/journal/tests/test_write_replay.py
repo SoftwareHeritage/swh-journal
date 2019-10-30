@@ -30,7 +30,7 @@ def test_write_replay_same_order_batches(objects):
     for (obj_type, obj) in objects:
         obj = obj.copy()
         if obj_type == 'origin_visit':
-            storage1.origin_add_one(obj['origin'])
+            storage1.origin_add_one({'url': obj['origin']})
             storage1.origin_visit_upsert([obj])
         else:
             method = getattr(storage1, obj_type + '_add')

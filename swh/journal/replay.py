@@ -89,16 +89,18 @@ def _fix_origin_visits(visits):
     good_visits = []
     for visit in visits:
         visit = visit.copy()
-        if isinstance(visit['origin'], str):
-            # note that it will crash with the pg and
-            # in-mem storages if the origin is not already known,
-            # but there is no other choice because we can't add an
-            # origin without knowing its type. Non-pg storages
-            # don't use a numeric FK internally,
-            visit['origin'] = {'url': visit['origin']}
-        else:
-            if 'type' not in visit:
+        if 'type' not in visit:
+            if isinstance(visit['origin'], dict) and 'type' in visit['origin']:
+                # Very old version of the schema: visits did not have a type,
+                # but their 'origin' field was a dict with a 'type' key.
                 visit['type'] = visit['origin']['type']
+            else:
+                # Very very old version of the schema: 'type' is missing,
+                # so there is nothing we can do to fix it.
+                raise ValueError('Got an origin_visit too old to be replayed.')
+        if isinstance(visit['origin'], dict):
+            # Old version of the schema: visit['origin'] was a dict.
+            visit['origin'] = visit['origin']['url']
         good_visits.append(visit)
     return good_visits
 
@@ -183,17 +185,20 @@ def fix_objects(object_type, objects):
     []
 
 
-    `visit['origin']` is an URL instead of a dict:
+    `visit['origin']` is a dict instead of an URL:
 
-    >>> fix_objects('origin_visit', [{'origin': 'http://foo'}])
-    [{'origin': {'url': 'http://foo'}}]
+    >>> pprint(fix_objects('origin_visit', [{
+    ...     'origin': {'url': 'http://foo'},
+    ...     'type': 'git',
+    ... }]))
+    [{'origin': 'http://foo', 'type': 'git'}]
 
     `visit['type']` is missing , but `origin['visit']['type']` exists:
 
-    >>> pprint(fix_objects(
-    ...     'origin_visit',
-    ...     [{'origin': {'type': 'hg', 'url': 'http://foo'}}]))
-    [{'origin': {'type': 'hg', 'url': 'http://foo'}, 'type': 'hg'}]
+    >>> pprint(fix_objects('origin_visit', [
+    ...     {'origin': {'type': 'hg', 'url': 'http://foo'}
+    ... }]))
+    [{'origin': 'http://foo', 'type': 'hg'}]
     """  # noqa
 
     if object_type == 'revision':
@@ -220,7 +225,7 @@ def _insert_objects(object_type, objects, storage):
         method(objects)
     elif object_type == 'origin_visit':
         for visit in objects:
-            storage.origin_add_one(visit['origin'])
+            storage.origin_add_one({'url': visit['origin']})
             if 'metadata' not in visit:
                 visit['metadata'] = None
         storage.origin_visit_upsert(objects)
