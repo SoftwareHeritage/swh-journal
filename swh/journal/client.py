@@ -30,6 +30,17 @@ ACCEPTED_OBJECT_TYPES = [
 ]
 
 
+def _error_cb(error):
+    if error.fatal():
+        raise KafkaException(error)
+    logger.info('Received non-fatal kafka error: %s', error)
+
+
+def _on_commit(error, partitions):
+    if error is not None:
+        _error_cb(error)
+
+
 class JournalClient:
     """A base client for the Software Heritage journal.
 
@@ -81,7 +92,10 @@ class JournalClient:
             'bootstrap.servers': ','.join(brokers),
             'auto.offset.reset': auto_offset_reset,
             'group.id': group_id,
+            'on_commit': _on_commit,
+            'error_cb': _error_cb,
             'enable.auto.commit': False,
+            'logger': logger,
         }
 
         logger.debug('Consumer settings: %s', consumer_settings)
@@ -92,7 +106,7 @@ class JournalClient:
                   for object_type in object_types]
 
         logger.debug('Upstream topics: %s',
-                     self.consumer.list_topics(timeout=1))
+                     self.consumer.list_topics(timeout=10))
         logger.debug('Subscribing to: %s', topics)
 
         self.consumer.subscribe(topics=topics)
@@ -122,36 +136,47 @@ class JournalClient:
 
             elapsed = time.monotonic() - start_time
             if self.process_timeout:
-                if elapsed >= self.process_timeout:
+                if elapsed + 0.01 >= self.process_timeout:
                     break
 
                 timeout = self.process_timeout - elapsed
 
-            message = self.consumer.poll(timeout=timeout)
-            if not message:
+            num_messages = 20
+
+            if self.max_messages:
+                if nb_messages >= self.max_messages:
+                    break
+                num_messages = min(num_messages, self.max_messages-nb_messages)
+
+            messages = self.consumer.consume(
+                timeout=timeout, num_messages=num_messages)
+            if not messages:
                 continue
 
-            error = message.error()
-            if error is not None:
-                if error.fatal():
-                    raise KafkaException(error)
-                logger.info('Received non-fatal kafka error: %s', error)
-                continue
+            for message in messages:
+                error = message.error()
+                if error is not None:
+                    if error.fatal():
+                        raise KafkaException(error)
+                    logger.info('Received non-fatal kafka error: %s', error)
+                    continue
 
-            nb_messages += 1
+                nb_messages += 1
 
-            object_type = message.topic().split('.')[-1]
-            # Got a message from a topic we did not subscribe to.
-            assert object_type in self._object_types, object_type
+                object_type = message.topic().split('.')[-1]
+                # Got a message from a topic we did not subscribe to.
+                assert object_type in self._object_types, object_type
 
-            objects[object_type].append(
-                self.value_deserializer(message.value())
-            )
+                objects[object_type].append(
+                    self.value_deserializer(message.value())
+                )
 
-            if nb_messages >= self.max_messages:
-                break
+            if objects:
+                worker_fn(dict(objects))
+                objects.clear()
 
-        worker_fn(dict(objects))
-
-        self.consumer.commit()
+                self.consumer.commit()
         return nb_messages
+
+    def close(self):
+        self.consumer.close()
