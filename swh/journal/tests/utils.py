@@ -47,8 +47,10 @@ class MockedKafkaConsumer:
         self.queue = queue
         self.committed = False
 
-    def poll(self, timeout=None):
-        return self.queue.pop(0)
+    def consume(self, num_messages, timeout=None):
+        L = self.queue[0:num_messages]
+        self.queue[0:num_messages] = []
+        return L
 
     def commit(self):
         if self.queue == []:

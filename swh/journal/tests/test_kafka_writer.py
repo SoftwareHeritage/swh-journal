@@ -123,12 +123,13 @@ def test_storage_direct_writer(
         elif object_type in ('origin_visit',):
             for object_ in objects:
                 object_ = object_.copy()
-                origin_id = storage.origin_add_one(object_.pop('origin'))
-                del object_['type']
-                visit = method(origin=origin_id, date=object_.pop('date'))
+                origin_url = object_.pop('origin')
+                storage.origin_add_one({'url': origin_url})
+                visit = method(origin=origin_url, date=object_.pop('date'),
+                               type=object_.pop('type'))
                 expected_messages += 1
                 visit_id = visit['visit']
-                storage.origin_visit_update(origin_id, visit_id, **object_)
+                storage.origin_visit_update(origin_url, visit_id, **object_)
                 expected_messages += 1
         else:
             assert False, object_type
