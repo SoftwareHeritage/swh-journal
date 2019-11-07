@@ -12,9 +12,9 @@ from typing import Tuple
 import dateutil
 from confluent_kafka import Producer
 from hypothesis import strategies, given, settings
+import pytest
 
 from swh.storage import get_storage
-from swh.storage.in_memory import ENABLE_ORIGIN_IDS
 
 from swh.journal.client import JournalClient
 from swh.journal.serializers import key_to_kafka, value_to_kafka
@@ -86,22 +86,20 @@ def test_storage_play(
     origins = list(storage.origin_get(
             [orig for orig in OBJECT_TYPE_KEYS['origin'][1]]))
     assert OBJECT_TYPE_KEYS['origin'][1] == \
-        [{'url': orig['url'], 'type': orig['type']} for orig in origins]
+        [{'url': orig['url']} for orig in origins]
     for origin in origins:
-        origin_id_or_url = \
-            origin['id'] if ENABLE_ORIGIN_IDS else origin['url']
+        origin_url = origin['url']
         expected_visits = [
             {
                 **visit,
-                'origin': origin_id_or_url,
+                'origin': origin_url,
                 'date': dateutil.parser.parse(visit['date']),
             }
             for visit in OBJECT_TYPE_KEYS['origin_visit'][1]
-            if visit['origin']['url'] == origin['url']
-            and visit['origin']['type'] == origin['type']
+            if visit['origin'] == origin['url']
         ]
         actual_visits = list(storage.origin_visit_get(
-            origin_id_or_url))
+            origin_url))
         for visit in actual_visits:
             del visit['visit']  # opaque identifier
         assert expected_visits == actual_visits
@@ -138,6 +136,8 @@ def _test_write_replay_origin_visit(visits):
         writer.send('origin_visit', 'foo', visit)
 
     queue_size = len(queue)
+    assert replayer.max_messages == 0
+    replayer.max_messages = queue_size
 
     storage = get_storage('memory', {})
     worker_fn = functools.partial(process_replay_objects, storage=storage)
@@ -152,17 +152,14 @@ def _test_write_replay_origin_visit(visits):
     for vin, vout in zip(visits, actual_visits):
         vin = vin.copy()
         vout = vout.copy()
-        if ENABLE_ORIGIN_IDS:
-            assert vout.pop('origin') == 1
-        else:
-            assert vout.pop('origin') == 'http://example.com/'
+        assert vout.pop('origin') == 'http://example.com/'
         vin.pop('origin')
         vin.setdefault('type', 'git')
         vin.setdefault('metadata', None)
         assert vin == vout
 
 
-def test_write_replay_legacy_origin_visit1():
+def test_write_replay_origin_visit():
     """Test origin_visit when the 'origin' is just a string."""
     now = datetime.datetime.now()
     visits = [{
@@ -176,14 +173,45 @@ def test_write_replay_legacy_origin_visit1():
     _test_write_replay_origin_visit(visits)
 
 
+def test_write_replay_legacy_origin_visit1():
+    """Test origin_visit when there is no type."""
+    now = datetime.datetime.now()
+    visits = [{
+        'visit': 1,
+        'origin': 'http://example.com/',
+        'date': now,
+        'status': 'partial',
+        'snapshot': None,
+    }]
+    with pytest.raises(ValueError, match='too old'):
+        _test_write_replay_origin_visit(visits)
+
+
 def test_write_replay_legacy_origin_visit2():
-    """Test origin_visit when 'type' is missing."""
+    """Test origin_visit when 'type' is missing from the visit, but not
+    from the origin."""
     now = datetime.datetime.now()
     visits = [{
         'visit': 1,
         'origin': {
             'url': 'http://example.com/',
             'type': 'git',
+        },
+        'date': now,
+        'type': 'git',
+        'status': 'partial',
+        'snapshot': None,
+    }]
+    _test_write_replay_origin_visit(visits)
+
+
+def test_write_replay_legacy_origin_visit3():
+    """Test origin_visit when the origin is a dict"""
+    now = datetime.datetime.now()
+    visits = [{
+        'visit': 1,
+        'origin': {
+            'url': 'http://example.com/',
         },
         'date': now,
         'type': 'git',
