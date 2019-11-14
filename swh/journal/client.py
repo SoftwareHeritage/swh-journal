@@ -13,6 +13,7 @@ from .serializers import kafka_to_value
 from swh.journal import DEFAULT_PREFIX
 
 logger = logging.getLogger(__name__)
+rdkafka_logger = logging.getLogger(__name__ + '.rdkafka')
 
 
 # Only accepted offset reset policy accepted
@@ -95,12 +96,12 @@ class JournalClient:
             'on_commit': _on_commit,
             'error_cb': _error_cb,
             'enable.auto.commit': False,
-            'logger': logger,
+            'logger': rdkafka_logger,
         }
 
         logger.debug('Consumer settings: %s', consumer_settings)
 
-        self.consumer = Consumer(consumer_settings, logger=logger)
+        self.consumer = Consumer(consumer_settings)
 
         topics = ['%s.%s' % (prefix, object_type)
                   for object_type in object_types]
