@@ -88,6 +88,10 @@ class JournalClient:
         if isinstance(brokers, str):
             brokers = [brokers]
 
+        debug_logging = rdkafka_logger.isEnabledFor(logging.DEBUG)
+        if debug_logging and 'debug' not in kwargs:
+            kwargs['debug'] = 'consumer'
+
         consumer_settings = {
             **kwargs,
             'bootstrap.servers': ','.join(brokers),
