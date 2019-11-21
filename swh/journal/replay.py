@@ -21,7 +21,12 @@ logger = logging.getLogger(__name__)
 def process_replay_objects(all_objects, *, storage):
     for (object_type, objects) in all_objects.items():
         logger.debug("Inserting %s %s objects", len(objects), object_type)
-        _insert_objects(object_type, objects, storage)
+        statsd_name = 'swh_journal_graph_replayer_%s_total_duration_seconds'
+        with statsd.timed(statsd_name % 'object_type'):
+            _insert_objects(object_type, objects, storage)
+        statsd.increment(
+            'swh_journal_graph_replayer_%s_total' % object_type,
+            len(objects))
 
 
 def _fix_revision_pypi_empty_string(rev):
