@@ -81,7 +81,8 @@ def _fix_revisions(revisions):
         if not _check_revision_date(rev):
             logging.warning('Excluding revision (invalid date): %r', rev)
             continue
-        good_revisions.append(rev)
+        if rev not in good_revisions:
+            good_revisions.append(rev)
     return good_revisions
 
 
