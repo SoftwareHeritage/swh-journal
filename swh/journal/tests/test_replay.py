@@ -30,7 +30,7 @@ def test_storage_play(
     (_, port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
 
-    storage = get_storage('memory', {})
+    storage = get_storage('memory')
 
     producer = Producer({
         'bootstrap.servers': 'localhost:{}'.format(port),
@@ -139,7 +139,7 @@ def _test_write_replay_origin_visit(visits):
     assert replayer.max_messages == 0
     replayer.max_messages = queue_size
 
-    storage = get_storage('memory', {})
+    storage = get_storage('memory')
     worker_fn = functools.partial(process_replay_objects, storage=storage)
     nb_messages = 0
     while nb_messages < queue_size:
