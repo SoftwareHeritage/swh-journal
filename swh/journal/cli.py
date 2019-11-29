@@ -48,10 +48,6 @@ def cli(ctx, config_file):
 
     ctx.ensure_object(dict)
 
-    log_level = ctx.obj.get('log_level', logging.INFO)
-    logging.root.setLevel(log_level)
-    logging.getLogger('kafka').setLevel(logging.INFO)
-
     ctx.obj['config'] = conf
 
 

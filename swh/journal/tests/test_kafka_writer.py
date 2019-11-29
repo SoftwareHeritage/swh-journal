@@ -107,8 +107,9 @@ def test_storage_direct_writer(
         'prefix': kafka_prefix,
     }
 
-    storage = get_storage('memory', {'journal_writer': {
-        'cls': 'kafka', 'args': config}})
+    storage = get_storage('memory', journal_writer={
+        'cls': 'kafka', 'args': config,
+    })
 
     expected_messages = 0
 
