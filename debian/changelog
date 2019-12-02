@@ -1,8 +1,10 @@
-swh-journal (0.0.20-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-journal (0.0.21-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.0.21     - (tagged by David Douard
+    <david.douard@sdfa3.org> on 2019-11-29 15:37:49 +0100)
+  * Upstream changes:     - v0.0.21
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 29 Nov 2019 11:11:55 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Mon, 02 Dec 2019 14:12:49 +0000
 
 swh-journal (0.0.20-1~swh1) unstable-swh; urgency=medium
 
