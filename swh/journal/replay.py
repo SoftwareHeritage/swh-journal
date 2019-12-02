@@ -17,16 +17,21 @@ from swh.storage import HashCollision
 
 logger = logging.getLogger(__name__)
 
+GRAPH_OPERATIONS_METRIC = "swh_graph_replayer_operations_total"
+GRAPH_DURATION_METRIC = "swh_graph_replayer_duration_seconds"
+CONTENT_OPERATIONS_METRIC = "swh_content_replayer_operations_total"
+CONTENT_BYTES_METRIC = "swh_content_replayer_bytes"
+CONTENT_DURATION_METRIC = "swh_content_replayer_duration_seconds"
+
 
 def process_replay_objects(all_objects, *, storage):
     for (object_type, objects) in all_objects.items():
         logger.debug("Inserting %s %s objects", len(objects), object_type)
-        statsd_name = 'swh_journal_graph_replayer_%s_total_duration_seconds'
-        with statsd.timed(statsd_name % 'object_type'):
+        with statsd.timed(GRAPH_DURATION_METRIC,
+                          tags={'object_type': object_type}):
             _insert_objects(object_type, objects, storage)
-        statsd.increment(
-            'swh_journal_graph_replayer_%s_total' % object_type,
-            len(objects))
+        statsd.increment(GRAPH_OPERATIONS_METRIC, len(objects),
+                         tags={'object_type': object_type})
 
 
 def _fix_revision_pypi_empty_string(rev):
@@ -302,20 +307,18 @@ def retry(max_retries):
 
 
 def copy_object(obj_id, src, dst, max_retries=3):
-    statsd_name = 'swh_journal_content_replayer_%s_duration_seconds'
     try:
-        with statsd.timed(statsd_name % 'get'):
+        with statsd.timed(CONTENT_DURATION_METRIC, tags={'request': 'get'}):
             with retry(max_retries):
                 obj = src.get(obj_id)
                 logger.debug('retrieved %s', hash_to_hex(obj_id))
 
-        with statsd.timed(statsd_name % 'put'):
+        with statsd.timed(CONTENT_DURATION_METRIC, tags={'request': 'put'}):
             with retry(max_retries):
                 dst.add(obj, obj_id=obj_id, check_presence=False)
                 logger.debug('copied %s', hash_to_hex(obj_id))
-        statsd.increment(
-            'swh_journal_content_replayer_bytes_total',
-            len(obj))
+        statsd.increment(CONTENT_OPERATIONS_METRIC)
+        statsd.increment(CONTENT_BYTES_METRIC, len(obj))
     except Exception:
         obj = ''
         logger.error('Failed to copy %s', hash_to_hex(obj_id))
