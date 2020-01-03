@@ -3,8 +3,16 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import warnings
 
-def get_journal_writer(cls, args={}):
+
+def get_journal_writer(cls, **kwargs):
+    if 'args' in kwargs:
+        warnings.warn(
+            'Explicit "args" key is deprecated, use keys directly instead.',
+            DeprecationWarning)
+        kwargs = kwargs['args']
+
     if cls == 'inmemory':  # FIXME: Remove inmemory in due time
         import warnings
         warnings.warn("cls = 'inmemory' is deprecated, use 'memory' instead",
@@ -17,4 +25,4 @@ def get_journal_writer(cls, args={}):
     else:
         raise ValueError('Unknown journal writer class `%s`' % cls)
 
-    return JournalWriter(**args)
+    return JournalWriter(**kwargs)
