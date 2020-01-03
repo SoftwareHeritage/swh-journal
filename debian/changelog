@@ -1,3 +1,12 @@
+swh-journal (0.0.23-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.0.23     - (tagged by Nicolas Dandrimont
+    <nicolas@dandrimont.eu> on 2020-01-03 20:02:39 +0100)
+  * Upstream changes:     - Release swh.journal v0.0.23     - support
+    short-hand syntax for initializing the journal direct writer
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 03 Jan 2020 19:06:31 +0000
+
 swh-journal (0.0.21-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.0.21     - (tagged by David Douard
