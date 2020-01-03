@@ -11,6 +11,11 @@ import time
 
 import click
 
+try:
+    from systemd.daemon import notify
+except ImportError:
+    notify = None
+
 from swh.core import config
 from swh.core.cli import CONTEXT_SETTINGS
 from swh.model.model import SHA1_SIZE
@@ -93,11 +98,16 @@ def replay(ctx, brokers, prefix, group_id, max_messages):
         max_messages=max_messages)
     worker_fn = functools.partial(process_replay_objects, storage=storage)
 
+    if notify:
+        notify('READY=1')
+
     try:
         nb_messages = 0
         last_log_time = 0
         while not max_messages or nb_messages < max_messages:
             nb_messages += client.process(worker_fn)
+            if notify:
+                notify('WATCHDOG=1')
             if time.time() - last_log_time >= 60:
                 # Log at most once per minute.
                 logger.info('Processed %d messages.' % nb_messages)
@@ -107,6 +117,8 @@ def replay(ctx, brokers, prefix, group_id, max_messages):
     else:
         print('Done.')
     finally:
+        if notify:
+            notify('STOPPING=1')
         client.close()
 
 
@@ -135,12 +147,18 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
     """
     conf = ctx.obj['config']
     backfiller = JournalBackfiller(conf)
+
+    if notify:
+        notify('READY=1')
+
     try:
         backfiller.run(
             object_type=object_type,
             start_object=start_object, end_object=end_object,
             dry_run=dry_run)
     except KeyboardInterrupt:
+        if notify:
+            notify('STOPPING=1')
         ctx.exit(0)
 
 
@@ -212,11 +230,16 @@ def content_replay(ctx, max_messages,
                                   dst=objstorage_dst,
                                   exclude_fn=exclude_fn)
 
+    if notify:
+        notify('READY=1')
+
     try:
         nb_messages = 0
         last_log_time = 0
         while not max_messages or nb_messages < max_messages:
             nb_messages += client.process(worker_fn)
+            if notify:
+                notify('WATCHDOG=1')
             if time.time() - last_log_time >= 60:
                 # Log at most once per minute.
                 logger.info('Processed %d messages.' % nb_messages)
@@ -225,6 +248,10 @@ def content_replay(ctx, max_messages,
         ctx.exit(0)
     else:
         print('Done.')
+    finally:
+        if notify:
+            notify('STOPPING=1')
+        client.close()
 
 
 def main():
