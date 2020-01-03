@@ -77,6 +77,9 @@ def test_kafka_writer(
         'brokers': ['localhost:%d' % kafka_server[1]],
         'client_id': 'kafka_writer',
         'prefix': kafka_prefix,
+        'producer_config': {
+            'message.max.bytes': 100000000,
+        }
     }
 
     writer = KafkaJournalWriter(**config)
@@ -105,10 +108,13 @@ def test_storage_direct_writer(
         'brokers': ['localhost:%d' % kafka_server[1]],
         'client_id': 'kafka_writer',
         'prefix': kafka_prefix,
+        'producer_config': {
+            'message.max.bytes': 100000000,
+        }
     }
 
     storage = get_storage('memory', journal_writer={
-        'cls': 'kafka', 'args': config,
+        'cls': 'kafka', **config,
     })
 
     expected_messages = 0
