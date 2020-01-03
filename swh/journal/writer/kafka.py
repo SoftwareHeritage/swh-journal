@@ -19,11 +19,14 @@ class KafkaJournalWriter:
     """This class is instantiated and used by swh-storage to write incoming
     new objects to Kafka before adding them to the storage backend
     (eg. postgresql) itself."""
-    def __init__(self, brokers, prefix, client_id):
+    def __init__(self, brokers, prefix, client_id, producer_config=None):
         self._prefix = prefix
 
         if isinstance(brokers, str):
             brokers = [brokers]
+
+        if not producer_config:
+            producer_config = {}
 
         self.producer = Producer({
             'bootstrap.servers': ','.join(brokers),
@@ -32,6 +35,7 @@ class KafkaJournalWriter:
             'error_cb': self._error_cb,
             'logger': logger,
             'enable.idempotence': 'true',
+            **producer_config,
         })
 
     def _error_cb(self, error):

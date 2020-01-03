@@ -8,6 +8,11 @@ from time import time
 import logging
 from contextlib import contextmanager
 
+try:
+    from systemd.daemon import notify
+except ImportError:
+    notify = None
+
 from swh.core.statsd import statsd
 from swh.model.identifiers import normalize_timestamp
 from swh.model.hashutil import hash_to_hex
@@ -32,6 +37,8 @@ def process_replay_objects(all_objects, *, storage):
             _insert_objects(object_type, objects, storage)
         statsd.increment(GRAPH_OPERATIONS_METRIC, len(objects),
                          tags={'object_type': object_type})
+    if notify:
+        notify('WATCHDOG=1')
 
 
 def _fix_revision_pypi_empty_string(rev):
@@ -404,3 +411,6 @@ def process_replay_objects_content(all_objects, *, src, dst,
         sum(vol)/1024/1024/dt,
         len([x for x in vol if not x]),
         nb_skipped)
+
+    if notify:
+        notify('WATCHDOG=1')
