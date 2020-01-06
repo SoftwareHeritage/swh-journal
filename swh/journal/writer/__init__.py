@@ -14,7 +14,6 @@ def get_journal_writer(cls, **kwargs):
         kwargs = kwargs['args']
 
     if cls == 'inmemory':  # FIXME: Remove inmemory in due time
-        import warnings
         warnings.warn("cls = 'inmemory' is deprecated, use 'memory' instead",
                       DeprecationWarning)
         cls = 'memory'
