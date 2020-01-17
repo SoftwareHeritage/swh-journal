@@ -261,7 +261,7 @@ def is_hash_in_bytearray(hash_, array, nb_hashes, hash_size=SHA1_SIZE):
     Args:
         hash_ (bytes): the hash to look for
         array (bytes): a sorted concatenated array of hashes (may be of
-            any type supporting slice indexing, eg. :py:cls:`mmap.mmap`)
+            any type supporting slice indexing, eg. :class:`mmap.mmap`)
         nb_hashes (int): number of hashes in the array
         hash_size (int): size of a hash (defaults to 20, for SHA1)
 
