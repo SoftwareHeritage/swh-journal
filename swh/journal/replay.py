@@ -6,7 +6,6 @@
 import copy
 from time import time
 import logging
-from contextlib import contextmanager
 
 try:
     from systemd.daemon import notify
@@ -305,30 +304,15 @@ def is_hash_in_bytearray(hash_, array, nb_hashes, hash_size=SHA1_SIZE):
     return get_hash(left) == hash_
 
 
-@contextmanager
-def retry(max_retries):
-    lasterror = None
-    for i in range(max_retries):
-        try:
-            yield
-            break
-        except Exception as exc:
-            lasterror = exc
-    else:
-        raise lasterror
-
-
-def copy_object(obj_id, src, dst, max_retries=3):
+def copy_object(obj_id, src, dst):
     try:
         with statsd.timed(CONTENT_DURATION_METRIC, tags={'request': 'get'}):
-            with retry(max_retries):
-                obj = src.get(obj_id)
-                logger.debug('retrieved %s', hash_to_hex(obj_id))
+            obj = src.get(obj_id)
+            logger.debug('retrieved %s', hash_to_hex(obj_id))
 
         with statsd.timed(CONTENT_DURATION_METRIC, tags={'request': 'put'}):
-            with retry(max_retries):
-                dst.add(obj, obj_id=obj_id, check_presence=False)
-                logger.debug('copied %s', hash_to_hex(obj_id))
+            dst.add(obj, obj_id=obj_id, check_presence=False)
+            logger.debug('copied %s', hash_to_hex(obj_id))
         statsd.increment(CONTENT_OPERATIONS_METRIC)
         statsd.increment(CONTENT_BYTES_METRIC, len(obj))
     except Exception:
