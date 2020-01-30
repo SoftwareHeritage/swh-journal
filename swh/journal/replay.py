@@ -75,9 +75,11 @@ def _fix_revision_transplant_source(rev):
 
 def _check_date(date):
     """Returns whether the date can be represented in backends with sane
-    limits on timestamps and timezeones (resp. signed 64-bits and
+    limits on timestamps and timezones (resp. signed 64-bits and
     signed 16 bits), and that microseconds is valid (ie. between 0 and 10^6).
     """
+    if date is None:
+        return True
     date = normalize_timestamp(date)
     return (-2**63 <= date['timestamp']['seconds'] < 2**63) \
         and (0 <= date['timestamp']['microseconds'] < 10**6) \
