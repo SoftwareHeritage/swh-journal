@@ -75,9 +75,11 @@ def _fix_revision_transplant_source(rev):
 
 def _check_date(date):
     """Returns whether the date can be represented in backends with sane
-    limits on timestamps and timezeones (resp. signed 64-bits and
+    limits on timestamps and timezones (resp. signed 64-bits and
     signed 16 bits), and that microseconds is valid (ie. between 0 and 10^6).
     """
+    if date is None:
+        return True
     date = normalize_timestamp(date)
     return (-2**63 <= date['timestamp']['seconds'] < 2**63) \
         and (0 <= date['timestamp']['microseconds'] < 10**6) \
@@ -261,7 +263,7 @@ def is_hash_in_bytearray(hash_, array, nb_hashes, hash_size=SHA1_SIZE):
     Args:
         hash_ (bytes): the hash to look for
         array (bytes): a sorted concatenated array of hashes (may be of
-            any type supporting slice indexing, eg. :py:cls:`mmap.mmap`)
+            any type supporting slice indexing, eg. :class:`mmap.mmap`)
         nb_hashes (int): number of hashes in the array
         hash_size (int): size of a hash (defaults to 20, for SHA1)
 

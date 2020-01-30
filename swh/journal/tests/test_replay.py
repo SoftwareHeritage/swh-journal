@@ -104,10 +104,11 @@ def test_storage_play(
             del visit['visit']  # opaque identifier
         assert expected_visits == actual_visits
 
-    contents = list(storage.content_get_metadata(
-            [cont['sha1'] for cont in OBJECT_TYPE_KEYS['content'][1]]))
-    assert None not in contents
-    assert contents == OBJECT_TYPE_KEYS['content'][1]
+    input_contents = OBJECT_TYPE_KEYS['content'][1]
+    contents = storage.content_get_metadata(
+            [cont['sha1'] for cont in input_contents])
+    assert len(contents) == len(input_contents)
+    assert contents == {cont['sha1']: [cont] for cont in input_contents}
 
 
 def _test_write_replay_origin_visit(visits):

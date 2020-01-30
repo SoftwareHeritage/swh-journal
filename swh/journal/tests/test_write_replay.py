@@ -10,7 +10,7 @@ from hypothesis import given, settings, HealthCheck
 from hypothesis.strategies import lists
 
 from swh.model.hypothesis_strategies import object_dicts
-from swh.storage.in_memory import Storage
+from swh.storage.in_memory import InMemoryStorage
 from swh.storage import HashCollision
 
 from swh.journal.replay import process_replay_objects
@@ -51,7 +51,7 @@ def test_write_replay_same_order_batches(objects):
     queue = []
     replayer = MockedJournalClient(queue)
 
-    storage1 = Storage()
+    storage1 = InMemoryStorage()
     storage1.journal_writer = MockedKafkaWriter(queue)
 
     for (obj_type, obj) in objects:
@@ -70,7 +70,7 @@ def test_write_replay_same_order_batches(objects):
     assert replayer.max_messages == 0
     replayer.max_messages = queue_size
 
-    storage2 = Storage()
+    storage2 = InMemoryStorage()
     worker_fn = functools.partial(process_replay_objects, storage=storage2)
     nb_messages = 0
     while nb_messages < queue_size:
@@ -108,7 +108,7 @@ def test_write_replay_content(objects):
     queue = []
     replayer = MockedJournalClient(queue)
 
-    storage1 = Storage()
+    storage1 = InMemoryStorage()
     storage1.journal_writer = MockedKafkaWriter(queue)
 
     contents = []
@@ -124,7 +124,7 @@ def test_write_replay_content(objects):
     assert replayer.max_messages == 0
     replayer.max_messages = queue_size
 
-    storage2 = Storage()
+    storage2 = InMemoryStorage()
     worker_fn = functools.partial(process_replay_objects_content,
                                   src=storage1.objstorage,
                                   dst=storage2.objstorage)
