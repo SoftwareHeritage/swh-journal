@@ -16,7 +16,7 @@ from confluent_kafka import Producer
 import pytest
 
 from swh.objstorage.backends.in_memory import InMemoryObjStorage
-from swh.storage.in_memory import Storage
+from swh.storage.in_memory import InMemoryStorage
 
 from swh.journal.cli import cli
 from swh.journal.serializers import key_to_kafka, value_to_kafka
@@ -42,9 +42,9 @@ objstorage_dst:
 
 @pytest.fixture
 def storage():
-    """An instance of swh.storage.in_memory.Storage that gets injected
+    """An instance of swh.storage.in_memory.InMemoryStorage that gets injected
     into the CLI functions."""
-    storage = Storage()
+    storage = InMemoryStorage()
     with patch('swh.journal.cli.get_storage') as get_storage_mock:
         get_storage_mock.return_value = storage
         yield storage
@@ -64,7 +64,7 @@ def invoke(catch_exceptions, args):
 
 
 def test_replay(
-        storage: Storage,
+        storage: InMemoryStorage,
         kafka_prefix: str,
         kafka_server: Tuple[Popen, int]):
     (_, port) = kafka_server
@@ -154,7 +154,7 @@ def _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages):
 @_patch_objstorages(['src', 'dst'])
 def test_replay_content(
         objstorages,
-        storage: Storage,
+        storage: InMemoryStorage,
         kafka_prefix: str,
         kafka_server: Tuple[Popen, int]):
     (_, kafka_port) = kafka_server
@@ -182,7 +182,7 @@ def test_replay_content(
 @_patch_objstorages(['src', 'dst'])
 def test_replay_content_exclude(
         objstorages,
-        storage: Storage,
+        storage: InMemoryStorage,
         kafka_prefix: str,
         kafka_server: Tuple[Popen, int]):
     (_, kafka_port) = kafka_server

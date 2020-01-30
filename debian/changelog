@@ -1,8 +1,11 @@
-swh-journal (0.0.24-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-journal (0.0.25-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.0.25     - (tagged by Valentin Lorentz
+    <vlorentz@softwareheritage.org> on 2020-01-30 15:35:41 +0100)
+  * Upstream changes:     - v0.0.25     - * Add support for swh-storage
+    v0.0.168.     - * Accept None dates when validating revisions.
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Mon, 06 Jan 2020 15:22:09 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 30 Jan 2020 14:43:25 +0000
 
 swh-journal (0.0.24-1~swh1) unstable-swh; urgency=medium
 
