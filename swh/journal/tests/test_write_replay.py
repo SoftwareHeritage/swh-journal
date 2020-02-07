@@ -60,6 +60,8 @@ def test_write_replay_same_order_batches(objects):
             storage1.origin_add_one({'url': obj['origin']})
             storage1.origin_visit_upsert([obj])
         else:
+            if obj_type == 'content' and obj.get('status') == 'absent':
+                obj_type = 'skipped_content'
             method = getattr(storage1, obj_type + '_add')
             try:
                 method([obj])
@@ -117,7 +119,8 @@ def test_write_replay_content(objects):
         if obj_type == 'content':
             # avoid hash collision
             if not storage1.content_find(obj):
-                storage1.content_add([obj])
+                if obj.get('status') != 'absent':
+                    storage1.content_add([obj])
                 contents.append(obj)
 
     queue_size = len(queue)

@@ -234,7 +234,10 @@ def _insert_objects(object_type, objects, storage):
         # TODO: insert 'content' in batches
         for object_ in objects:
             try:
-                storage.content_add_metadata([object_])
+                if object_.get('status') == 'absent':
+                    storage.skipped_content_add([object_])
+                else:
+                    storage.content_add_metadata([object_])
             except HashCollision as e:
                 logger.error('Hash collision: %s', e.args)
     elif object_type in ('directory', 'revision', 'release',
