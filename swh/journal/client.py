@@ -150,6 +150,12 @@ class JournalClient:
 
             elapsed = time.monotonic() - start_time
             if self.process_timeout:
+                # +0.01 to prevent busy-waiting on / spamming consumer.poll.
+                # consumer.consume() returns shortly before X expired
+                # (a matter of milliseconds), so after it returns a first
+                # time, it would then be called with a timeout in the order
+                # of milliseconds, therefore returning immediately, then be
+                # called again, etc.
                 if elapsed + 0.01 >= self.process_timeout:
                     break
 
