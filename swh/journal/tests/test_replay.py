@@ -24,13 +24,22 @@ from .conftest import OBJECT_TYPE_KEYS
 from .utils import MockedJournalClient, MockedKafkaWriter
 
 
+storage_config = {
+    'cls': 'pipeline',
+    'steps': [
+        {'cls': 'validate'},
+        {'cls': 'memory'},
+    ]
+}
+
+
 def test_storage_play(
         kafka_prefix: str,
         kafka_server: Tuple[Popen, int]):
     (_, port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
 
-    storage = get_storage('memory')
+    storage = get_storage(**storage_config)
 
     producer = Producer({
         'bootstrap.servers': 'localhost:{}'.format(port),
@@ -140,7 +149,7 @@ def _test_write_replay_origin_visit(visits):
     assert replayer.max_messages == 0
     replayer.max_messages = queue_size
 
-    storage = get_storage('memory')
+    storage = get_storage(**storage_config)
     worker_fn = functools.partial(process_replay_objects, storage=storage)
     nb_messages = 0
     while nb_messages < queue_size:
