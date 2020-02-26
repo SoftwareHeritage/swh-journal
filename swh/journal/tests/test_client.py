@@ -48,3 +48,38 @@ def test_client(
     client.process(worker_fn)
 
     worker_fn.assert_called_once_with({'revision': [rev.to_dict()]})
+
+
+def test_client_eof(
+        kafka_prefix: str,
+        kafka_server: Tuple[Popen, int]):
+    (_, port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    producer = Producer({
+        'bootstrap.servers': 'localhost:{}'.format(port),
+        'client.id': 'test producer',
+        'enable.idempotence': 'true',
+    })
+
+    rev = revisions().example()
+
+    # Fill Kafka
+    producer.produce(
+        topic=kafka_prefix + '.revision', key=key_to_kafka(rev.id),
+        value=value_to_kafka(rev.to_dict()),
+    )
+    producer.flush()
+
+    config = {
+        'brokers': 'localhost:%d' % kafka_server[1],
+        'group_id': 'replayer',
+        'prefix': kafka_prefix,
+        'stop_on_eof': True,
+    }
+    client = JournalClient(**config)
+
+    worker_fn = MagicMock()
+    client.process(worker_fn)
+
+    worker_fn.assert_called_once_with({'revision': [rev.to_dict()]})
