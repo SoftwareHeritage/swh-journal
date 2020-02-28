@@ -5,6 +5,7 @@
 
 from collections import defaultdict
 import logging
+import os
 import time
 
 from confluent_kafka import Consumer, KafkaException, KafkaError
@@ -100,6 +101,35 @@ class JournalClient:
         debug_logging = rdkafka_logger.isEnabledFor(logging.DEBUG)
         if debug_logging and 'debug' not in kwargs:
             kwargs['debug'] = 'consumer'
+
+        # Static group instance id management
+        group_instance_id = os.environ.get('KAFKA_GROUP_INSTANCE_ID')
+        if group_instance_id:
+            kwargs['group.instance.id'] = group_instance_id
+
+        if 'group.instance.id' in kwargs:
+            # When doing static consumer group membership, set a higher default
+            # session timeout. The session timeout is the duration after which
+            # the broker considers that a consumer has left the consumer group
+            # for good, and triggers a rebalance. Considering our current
+            # processing pattern, 10 minutes gives the consumer ample time to
+            # restart before that happens.
+            if 'session.timeout.ms' not in kwargs:
+                kwargs['session.timeout.ms'] = 10 * 60 * 1000  # 10 minutes
+
+        if 'session.timeout.ms' in kwargs:
+            # When the session timeout is set, rdkafka requires the max poll
+            # interval to be set to a higher value; the max poll interval is
+            # rdkafka's way of figuring out whether the client's message
+            # processing thread has stalled: when the max poll interval lapses
+            # between two calls to consumer.poll(), rdkafka leaves the consumer
+            # group and terminates the connection to the brokers.
+            #
+            # We default to 1.5 times the session timeout
+            if 'max.poll.interval.ms' not in kwargs:
+                kwargs['max.poll.interval.ms'] = (
+                    kwargs['session.timeout.ms'] // 2 * 3
+                )
 
         consumer_settings = {
             **kwargs,

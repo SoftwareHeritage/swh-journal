@@ -56,13 +56,15 @@ def storage():
         yield storage
 
 
-def invoke(catch_exceptions, args):
+def invoke(catch_exceptions, args, env=None):
     runner = CliRunner()
     with tempfile.NamedTemporaryFile('a', suffix='.yml') as config_fd:
         config_fd.write(CLI_CONFIG)
         config_fd.seek(0)
         args = ['-C' + config_fd.name] + args
-        result = runner.invoke(cli, args, obj={'log_level': logging.DEBUG})
+        result = runner.invoke(
+            cli, args, obj={'log_level': logging.DEBUG}, env=env,
+        )
     if not catch_exceptions and result.exception:
         print(result.output)
         raise result.exception
@@ -179,6 +181,52 @@ def test_replay_content(
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
+
+    for (sha1, content) in contents.items():
+        assert sha1 in objstorages['dst'], sha1
+        assert objstorages['dst'].get(sha1) == content
+
+
+@_patch_objstorages(['src', 'dst'])
+def test_replay_content_static_group_id(
+        objstorages,
+        storage,
+        kafka_prefix: str,
+        kafka_server: Tuple[Popen, int],
+        caplog):
+    (_, kafka_port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    contents = _fill_objstorage_and_kafka(
+        kafka_port, kafka_prefix, objstorages)
+
+    # Setup log capture to fish the consumer settings out of the log messages
+    caplog.set_level(logging.DEBUG, 'swh.journal.client')
+
+    result = invoke(False, [
+        'content-replay',
+        '--broker', '127.0.0.1:%d' % kafka_port,
+        '--group-id', 'test-cli-consumer',
+        '--prefix', kafka_prefix,
+        '--max-messages', '10',
+    ], {'KAFKA_GROUP_INSTANCE_ID': 'static-group-instance-id'})
+    expected = r'Done.\n'
+    assert result.exit_code == 0, result.output
+    assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
+
+    consumer_settings = None
+    for record in caplog.records:
+        if 'Consumer settings' in record.message:
+            consumer_settings = record.args
+            break
+
+    assert consumer_settings is not None, (
+        'Failed to get consumer settings out of the consumer log. '
+        'See log capture for details.'
+    )
+    assert consumer_settings['group.instance.id'] == 'static-group-instance-id'
+    assert consumer_settings['session.timeout.ms'] == 60 * 10 * 1000
+    assert consumer_settings['max.poll.interval.ms'] == 90 * 10 * 1000
 
     for (sha1, content) in contents.items():
         assert sha1 in objstorages['dst'], sha1

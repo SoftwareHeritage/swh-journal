@@ -184,7 +184,8 @@ def content_replay(ctx, max_messages,
     and retrieving objects from an existing source ObjStorage.
 
     There can be several 'replayers' filling a given ObjStorage as long as they
-    use the same `group-id`.
+    use the same `group-id`. You can use the `KAFKA_GROUP_INSTANCE_ID`
+    environment variable to use KIP-345 static group membership.
 
     This service retrieves object ids to copy from the 'content' topic. It will
     only copy object's content if the object's description in the kafka
