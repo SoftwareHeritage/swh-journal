@@ -272,3 +272,64 @@ def test_replay_content_exclude(
         else:
             assert sha1 in objstorages['dst'], sha1
             assert objstorages['dst'].get(sha1) == content
+
+
+NUM_CONTENTS_DST = 5
+
+
+@_patch_objstorages(['src', 'dst'])
+@pytest.mark.parametrize("check_dst,expected_copied,expected_in_dst", [
+    (True, NUM_CONTENTS - NUM_CONTENTS_DST, NUM_CONTENTS_DST),
+    (False, NUM_CONTENTS, 0),
+])
+def test_replay_content_check_dst(
+        objstorages,
+        storage,
+        kafka_prefix: str,
+        kafka_server: Tuple[Popen, int],
+        check_dst: bool,
+        expected_copied: int,
+        expected_in_dst: int,
+        caplog):
+    (_, kafka_port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    contents = _fill_objstorage_and_kafka(
+        kafka_port, kafka_prefix, objstorages)
+
+    for i, (sha1, content) in enumerate(contents.items()):
+        if i >= NUM_CONTENTS_DST:
+            break
+
+        objstorages['dst'].add(content, obj_id=sha1)
+
+    caplog.set_level(logging.DEBUG, 'swh.journal.replay')
+
+    result = invoke(False, [
+        'content-replay',
+        '--broker', '127.0.0.1:%d' % kafka_port,
+        '--group-id', 'test-cli-consumer',
+        '--prefix', kafka_prefix,
+        '--max-messages', str(NUM_CONTENTS),
+        '--check-dst' if check_dst else '--no-check-dst',
+    ])
+    expected = r'Done.\n'
+    assert result.exit_code == 0, result.output
+    assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
+
+    copied = 0
+    in_dst = 0
+    for record in caplog.records:
+        logtext = record.getMessage()
+        if 'copied' in logtext:
+            copied += 1
+        elif 'in dst' in logtext:
+            in_dst += 1
+
+    assert (copied == expected_copied and in_dst == expected_in_dst), (
+        "Unexpected amount of objects copied, see the captured log for details"
+    )
+
+    for (sha1, content) in contents.items():
+        assert sha1 in objstorages['dst'], sha1
+        assert objstorages['dst'].get(sha1) == content

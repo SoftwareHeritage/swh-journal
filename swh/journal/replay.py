@@ -322,7 +322,7 @@ def copy_object(obj_id, src, dst):
 
 
 def process_replay_objects_content(all_objects, *, src, dst,
-                                   exclude_fn=None):
+                                   exclude_fn=None, check_dst=True):
     """
     Takes a list of records from Kafka (see
     :py:func:`swh.journal.client.JournalClient.process`) and copies them
@@ -392,6 +392,11 @@ def process_replay_objects_content(all_objects, *, src, dst,
                              hash_to_hex(obj_id))
                 statsd.increment(CONTENT_OPERATIONS_METRIC,
                                  tags={"decision": "excluded"})
+            elif check_dst and obj_id in dst:
+                nb_skipped += 1
+                logger.debug('skipped %s (in dst)', hash_to_hex(obj_id))
+                statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                 tags={"decision": "in_dst"})
             else:
                 vol.append(copy_object(obj_id, src, dst))
                 statsd.increment(CONTENT_OPERATIONS_METRIC,
