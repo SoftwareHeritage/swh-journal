@@ -313,7 +313,6 @@ def copy_object(obj_id, src, dst):
         with statsd.timed(CONTENT_DURATION_METRIC, tags={'request': 'put'}):
             dst.add(obj, obj_id=obj_id, check_presence=False)
             logger.debug('copied %s', hash_to_hex(obj_id))
-        statsd.increment(CONTENT_OPERATIONS_METRIC)
         statsd.increment(CONTENT_BYTES_METRIC, len(obj))
     except Exception:
         obj = ''
@@ -384,12 +383,19 @@ def process_replay_objects_content(all_objects, *, src, dst,
                 nb_skipped += 1
                 logger.debug('skipped %s (status=%s)',
                              hash_to_hex(obj_id), obj['status'])
+                statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                 tags={"decision": "skipped",
+                                       "status": obj["status"]})
             elif exclude_fn and exclude_fn(obj):
                 nb_skipped += 1
                 logger.debug('skipped %s (manually excluded)',
                              hash_to_hex(obj_id))
+                statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                 tags={"decision": "excluded"})
             else:
                 vol.append(copy_object(obj_id, src, dst))
+                statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                 tags={"decision": "copied"})
 
     dt = time() - t0
     logger.info(
