@@ -8,12 +8,16 @@ import logging
 from time import time
 from typing import Callable, Dict, List, Optional
 
+from sentry_sdk import capture_exception, push_scope
 try:
     from systemd.daemon import notify
 except ImportError:
     notify = None
 
-from tenacity import retry, stop_after_attempt, wait_random_exponential
+from tenacity import (
+    retry, retry_if_exception_type, stop_after_attempt,
+    wait_random_exponential,
+)
 
 from swh.core.statsd import statsd
 from swh.model.identifiers import normalize_timestamp
@@ -29,6 +33,7 @@ logger = logging.getLogger(__name__)
 GRAPH_OPERATIONS_METRIC = "swh_graph_replayer_operations_total"
 GRAPH_DURATION_METRIC = "swh_graph_replayer_duration_seconds"
 CONTENT_OPERATIONS_METRIC = "swh_content_replayer_operations_total"
+CONTENT_RETRY_METRIC = "swh_content_replayer_retries_total"
 CONTENT_BYTES_METRIC = "swh_content_replayer_bytes"
 CONTENT_DURATION_METRIC = "swh_content_replayer_duration_seconds"
 
@@ -312,6 +317,62 @@ def is_hash_in_bytearray(hash_, array, nb_hashes, hash_size=SHA1_SIZE):
     return get_hash(left) == hash_
 
 
+class ReplayError(Exception):
+    """An error occurred during the replay of an object"""
+    def __init__(self, operation, *, obj_id, exc):
+        self.operation = operation
+        self.obj_id = hash_to_hex(obj_id)
+        self.exc = exc
+
+    def __str__(self):
+        return "ReplayError(doing %s, %s, %s)" % (
+            self.operation, self.obj_id, self.exc
+        )
+
+
+def log_replay_retry(retry_obj, sleep, last_result):
+    """Log a retry of the content replayer"""
+    exc = last_result.exception()
+    logger.debug('Retry operation %(operation)s on %(obj_id)s: %(exc)s',
+                 {'operation': exc.operation, 'obj_id': exc.obj_id,
+                  'exc': str(exc.exc)})
+
+    statsd.increment(CONTENT_RETRY_METRIC, tags={
+        'operation': exc.operation,
+        'attempt': str(retry_obj.statistics['attempt_number']),
+    })
+
+
+def log_replay_error(last_attempt):
+    """Log a replay error to sentry"""
+    exc = last_attempt.exception()
+    with push_scope() as scope:
+        scope.set_tag('operation', exc.operation)
+        scope.set_extra('obj_id', exc.obj_id)
+        capture_exception(exc.exc)
+
+    logger.error(
+        'Failed operation %(operation)s on %(obj_id)s after %(retries)s'
+        ' retries: %(exc)s', {
+            'obj_id': exc.obj_id, 'operation': exc.operation,
+            'exc': str(exc.exc), 'retries': last_attempt.attempt_number,
+        })
+
+    return None
+
+
+CONTENT_REPLAY_RETRIES = 3
+
+content_replay_retry = retry(
+    retry=retry_if_exception_type(ReplayError),
+    stop=stop_after_attempt(CONTENT_REPLAY_RETRIES),
+    wait=wait_random_exponential(multiplier=1, max=60),
+    before_sleep=log_replay_retry,
+    retry_error_callback=log_replay_error,
+)
+
+
+@content_replay_retry
 def copy_object(obj_id, src, dst):
     hex_obj_id = hash_to_hex(obj_id)
     obj = ''
@@ -324,19 +385,22 @@ def copy_object(obj_id, src, dst):
             dst.add(obj, obj_id=obj_id, check_presence=False)
             logger.debug('copied %(obj_id)s', {'obj_id': hex_obj_id})
         statsd.increment(CONTENT_BYTES_METRIC, len(obj))
-    except Exception as exc:
-        logger.error('Failed to copy %(obj_id)s: %(exc)s',
-                     {'obj_id': hex_obj_id, 'exc': str(exc)})
+    except ObjNotFoundError:
+        logger.error('Failed to copy %(obj_id)s: object not found',
+                     {'obj_id': hex_obj_id})
         raise
+    except Exception as exc:
+        raise ReplayError('copy', obj_id=obj_id, exc=exc) from None
     return len(obj)
 
 
-@retry(stop=stop_after_attempt(3),
-       reraise=True,
-       wait=wait_random_exponential(multiplier=1, max=60))
+@content_replay_retry
 def obj_in_objstorage(obj_id, dst):
     """Check if an object is already in an objstorage, tenaciously"""
-    return obj_id in dst
+    try:
+        return obj_id in dst
+    except Exception as exc:
+        raise ReplayError('in_dst', obj_id=obj_id, exc=exc) from None
 
 
 def process_replay_objects_content(
@@ -395,6 +459,7 @@ def process_replay_objects_content(
     """
     vol = []
     nb_skipped = 0
+    nb_failures = 0
     t0 = time()
 
     for (object_type, objects) in all_objects.items():
@@ -431,9 +496,14 @@ def process_replay_objects_content(
                     statsd.increment(CONTENT_OPERATIONS_METRIC,
                                      tags={"decision": "not_in_src"})
                 else:
-                    vol.append(copied)
-                    statsd.increment(CONTENT_OPERATIONS_METRIC,
-                                     tags={"decision": "copied"})
+                    if copied is None:
+                        nb_failures += 1
+                        statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                         tags={"decision": "failed"})
+                    else:
+                        vol.append(copied)
+                        statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                         tags={"decision": "copied"})
 
     dt = time() - t0
     logger.info(
@@ -442,7 +512,7 @@ def process_replay_objects_content(
         len(vol), dt,
         len(vol)/dt,
         sum(vol)/1024/1024/dt,
-        len([x for x in vol if not x]),
+        nb_failures,
         nb_skipped)
 
     if notify:
