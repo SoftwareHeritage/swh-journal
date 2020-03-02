@@ -16,6 +16,7 @@ from click.testing import CliRunner
 from confluent_kafka import Producer
 import pytest
 
+from swh.model.hashutil import hash_to_hex
 from swh.objstorage.backends.in_memory import InMemoryObjStorage
 from swh.storage import get_storage
 
@@ -395,3 +396,64 @@ def test_replay_content_check_dst_retry(
     for (sha1, content) in contents.items():
         assert dst_contains_failed[sha1] >= 0
         assert dst_state[sha1] == content
+
+
+@_patch_objstorages(['src', 'dst'])
+def test_replay_content_objnotfound(
+        objstorages,
+        storage,
+        kafka_prefix: str,
+        kafka_consumer_group: str,
+        kafka_server: Tuple[Popen, int],
+        caplog):
+    (_, kafka_port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    contents = _fill_objstorage_and_kafka(
+        kafka_port, kafka_prefix, objstorages)
+
+    num_contents_deleted = 5
+    contents_deleted = set()
+
+    for i, sha1 in enumerate(contents):
+        if i >= num_contents_deleted:
+            break
+
+        del objstorages['src'].state[sha1]
+        contents_deleted.add(hash_to_hex(sha1))
+
+    caplog.set_level(logging.DEBUG, 'swh.journal.replay')
+
+    result = invoke(False, [
+        'content-replay',
+        '--broker', '127.0.0.1:%d' % kafka_port,
+        '--group-id', kafka_consumer_group,
+        '--prefix', kafka_prefix,
+        '--max-messages', str(NUM_CONTENTS),
+    ])
+    expected = r'Done.\n'
+    assert result.exit_code == 0, result.output
+    assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
+
+    copied = 0
+    not_in_src = 0
+    for record in caplog.records:
+        logtext = record.getMessage()
+        if 'copied' in logtext:
+            copied += 1
+        elif 'object not found' in logtext:
+            # Check that the object id can be recovered from logs
+            assert record.levelno == logging.ERROR
+            assert record.args[0] in contents_deleted
+            not_in_src += 1
+
+    assert (copied == NUM_CONTENTS - num_contents_deleted
+            and not_in_src == num_contents_deleted), (
+        "Unexpected amount of objects copied, see the captured log for details"
+    )
+
+    for (sha1, content) in contents.items():
+        if sha1 not in objstorages['src']:
+            continue
+        assert sha1 in objstorages['dst'], sha1
+        assert objstorages['dst'].get(sha1) == content

@@ -19,7 +19,9 @@ from swh.core.statsd import statsd
 from swh.model.identifiers import normalize_timestamp
 from swh.model.hashutil import hash_to_hex
 from swh.model.model import SHA1_SIZE
-from swh.objstorage.objstorage import ID_HASH_ALGO, ObjStorage
+from swh.objstorage.objstorage import (
+    ID_HASH_ALGO, ObjNotFoundError, ObjStorage,
+)
 from swh.storage import HashCollision
 
 logger = logging.getLogger(__name__)
@@ -311,6 +313,7 @@ def is_hash_in_bytearray(hash_, array, nb_hashes, hash_size=SHA1_SIZE):
 
 
 def copy_object(obj_id, src, dst):
+    obj = ''
     try:
         with statsd.timed(CONTENT_DURATION_METRIC, tags={'request': 'get'}):
             obj = src.get(obj_id)
@@ -320,9 +323,8 @@ def copy_object(obj_id, src, dst):
             dst.add(obj, obj_id=obj_id, check_presence=False)
             logger.debug('copied %s', hash_to_hex(obj_id))
         statsd.increment(CONTENT_BYTES_METRIC, len(obj))
-    except Exception:
-        obj = ''
-        logger.error('Failed to copy %s', hash_to_hex(obj_id))
+    except Exception as exc:
+        logger.error('Failed to copy %s: %s', hash_to_hex(obj_id), exc)
         raise
     return len(obj)
 
@@ -420,9 +422,16 @@ def process_replay_objects_content(
                 statsd.increment(CONTENT_OPERATIONS_METRIC,
                                  tags={"decision": "in_dst"})
             else:
-                vol.append(copy_object(obj_id, src, dst))
-                statsd.increment(CONTENT_OPERATIONS_METRIC,
-                                 tags={"decision": "copied"})
+                try:
+                    copied = copy_object(obj_id, src, dst)
+                except ObjNotFoundError:
+                    nb_skipped += 1
+                    statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                     tags={"decision": "not_in_src"})
+                else:
+                    vol.append(copied)
+                    statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                     tags={"decision": "copied"})
 
     dt = time() - t0
     logger.info(
