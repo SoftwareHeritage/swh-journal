@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pathlib import Path
 from pytest_kafka import (
-    make_zookeeper_process, make_kafka_server
+    make_zookeeper_process, make_kafka_server, ZOOKEEPER_CONFIG_TEMPLATE,
 )
 
 from swh.model.hashutil import hash_to_bytes
@@ -167,9 +167,12 @@ KAFKA_SCRIPTS = Path(KAFKA_ROOT) / 'bin'
 KAFKA_BIN = str(KAFKA_SCRIPTS / 'kafka-server-start.sh')
 ZOOKEEPER_BIN = str(KAFKA_SCRIPTS / 'zookeeper-server-start.sh')
 
+ZK_CONFIG_TEMPLATE = ZOOKEEPER_CONFIG_TEMPLATE + '\nadmin.enableServer=false\n'
 
 # Those defines fixtures
-zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN, scope='session')
+zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN,
+                                        zk_config_template=ZK_CONFIG_TEMPLATE,
+                                        scope='session')
 os.environ['KAFKA_LOG4J_OPTS'] = \
     '-Dlog4j.configuration=file:%s/log4j.properties' % \
     os.path.dirname(__file__)
