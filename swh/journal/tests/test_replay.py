@@ -45,7 +45,7 @@ def test_storage_play(
     producer = Producer({
         'bootstrap.servers': 'localhost:{}'.format(port),
         'client.id': 'test producer',
-        'enable.idempotence': 'true',
+        'acks': 'all',
     })
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)

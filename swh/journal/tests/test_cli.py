@@ -94,7 +94,7 @@ def test_replay(
     producer = Producer({
         'bootstrap.servers': 'localhost:{}'.format(kafka_port),
         'client.id': 'test-producer',
-        'enable.idempotence': 'true',
+        'acks': 'all',
     })
 
     snapshot = {'id': b'foo', 'branches': {
@@ -156,7 +156,7 @@ def _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages):
     producer = Producer({
         'bootstrap.servers': '127.0.0.1:{}'.format(kafka_port),
         'client.id': 'test-producer',
-        'enable.idempotence': 'true',
+        'acks': 'all',
     })
 
     contents = {}

@@ -34,7 +34,7 @@ class KafkaJournalWriter:
             'on_delivery': self._on_delivery,
             'error_cb': self._error_cb,
             'logger': logger,
-            'enable.idempotence': 'true',
+            'acks': 'all',
             **producer_config,
         })
 

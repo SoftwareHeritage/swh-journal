@@ -27,7 +27,7 @@ def test_client(
     producer = Producer({
         'bootstrap.servers': 'localhost:{}'.format(port),
         'client.id': 'test producer',
-        'enable.idempotence': 'true',
+        'acks': 'all',
     })
 
     rev = revisions().example()
@@ -61,7 +61,7 @@ def test_client_eof(
     producer = Producer({
         'bootstrap.servers': 'localhost:{}'.format(port),
         'client.id': 'test producer',
-        'enable.idempotence': 'true',
+        'acks': 'all',
     })
 
     rev = revisions().example()
@@ -103,7 +103,7 @@ def test_client_batch_size(
     producer = Producer({
         'bootstrap.servers': 'localhost:{}'.format(port),
         'client.id': 'test producer',
-        'enable.idempotence': 'true',
+        'acks': 'all',
     })
 
     contents = [Content.from_data(bytes([i])) for i in range(num_objects)]
