@@ -139,9 +139,13 @@ def test_write_replay_content(objects):
     replayer.max_messages = queue_size
 
     storage2 = get_storage(**storage_config)
+
+    objstorage1 = storage1.objstorage.objstorage
+    objstorage2 = storage2.objstorage.objstorage
+
     worker_fn = functools.partial(process_replay_objects_content,
-                                  src=storage1.objstorage,
-                                  dst=storage2.objstorage)
+                                  src=objstorage1,
+                                  dst=objstorage2)
     nb_messages = 0
     while nb_messages < queue_size:
         nb_messages += replayer.process(worker_fn)
@@ -151,4 +155,4 @@ def test_write_replay_content(objects):
         c['sha1']: c['data'] for c in contents if c['status'] == 'visible'
     }
 
-    assert expected_objstorage_state == storage2.objstorage.state
+    assert expected_objstorage_state == objstorage2.state
