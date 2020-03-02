@@ -508,7 +508,7 @@ def process_replay_objects_content(
     dt = time() - t0
     logger.info(
         'processed %s content objects in %.1fsec '
-        '(%.1f obj/sec, %.1fMB/sec) - %d failures - %d skipped',
+        '(%.1f obj/sec, %.1fMB/sec) - %d failed - %d skipped',
         len(vol), dt,
         len(vol)/dt,
         sum(vol)/1024/1024/dt,
