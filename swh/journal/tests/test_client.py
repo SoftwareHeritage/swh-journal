@@ -4,12 +4,14 @@
 # See top-level LICENSE file for more information
 
 from subprocess import Popen
-from typing import Tuple
+from typing import Dict, List, Tuple
 from unittest.mock import MagicMock
 
 from confluent_kafka import Producer
+import pytest
 
 from swh.model.hypothesis_strategies import revisions
+from swh.model.model import Content
 
 from swh.journal.client import JournalClient
 from swh.journal.serializers import key_to_kafka, value_to_kafka
@@ -83,3 +85,54 @@ def test_client_eof(
     client.process(worker_fn)
 
     worker_fn.assert_called_once_with({'revision': [rev.to_dict()]})
+
+
+@pytest.mark.parametrize("batch_size", [1, 5, 100])
+def test_client_batch_size(
+        kafka_prefix: str,
+        kafka_consumer_group: str,
+        kafka_server: Tuple[Popen, int],
+        batch_size: int,
+):
+    (_, port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    num_objects = 2 * batch_size + 1
+    assert num_objects < 256, "Too many objects, generation will fail"
+
+    producer = Producer({
+        'bootstrap.servers': 'localhost:{}'.format(port),
+        'client.id': 'test producer',
+        'enable.idempotence': 'true',
+    })
+
+    contents = [Content.from_data(bytes([i])) for i in range(num_objects)]
+
+    # Fill Kafka
+    for content in contents:
+        producer.produce(
+            topic=kafka_prefix + '.content',
+            key=key_to_kafka(content.sha1),
+            value=value_to_kafka(content.to_dict()),
+        )
+
+    producer.flush()
+
+    client = JournalClient(
+        brokers=['localhost:%d' % kafka_server[1]],
+        group_id=kafka_consumer_group,
+        prefix=kafka_prefix,
+        stop_after_objects=num_objects,
+        batch_size=batch_size,
+    )
+
+    collected_output: List[Dict] = []
+
+    def worker_fn(objects):
+        received = objects['content']
+        assert len(received) <= batch_size
+        collected_output.extend(received)
+
+    client.process(worker_fn)
+
+    assert collected_output == [content.to_dict() for content in contents]

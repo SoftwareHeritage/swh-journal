@@ -73,3 +73,4 @@ class MockedJournalClient(JournalClient):
         self.stop_after_objects = None
         self.value_deserializer = kafka_to_value
         self.stop_on_eof = False
+        self.batch_size = 200

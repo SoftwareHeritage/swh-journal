@@ -70,9 +70,10 @@ class JournalClient:
     throughput across the nodes sharing the same group_id.
 
     Messages are processed by the `worker_fn` callback passed to the `process`
-    method, in batches of maximum 20 messages (currently hardcoded). If set,
-    the processing stops after processing `stop_after_objects` messages in
-    total.
+    method, in batches of maximum `batch_size` messages (defaults to 200).
+
+    If set, the processing stops after processing `stop_after_objects` messages
+    in total.
 
     `stop_on_eof` stops the processing when the client has reached the end of
     each partition in turn.
@@ -91,6 +92,7 @@ class JournalClient:
             prefix: Optional[str] = None,
             object_types: Optional[List[str]] = None,
             stop_after_objects: Optional[int] = None,
+            batch_size: int = 200,
             process_timeout: Optional[float] = None,
             auto_offset_reset: str = 'earliest',
             stop_on_eof: bool = False,
@@ -110,6 +112,9 @@ class JournalClient:
                 raise ValueError(
                     'Option \'object_types\' only accepts %s, not %s.' %
                     (ACCEPTED_OBJECT_TYPES, object_type))
+
+        if batch_size <= 0:
+            raise ValueError("Option 'batch_size' needs to be positive")
 
         self.value_deserializer = kafka_to_value
 
@@ -180,6 +185,7 @@ class JournalClient:
         self.stop_after_objects = stop_after_objects
         self.process_timeout = process_timeout
         self.eof_reached: Set[Tuple[str, str]] = set()
+        self.batch_size = batch_size
 
         self._object_types = object_types
 
@@ -212,8 +218,7 @@ class JournalClient:
 
                 timeout = self.process_timeout - elapsed
 
-            batch_size = 20
-
+            batch_size = self.batch_size
             if self.stop_after_objects:
                 if total_objects_processed >= self.stop_after_objects:
                     break
