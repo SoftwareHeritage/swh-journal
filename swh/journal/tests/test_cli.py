@@ -133,6 +133,9 @@ def _patch_objstorages(names):
     return decorator
 
 
+NUM_CONTENTS = 10
+
+
 def _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages):
     producer = Producer({
         'bootstrap.servers': '127.0.0.1:{}'.format(kafka_port),
@@ -141,7 +144,7 @@ def _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages):
     })
 
     contents = {}
-    for i in range(10):
+    for i in range(NUM_CONTENTS):
         content = b'\x00'*19 + bytes([i])
         sha1 = objstorages['src'].add(content)
         contents[sha1] = content
@@ -176,7 +179,7 @@ def test_replay_content(
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', 'test-cli-consumer',
         '--prefix', kafka_prefix,
-        '--max-messages', '10',
+        '--max-messages', str(NUM_CONTENTS),
     ])
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -208,7 +211,7 @@ def test_replay_content_static_group_id(
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', 'test-cli-consumer',
         '--prefix', kafka_prefix,
-        '--max-messages', '10',
+        '--max-messages', str(NUM_CONTENTS),
     ], {'KAFKA_GROUP_INSTANCE_ID': 'static-group-instance-id'})
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -256,7 +259,7 @@ def test_replay_content_exclude(
             '--broker', '127.0.0.1:%d' % kafka_port,
             '--group-id', 'test-cli-consumer',
             '--prefix', kafka_prefix,
-            '--max-messages', '10',
+            '--max-messages', str(NUM_CONTENTS),
             '--exclude-sha1-file', fd.name,
         ])
     expected = r'Done.\n'
