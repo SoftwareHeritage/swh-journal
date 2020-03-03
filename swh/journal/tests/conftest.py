@@ -184,7 +184,14 @@ kafka_logger.setLevel(logging.WARN)
 
 @pytest.fixture(scope='function')
 def kafka_prefix():
+    """Pick a random prefix for kafka topics on each call"""
     return ''.join(random.choice(string.ascii_lowercase) for _ in range(10))
+
+
+@pytest.fixture(scope='function')
+def kafka_consumer_group(kafka_prefix: str):
+    """Pick a random consumer group for kafka consumers on each call"""
+    return "test-consumer-%s" % kafka_prefix
 
 
 TEST_CONFIG = {
@@ -213,7 +220,7 @@ def test_config(kafka_server: Tuple[Popen, int],
 def consumer(
     kafka_server: Tuple[Popen, int],
     test_config: Dict,
-    kafka_prefix: str,
+    kafka_consumer_group: str,
 ) -> Consumer:
     """Get a connected Kafka consumer.
 
@@ -223,7 +230,7 @@ def consumer(
         'bootstrap.servers': '127.0.0.1:{}'.format(kafka_port),
         'auto.offset.reset': 'earliest',
         'enable.auto.commit': True,
-        'group.id': "test-consumer-%s" % kafka_prefix,
+        'group.id': kafka_consumer_group,
     })
 
     kafka_topics = [

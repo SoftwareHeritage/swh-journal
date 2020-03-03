@@ -17,6 +17,7 @@ from swh.journal.serializers import key_to_kafka, value_to_kafka
 
 def test_client(
         kafka_prefix: str,
+        kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int]):
     (_, port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
@@ -38,7 +39,7 @@ def test_client(
 
     config = {
         'brokers': 'localhost:%d' % kafka_server[1],
-        'group_id': 'replayer',
+        'group_id': kafka_consumer_group,
         'prefix': kafka_prefix,
         'max_messages': 1,
     }
@@ -52,6 +53,7 @@ def test_client(
 
 def test_client_eof(
         kafka_prefix: str,
+        kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int]):
     (_, port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
@@ -73,7 +75,7 @@ def test_client_eof(
 
     config = {
         'brokers': 'localhost:%d' % kafka_server[1],
-        'group_id': 'replayer',
+        'group_id': kafka_consumer_group,
         'prefix': kafka_prefix,
         'stop_on_eof': True,
     }

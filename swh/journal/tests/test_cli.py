@@ -74,6 +74,7 @@ def invoke(catch_exceptions, args, env=None):
 def test_replay(
         storage,
         kafka_prefix: str,
+        kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int]):
     (_, port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
@@ -102,7 +103,7 @@ def test_replay(
     result = invoke(False, [
         'replay',
         '--broker', '127.0.0.1:%d' % port,
-        '--group-id', 'test-cli-consumer',
+        '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--max-messages', '1',
     ])
@@ -167,6 +168,7 @@ def test_replay_content(
         objstorages,
         storage,
         kafka_prefix: str,
+        kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int]):
     (_, kafka_port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
@@ -177,7 +179,7 @@ def test_replay_content(
     result = invoke(False, [
         'content-replay',
         '--broker', '127.0.0.1:%d' % kafka_port,
-        '--group-id', 'test-cli-consumer',
+        '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--max-messages', str(NUM_CONTENTS),
     ])
@@ -195,6 +197,7 @@ def test_replay_content_static_group_id(
         objstorages,
         storage,
         kafka_prefix: str,
+        kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int],
         caplog):
     (_, kafka_port) = kafka_server
@@ -209,7 +212,7 @@ def test_replay_content_static_group_id(
     result = invoke(False, [
         'content-replay',
         '--broker', '127.0.0.1:%d' % kafka_port,
-        '--group-id', 'test-cli-consumer',
+        '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--max-messages', str(NUM_CONTENTS),
     ], {'KAFKA_GROUP_INSTANCE_ID': 'static-group-instance-id'})
@@ -241,6 +244,7 @@ def test_replay_content_exclude(
         objstorages,
         storage,
         kafka_prefix: str,
+        kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int]):
     (_, kafka_port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
@@ -257,7 +261,7 @@ def test_replay_content_exclude(
         result = invoke(False, [
             'content-replay',
             '--broker', '127.0.0.1:%d' % kafka_port,
-            '--group-id', 'test-cli-consumer',
+            '--group-id', kafka_consumer_group,
             '--prefix', kafka_prefix,
             '--max-messages', str(NUM_CONTENTS),
             '--exclude-sha1-file', fd.name,
@@ -286,6 +290,7 @@ def test_replay_content_check_dst(
         objstorages,
         storage,
         kafka_prefix: str,
+        kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int],
         check_dst: bool,
         expected_copied: int,
@@ -308,7 +313,7 @@ def test_replay_content_check_dst(
     result = invoke(False, [
         'content-replay',
         '--broker', '127.0.0.1:%d' % kafka_port,
-        '--group-id', 'test-cli-consumer',
+        '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--max-messages', str(NUM_CONTENTS),
         '--check-dst' if check_dst else '--no-check-dst',

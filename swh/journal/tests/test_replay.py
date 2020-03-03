@@ -35,6 +35,7 @@ storage_config = {
 
 def test_storage_play(
         kafka_prefix: str,
+        kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int]):
     (_, port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
@@ -73,7 +74,7 @@ def test_storage_play(
     # Fill the storage from Kafka
     config = {
         'brokers': 'localhost:%d' % kafka_server[1],
-        'group_id': 'replayer',
+        'group_id': kafka_consumer_group,
         'prefix': kafka_prefix,
         'max_messages': nb_sent,
     }
