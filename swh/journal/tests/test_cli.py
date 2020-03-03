@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from collections import Counter
 import functools
 import logging
 import re
@@ -338,3 +339,59 @@ def test_replay_content_check_dst(
     for (sha1, content) in contents.items():
         assert sha1 in objstorages['dst'], sha1
         assert objstorages['dst'].get(sha1) == content
+
+
+@_patch_objstorages(['src', 'dst'])
+def test_replay_content_check_dst_retry(
+        objstorages,
+        storage,
+        kafka_prefix: str,
+        kafka_consumer_group: str,
+        kafka_server: Tuple[Popen, int]):
+    (_, kafka_port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    contents = _fill_objstorage_and_kafka(
+        kafka_port, kafka_prefix, objstorages)
+
+    class FlakyMemoryObjStorage(InMemoryObjStorage):
+        def __init__(self, *args, **kwargs):
+            state = kwargs.pop('state')
+            super().__init__(*args, **kwargs)
+            if state:
+                self.state = state
+            self.contains_failed = Counter()
+
+        def __contains__(self, id):
+            if self.contains_failed[id] == 0:
+                self.contains_failed[id] += 1
+                raise ValueError('This contains is flaky')
+
+            return super().__contains__(id)
+
+    for i, (sha1, content) in enumerate(contents.items()):
+        if i >= NUM_CONTENTS_DST:
+            break
+
+        objstorages['dst'].add(content, obj_id=sha1)
+
+    dst_state = objstorages['dst'].state
+    flaky_objstorage = FlakyMemoryObjStorage(state=dst_state)
+    objstorages['dst'] = flaky_objstorage
+    dst_contains_failed = flaky_objstorage.contains_failed
+
+    result = invoke(False, [
+        'content-replay',
+        '--broker', '127.0.0.1:%d' % kafka_port,
+        '--group-id', kafka_consumer_group,
+        '--prefix', kafka_prefix,
+        '--max-messages', str(NUM_CONTENTS),
+        '--check-dst',
+    ])
+    expected = r'Done.\n'
+    assert result.exit_code == 0, result.output
+    assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
+
+    for (sha1, content) in contents.items():
+        assert dst_contains_failed[sha1] >= 0
+        assert dst_state[sha1] == content

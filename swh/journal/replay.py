@@ -13,6 +13,8 @@ try:
 except ImportError:
     notify = None
 
+from tenacity import retry, stop_after_attempt, wait_random_exponential
+
 from swh.core.statsd import statsd
 from swh.model.identifiers import normalize_timestamp
 from swh.model.hashutil import hash_to_hex
@@ -322,6 +324,14 @@ def copy_object(obj_id, src, dst):
     return len(obj)
 
 
+@retry(stop=stop_after_attempt(3),
+       reraise=True,
+       wait=wait_random_exponential(multiplier=1, max=60))
+def obj_in_objstorage(obj_id, dst):
+    """Check if an object is already in an objstorage, tenaciously"""
+    return obj_id in dst
+
+
 def process_replay_objects_content(
         all_objects: Dict[str, List[dict]],
         *,
@@ -401,7 +411,7 @@ def process_replay_objects_content(
                              hash_to_hex(obj_id))
                 statsd.increment(CONTENT_OPERATIONS_METRIC,
                                  tags={"decision": "excluded"})
-            elif check_dst and obj_id in dst:
+            elif check_dst and obj_in_objstorage(obj_id, dst):
                 nb_skipped += 1
                 logger.debug('skipped %s (in dst)', hash_to_hex(obj_id))
                 statsd.increment(CONTENT_OPERATIONS_METRIC,
