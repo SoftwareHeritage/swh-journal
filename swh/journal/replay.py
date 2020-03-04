@@ -313,18 +313,20 @@ def is_hash_in_bytearray(hash_, array, nb_hashes, hash_size=SHA1_SIZE):
 
 
 def copy_object(obj_id, src, dst):
+    hex_obj_id = hash_to_hex(obj_id)
     obj = ''
     try:
         with statsd.timed(CONTENT_DURATION_METRIC, tags={'request': 'get'}):
             obj = src.get(obj_id)
-            logger.debug('retrieved %s', hash_to_hex(obj_id))
+            logger.debug('retrieved %(obj_id)s', {'obj_id': hex_obj_id})
 
         with statsd.timed(CONTENT_DURATION_METRIC, tags={'request': 'put'}):
             dst.add(obj, obj_id=obj_id, check_presence=False)
-            logger.debug('copied %s', hash_to_hex(obj_id))
+            logger.debug('copied %(obj_id)s', {'obj_id': hex_obj_id})
         statsd.increment(CONTENT_BYTES_METRIC, len(obj))
     except Exception as exc:
-        logger.error('Failed to copy %s: %s', hash_to_hex(obj_id), exc)
+        logger.error('Failed to copy %(obj_id)s: %(exc)s',
+                     {'obj_id': hex_obj_id, 'exc': str(exc)})
         raise
     return len(obj)
 
