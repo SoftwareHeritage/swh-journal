@@ -72,13 +72,12 @@ def test_storage_play(
     producer.flush()
 
     # Fill the storage from Kafka
-    config = {
-        'brokers': 'localhost:%d' % kafka_server[1],
-        'group_id': kafka_consumer_group,
-        'prefix': kafka_prefix,
-        'max_messages': nb_sent,
-    }
-    replayer = JournalClient(**config)
+    replayer = JournalClient(
+        brokers='localhost:%d' % kafka_server[1],
+        group_id=kafka_consumer_group,
+        prefix=kafka_prefix,
+        max_messages=nb_sent,
+    )
     worker_fn = functools.partial(process_replay_objects, storage=storage)
     nb_inserted = 0
     while nb_inserted < nb_sent:
@@ -147,7 +146,7 @@ def _test_write_replay_origin_visit(visits):
         writer.send('origin_visit', 'foo', visit)
 
     queue_size = len(queue)
-    assert replayer.max_messages == 0
+    assert replayer.max_messages is None
     replayer.max_messages = queue_size
 
     storage = get_storage(**storage_config)

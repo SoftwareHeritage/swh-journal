@@ -79,7 +79,7 @@ def test_write_replay_same_order_batches(objects):
                 pass
 
     queue_size = len(queue)
-    assert replayer.max_messages == 0
+    assert replayer.max_messages is None
     replayer.max_messages = queue_size
 
     storage2 = get_storage(**storage_config)
@@ -135,7 +135,7 @@ def test_write_replay_content(objects):
                 contents.append(obj)
 
     queue_size = len(queue)
-    assert replayer.max_messages == 0
+    assert replayer.max_messages is None
     replayer.max_messages = queue_size
 
     storage2 = get_storage(**storage_config)

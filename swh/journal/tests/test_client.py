@@ -37,14 +37,12 @@ def test_client(
     )
     producer.flush()
 
-    config = {
-        'brokers': 'localhost:%d' % kafka_server[1],
-        'group_id': kafka_consumer_group,
-        'prefix': kafka_prefix,
-        'max_messages': 1,
-    }
-    client = JournalClient(**config)
-
+    client = JournalClient(
+        brokers='localhost:%d' % kafka_server[1],
+        group_id=kafka_consumer_group,
+        prefix=kafka_prefix,
+        max_messages=1,
+    )
     worker_fn = MagicMock()
     client.process(worker_fn)
 
@@ -73,13 +71,13 @@ def test_client_eof(
     )
     producer.flush()
 
-    config = {
-        'brokers': 'localhost:%d' % kafka_server[1],
-        'group_id': kafka_consumer_group,
-        'prefix': kafka_prefix,
-        'stop_on_eof': True,
-    }
-    client = JournalClient(**config)
+    client = JournalClient(
+        brokers='localhost:%d' % kafka_server[1],
+        group_id=kafka_consumer_group,
+        prefix=kafka_prefix,
+        max_messages=1,
+        stop_on_eof=True,
+    )
 
     worker_fn = MagicMock()
     client.process(worker_fn)

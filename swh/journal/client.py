@@ -7,6 +7,7 @@ from collections import defaultdict
 import logging
 import os
 import time
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from confluent_kafka import Consumer, KafkaException, KafkaError
 
@@ -75,9 +76,17 @@ class JournalClient:
 
     """
     def __init__(
-            self, brokers, group_id, prefix=None, object_types=None,
-            max_messages=0, process_timeout=0, auto_offset_reset='earliest',
-            stop_on_eof=False, **kwargs):
+            self,
+            brokers: Union[str, List[str]],
+            group_id: str,
+            prefix: Optional[str] = None,
+            object_types: Optional[List[str]] = None,
+            max_messages: Optional[int] = None,
+            process_timeout: Optional[float] = None,
+            auto_offset_reset: str = 'earliest',
+            stop_on_eof: bool = False,
+            **kwargs
+    ):
         if prefix is None:
             prefix = DEFAULT_PREFIX
         if object_types is None:
@@ -161,7 +170,7 @@ class JournalClient:
 
         self.max_messages = max_messages
         self.process_timeout = process_timeout
-        self.eof_reached = set()
+        self.eof_reached: Set[Tuple[str, str]] = set()
 
         self._object_types = object_types
 
@@ -214,7 +223,7 @@ class JournalClient:
         return nb_messages
 
     def handle_messages(self, messages, worker_fn):
-        objects = defaultdict(list)
+        objects: Dict[str, List[Any]] = defaultdict(list)
         nb_processed = 0
 
         for message in messages:

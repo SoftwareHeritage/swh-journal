@@ -69,7 +69,7 @@ class MockedJournalClient(JournalClient):
     def __init__(self, queue, object_types=ACCEPTED_OBJECT_TYPES):
         self._object_types = object_types
         self.consumer = MockedKafkaConsumer(queue)
-        self.process_timeout = 0
-        self.max_messages = 0
+        self.process_timeout = None
+        self.max_messages = None
         self.value_deserializer = kafka_to_value
         self.stop_on_eof = False
