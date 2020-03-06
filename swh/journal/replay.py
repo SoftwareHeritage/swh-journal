@@ -1,4 +1,4 @@
-# Copyright (C) 2019 The Software Heritage developers
+# Copyright (C) 2019-2020 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -233,15 +233,18 @@ def fix_objects(object_type, objects):
 def _insert_objects(object_type, objects, storage):
     objects = fix_objects(object_type, objects)
     if object_type == 'content':
-        # TODO: insert 'content' in batches
-        for object_ in objects:
-            try:
-                if object_.get('status') == 'absent':
-                    storage.skipped_content_add([object_])
-                else:
-                    storage.content_add_metadata([object_])
-            except HashCollision as e:
-                logger.error('Hash collision: %s', e.args)
+        try:
+            storage.skipped_content_add(
+              (obj for obj in objects if obj.get('status') == 'absent'))
+        except HashCollision as e:
+            logger.error('(SkippedContent) Hash collision: %s', e.args)
+
+        try:
+            storage.content_add_metadata(
+              (obj for obj in objects if obj.get('status') != 'absent'))
+        except HashCollision as e:
+            logger.error('(Content) Hash collision: %s', e.args)
+
     elif object_type in ('directory', 'revision', 'release',
                          'snapshot', 'origin'):
         # TODO: split batches that are too large for the storage
