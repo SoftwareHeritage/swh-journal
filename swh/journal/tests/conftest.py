@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pathlib import Path
 from pytest_kafka import (
-    make_zookeeper_process, make_kafka_server
+    make_zookeeper_process, make_kafka_server, ZOOKEEPER_CONFIG_TEMPLATE,
 )
 
 from swh.model.hashutil import hash_to_bytes
@@ -167,9 +167,12 @@ KAFKA_SCRIPTS = Path(KAFKA_ROOT) / 'bin'
 KAFKA_BIN = str(KAFKA_SCRIPTS / 'kafka-server-start.sh')
 ZOOKEEPER_BIN = str(KAFKA_SCRIPTS / 'zookeeper-server-start.sh')
 
+ZK_CONFIG_TEMPLATE = ZOOKEEPER_CONFIG_TEMPLATE + '\nadmin.enableServer=false\n'
 
 # Those defines fixtures
-zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN, scope='session')
+zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN,
+                                        zk_config_template=ZK_CONFIG_TEMPLATE,
+                                        scope='session')
 os.environ['KAFKA_LOG4J_OPTS'] = \
     '-Dlog4j.configuration=file:%s/log4j.properties' % \
     os.path.dirname(__file__)
@@ -181,7 +184,14 @@ kafka_logger.setLevel(logging.WARN)
 
 @pytest.fixture(scope='function')
 def kafka_prefix():
+    """Pick a random prefix for kafka topics on each call"""
     return ''.join(random.choice(string.ascii_lowercase) for _ in range(10))
+
+
+@pytest.fixture(scope='function')
+def kafka_consumer_group(kafka_prefix: str):
+    """Pick a random consumer group for kafka consumers on each call"""
+    return "test-consumer-%s" % kafka_prefix
 
 
 TEST_CONFIG = {
@@ -210,7 +220,7 @@ def test_config(kafka_server: Tuple[Popen, int],
 def consumer(
     kafka_server: Tuple[Popen, int],
     test_config: Dict,
-    kafka_prefix: str,
+    kafka_consumer_group: str,
 ) -> Consumer:
     """Get a connected Kafka consumer.
 
@@ -220,7 +230,7 @@ def consumer(
         'bootstrap.servers': '127.0.0.1:{}'.format(kafka_port),
         'auto.offset.reset': 'earliest',
         'enable.auto.commit': True,
-        'group.id': "test-consumer-%s" % kafka_prefix,
+        'group.id': kafka_consumer_group,
     })
 
     kafka_topics = [

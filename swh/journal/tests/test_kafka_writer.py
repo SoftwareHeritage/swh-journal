@@ -104,7 +104,8 @@ def test_storage_direct_writer(
         consumer: Consumer):
     kafka_prefix += '.swh.journal.objects'
 
-    config = {
+    writer_config = {
+        'cls': 'kafka',
         'brokers': ['localhost:%d' % kafka_server[1]],
         'client_id': 'kafka_writer',
         'prefix': kafka_prefix,
@@ -112,10 +113,15 @@ def test_storage_direct_writer(
             'message.max.bytes': 100000000,
         }
     }
+    storage_config = {
+        'cls': 'pipeline',
+        'steps': [
+            {'cls': 'validate'},
+            {'cls': 'memory', 'journal_writer': writer_config},
+        ]
+    }
 
-    storage = get_storage('memory', journal_writer={
-        'cls': 'kafka', **config,
-    })
+    storage = get_storage(**storage_config)
 
     expected_messages = 0
 

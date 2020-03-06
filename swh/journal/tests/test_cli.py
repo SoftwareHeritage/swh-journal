@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from collections import Counter
 import functools
 import logging
 import re
@@ -15,8 +16,9 @@ from click.testing import CliRunner
 from confluent_kafka import Producer
 import pytest
 
+from swh.model.hashutil import hash_to_hex
 from swh.objstorage.backends.in_memory import InMemoryObjStorage
-from swh.storage.in_memory import InMemoryStorage
+from swh.storage import get_storage
 
 from swh.journal.cli import cli
 from swh.journal.serializers import key_to_kafka, value_to_kafka
@@ -42,21 +44,29 @@ objstorage_dst:
 
 @pytest.fixture
 def storage():
-    """An instance of swh.storage.in_memory.InMemoryStorage that gets injected
-    into the CLI functions."""
-    storage = InMemoryStorage()
+    """An swh-storage object that gets injected into the CLI functions."""
+    storage_config = {
+        'cls': 'pipeline',
+        'steps': [
+            {'cls': 'validate'},
+            {'cls': 'memory'},
+        ]
+    }
+    storage = get_storage(**storage_config)
     with patch('swh.journal.cli.get_storage') as get_storage_mock:
         get_storage_mock.return_value = storage
         yield storage
 
 
-def invoke(catch_exceptions, args):
+def invoke(catch_exceptions, args, env=None):
     runner = CliRunner()
     with tempfile.NamedTemporaryFile('a', suffix='.yml') as config_fd:
         config_fd.write(CLI_CONFIG)
         config_fd.seek(0)
         args = ['-C' + config_fd.name] + args
-        result = runner.invoke(cli, args, obj={'log_level': logging.DEBUG})
+        result = runner.invoke(
+            cli, args, obj={'log_level': logging.DEBUG}, env=env,
+        )
     if not catch_exceptions and result.exception:
         print(result.output)
         raise result.exception
@@ -64,8 +74,9 @@ def invoke(catch_exceptions, args):
 
 
 def test_replay(
-        storage: InMemoryStorage,
+        storage,
         kafka_prefix: str,
+        kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int]):
     (_, port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
@@ -94,7 +105,7 @@ def test_replay(
     result = invoke(False, [
         'replay',
         '--broker', '127.0.0.1:%d' % port,
-        '--group-id', 'test-cli-consumer',
+        '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--max-messages', '1',
     ])
@@ -125,6 +136,9 @@ def _patch_objstorages(names):
     return decorator
 
 
+NUM_CONTENTS = 10
+
+
 def _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages):
     producer = Producer({
         'bootstrap.servers': '127.0.0.1:{}'.format(kafka_port),
@@ -133,7 +147,7 @@ def _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages):
     })
 
     contents = {}
-    for i in range(10):
+    for i in range(NUM_CONTENTS):
         content = b'\x00'*19 + bytes([i])
         sha1 = objstorages['src'].add(content)
         contents[sha1] = content
@@ -154,8 +168,9 @@ def _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages):
 @_patch_objstorages(['src', 'dst'])
 def test_replay_content(
         objstorages,
-        storage: InMemoryStorage,
+        storage,
         kafka_prefix: str,
+        kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int]):
     (_, kafka_port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
@@ -166,9 +181,9 @@ def test_replay_content(
     result = invoke(False, [
         'content-replay',
         '--broker', '127.0.0.1:%d' % kafka_port,
-        '--group-id', 'test-cli-consumer',
+        '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
-        '--max-messages', '10',
+        '--max-messages', str(NUM_CONTENTS),
     ])
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -180,10 +195,98 @@ def test_replay_content(
 
 
 @_patch_objstorages(['src', 'dst'])
+def test_replay_content_structured_log(
+        objstorages,
+        storage,
+        kafka_prefix: str,
+        kafka_consumer_group: str,
+        kafka_server: Tuple[Popen, int],
+        caplog):
+    (_, kafka_port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    contents = _fill_objstorage_and_kafka(
+        kafka_port, kafka_prefix, objstorages)
+
+    caplog.set_level(logging.DEBUG, 'swh.journal.replay')
+
+    expected_obj_ids = set(hash_to_hex(sha1) for sha1 in contents)
+
+    result = invoke(False, [
+        'content-replay',
+        '--broker', '127.0.0.1:%d' % kafka_port,
+        '--group-id', kafka_consumer_group,
+        '--prefix', kafka_prefix,
+        '--max-messages', str(NUM_CONTENTS),
+    ])
+    expected = r'Done.\n'
+    assert result.exit_code == 0, result.output
+    assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
+
+    copied = set()
+    for record in caplog.records:
+        logtext = record.getMessage()
+        if 'copied' in logtext:
+            copied.add(record.args['obj_id'])
+
+    assert copied == expected_obj_ids, (
+        "Mismatched logging; see captured log output for details."
+    )
+
+
+@_patch_objstorages(['src', 'dst'])
+def test_replay_content_static_group_id(
+        objstorages,
+        storage,
+        kafka_prefix: str,
+        kafka_consumer_group: str,
+        kafka_server: Tuple[Popen, int],
+        caplog):
+    (_, kafka_port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    contents = _fill_objstorage_and_kafka(
+        kafka_port, kafka_prefix, objstorages)
+
+    # Setup log capture to fish the consumer settings out of the log messages
+    caplog.set_level(logging.DEBUG, 'swh.journal.client')
+
+    result = invoke(False, [
+        'content-replay',
+        '--broker', '127.0.0.1:%d' % kafka_port,
+        '--group-id', kafka_consumer_group,
+        '--prefix', kafka_prefix,
+        '--max-messages', str(NUM_CONTENTS),
+    ], {'KAFKA_GROUP_INSTANCE_ID': 'static-group-instance-id'})
+    expected = r'Done.\n'
+    assert result.exit_code == 0, result.output
+    assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
+
+    consumer_settings = None
+    for record in caplog.records:
+        if 'Consumer settings' in record.message:
+            consumer_settings = record.args
+            break
+
+    assert consumer_settings is not None, (
+        'Failed to get consumer settings out of the consumer log. '
+        'See log capture for details.'
+    )
+    assert consumer_settings['group.instance.id'] == 'static-group-instance-id'
+    assert consumer_settings['session.timeout.ms'] == 60 * 10 * 1000
+    assert consumer_settings['max.poll.interval.ms'] == 90 * 10 * 1000
+
+    for (sha1, content) in contents.items():
+        assert sha1 in objstorages['dst'], sha1
+        assert objstorages['dst'].get(sha1) == content
+
+
+@_patch_objstorages(['src', 'dst'])
 def test_replay_content_exclude(
         objstorages,
-        storage: InMemoryStorage,
+        storage,
         kafka_prefix: str,
+        kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int]):
     (_, kafka_port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
@@ -200,9 +303,9 @@ def test_replay_content_exclude(
         result = invoke(False, [
             'content-replay',
             '--broker', '127.0.0.1:%d' % kafka_port,
-            '--group-id', 'test-cli-consumer',
+            '--group-id', kafka_consumer_group,
             '--prefix', kafka_prefix,
-            '--max-messages', '10',
+            '--max-messages', str(NUM_CONTENTS),
             '--exclude-sha1-file', fd.name,
         ])
     expected = r'Done.\n'
@@ -215,3 +318,199 @@ def test_replay_content_exclude(
         else:
             assert sha1 in objstorages['dst'], sha1
             assert objstorages['dst'].get(sha1) == content
+
+
+NUM_CONTENTS_DST = 5
+
+
+@_patch_objstorages(['src', 'dst'])
+@pytest.mark.parametrize("check_dst,expected_copied,expected_in_dst", [
+    (True, NUM_CONTENTS - NUM_CONTENTS_DST, NUM_CONTENTS_DST),
+    (False, NUM_CONTENTS, 0),
+])
+def test_replay_content_check_dst(
+        objstorages,
+        storage,
+        kafka_prefix: str,
+        kafka_consumer_group: str,
+        kafka_server: Tuple[Popen, int],
+        check_dst: bool,
+        expected_copied: int,
+        expected_in_dst: int,
+        caplog):
+    (_, kafka_port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    contents = _fill_objstorage_and_kafka(
+        kafka_port, kafka_prefix, objstorages)
+
+    for i, (sha1, content) in enumerate(contents.items()):
+        if i >= NUM_CONTENTS_DST:
+            break
+
+        objstorages['dst'].add(content, obj_id=sha1)
+
+    caplog.set_level(logging.DEBUG, 'swh.journal.replay')
+
+    result = invoke(False, [
+        'content-replay',
+        '--broker', '127.0.0.1:%d' % kafka_port,
+        '--group-id', kafka_consumer_group,
+        '--prefix', kafka_prefix,
+        '--max-messages', str(NUM_CONTENTS),
+        '--check-dst' if check_dst else '--no-check-dst',
+    ])
+    expected = r'Done.\n'
+    assert result.exit_code == 0, result.output
+    assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
+
+    copied = 0
+    in_dst = 0
+    for record in caplog.records:
+        logtext = record.getMessage()
+        if 'copied' in logtext:
+            copied += 1
+        elif 'in dst' in logtext:
+            in_dst += 1
+
+    assert (copied == expected_copied and in_dst == expected_in_dst), (
+        "Unexpected amount of objects copied, see the captured log for details"
+    )
+
+    for (sha1, content) in contents.items():
+        assert sha1 in objstorages['dst'], sha1
+        assert objstorages['dst'].get(sha1) == content
+
+
+class FlakyObjStorage(InMemoryObjStorage):
+    def __init__(self, *args, **kwargs):
+        state = kwargs.pop('state')
+        self.failures_left = Counter(kwargs.pop('failures'))
+        super().__init__(*args, **kwargs)
+        if state:
+            self.state = state
+
+    def flaky_operation(self, op, obj_id):
+        if self.failures_left[op, obj_id] > 0:
+            self.failures_left[op, obj_id] -= 1
+            raise RuntimeError(
+                'Failed %s on %s' % (op, hash_to_hex(obj_id))
+            )
+
+    def get(self, obj_id):
+        self.flaky_operation('get', obj_id)
+        return super().get(obj_id)
+
+    def add(self, data, obj_id=None, check_presence=True):
+        self.flaky_operation('add', obj_id)
+        return super().add(data, obj_id=obj_id,
+                           check_presence=check_presence)
+
+    def __contains__(self, obj_id):
+        self.flaky_operation('in', obj_id)
+        return super().__contains__(obj_id)
+
+
+@_patch_objstorages(['src', 'dst'])
+def test_replay_content_check_dst_retry(
+        objstorages,
+        storage,
+        kafka_prefix: str,
+        kafka_consumer_group: str,
+        kafka_server: Tuple[Popen, int]):
+    (_, kafka_port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    contents = _fill_objstorage_and_kafka(
+        kafka_port, kafka_prefix, objstorages)
+
+    failures = {}
+    for i, (sha1, content) in enumerate(contents.items()):
+        if i >= NUM_CONTENTS_DST:
+            break
+
+        objstorages['dst'].add(content, obj_id=sha1)
+        failures['in', sha1] = 1
+
+    orig_dst = objstorages['dst']
+    objstorages['dst'] = FlakyObjStorage(state=orig_dst.state,
+                                         failures=failures)
+
+    result = invoke(False, [
+        'content-replay',
+        '--broker', '127.0.0.1:%d' % kafka_port,
+        '--group-id', kafka_consumer_group,
+        '--prefix', kafka_prefix,
+        '--max-messages', str(NUM_CONTENTS),
+        '--check-dst',
+    ])
+    expected = r'Done.\n'
+    assert result.exit_code == 0, result.output
+    assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
+
+    for (sha1, content) in contents.items():
+        assert sha1 in objstorages['dst'], sha1
+        assert objstorages['dst'].get(sha1) == content
+
+
+@_patch_objstorages(['src', 'dst'])
+def test_replay_content_objnotfound(
+        objstorages,
+        storage,
+        kafka_prefix: str,
+        kafka_consumer_group: str,
+        kafka_server: Tuple[Popen, int],
+        caplog):
+    (_, kafka_port) = kafka_server
+    kafka_prefix += '.swh.journal.objects'
+
+    contents = _fill_objstorage_and_kafka(
+        kafka_port, kafka_prefix, objstorages)
+
+    num_contents_deleted = 5
+    contents_deleted = set()
+
+    for i, sha1 in enumerate(contents):
+        if i >= num_contents_deleted:
+            break
+
+        del objstorages['src'].state[sha1]
+        contents_deleted.add(hash_to_hex(sha1))
+
+    caplog.set_level(logging.DEBUG, 'swh.journal.replay')
+
+    result = invoke(False, [
+        'content-replay',
+        '--broker', '127.0.0.1:%d' % kafka_port,
+        '--group-id', kafka_consumer_group,
+        '--prefix', kafka_prefix,
+        '--max-messages', str(NUM_CONTENTS),
+    ])
+    expected = r'Done.\n'
+    assert result.exit_code == 0, result.output
+    assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
+
+    copied = 0
+    not_in_src = set()
+    for record in caplog.records:
+        logtext = record.getMessage()
+        if 'copied' in logtext:
+            copied += 1
+        elif 'object not found' in logtext:
+            # Check that the object id can be recovered from logs
+            assert record.levelno == logging.ERROR
+            not_in_src.add(record.args['obj_id'])
+
+    assert copied == NUM_CONTENTS - num_contents_deleted, (
+        "Unexpected number of contents copied"
+    )
+
+    assert not_in_src == contents_deleted, (
+        "Mismatch between deleted contents and not_in_src logs"
+    )
+
+    for (sha1, content) in contents.items():
+        if sha1 not in objstorages['src']:
+            continue
+        assert sha1 in objstorages['dst'], sha1
+        assert objstorages['dst'].get(sha1) == content

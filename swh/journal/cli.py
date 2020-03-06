@@ -177,14 +177,18 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
                    '(deprecated, use the config file instead)')
 @click.option('--exclude-sha1-file', default=None, type=click.File('rb'),
               help='File containing a sorted array of hashes to be excluded.')
+@click.option('--check-dst/--no-check-dst', default=True,
+              help='Check whether the destination contains the object before '
+                   'copying.')
 @click.pass_context
 def content_replay(ctx, max_messages,
-                   brokers, prefix, group_id, exclude_sha1_file):
+                   brokers, prefix, group_id, exclude_sha1_file, check_dst):
     """Fill a destination Object Storage (typically a mirror) by reading a Journal
     and retrieving objects from an existing source ObjStorage.
 
     There can be several 'replayers' filling a given ObjStorage as long as they
-    use the same `group-id`.
+    use the same `group-id`. You can use the `KAFKA_GROUP_INSTANCE_ID`
+    environment variable to use KIP-345 static group membership.
 
     This service retrieves object ids to copy from the 'content' topic. It will
     only copy object's content if the object's description in the kafka
@@ -196,6 +200,10 @@ def content_replay(ctx, max_messages,
     and it must be sorted.
     This file will not be fully loaded into memory at any given time,
     so it can be arbitrarily large.
+
+    `--check-dst` sets whether the replayer should check in the destination
+    ObjStorage before copying an object. You can turn that off if you know
+    you're copying to an empty ObjStorage.
     """
     logger = logging.getLogger(__name__)
     conf = ctx.obj['config']
@@ -225,10 +233,10 @@ def content_replay(ctx, max_messages,
     client = get_journal_client(
         ctx, brokers=brokers, prefix=prefix, group_id=group_id,
         max_messages=max_messages, object_types=('content',))
-    worker_fn = functools.partial(process_replay_objects_content,
-                                  src=objstorage_src,
-                                  dst=objstorage_dst,
-                                  exclude_fn=exclude_fn)
+    worker_fn = functools.partial(
+        process_replay_objects_content,
+        src=objstorage_src, dst=objstorage_dst, exclude_fn=exclude_fn,
+        check_dst=check_dst)
 
     if notify:
         notify('READY=1')

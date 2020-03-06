@@ -72,3 +72,4 @@ class MockedJournalClient(JournalClient):
         self.process_timeout = 0
         self.max_messages = 0
         self.value_deserializer = kafka_to_value
+        self.stop_on_eof = False

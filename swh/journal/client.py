@@ -5,6 +5,7 @@
 
 from collections import defaultdict
 import logging
+import os
 import time
 
 from confluent_kafka import Consumer, KafkaException, KafkaError
@@ -76,7 +77,7 @@ class JournalClient:
     def __init__(
             self, brokers, group_id, prefix=None, object_types=None,
             max_messages=0, process_timeout=0, auto_offset_reset='earliest',
-            **kwargs):
+            stop_on_eof=False, **kwargs):
         if prefix is None:
             prefix = DEFAULT_PREFIX
         if object_types is None:
@@ -101,6 +102,35 @@ class JournalClient:
         if debug_logging and 'debug' not in kwargs:
             kwargs['debug'] = 'consumer'
 
+        # Static group instance id management
+        group_instance_id = os.environ.get('KAFKA_GROUP_INSTANCE_ID')
+        if group_instance_id:
+            kwargs['group.instance.id'] = group_instance_id
+
+        if 'group.instance.id' in kwargs:
+            # When doing static consumer group membership, set a higher default
+            # session timeout. The session timeout is the duration after which
+            # the broker considers that a consumer has left the consumer group
+            # for good, and triggers a rebalance. Considering our current
+            # processing pattern, 10 minutes gives the consumer ample time to
+            # restart before that happens.
+            if 'session.timeout.ms' not in kwargs:
+                kwargs['session.timeout.ms'] = 10 * 60 * 1000  # 10 minutes
+
+        if 'session.timeout.ms' in kwargs:
+            # When the session timeout is set, rdkafka requires the max poll
+            # interval to be set to a higher value; the max poll interval is
+            # rdkafka's way of figuring out whether the client's message
+            # processing thread has stalled: when the max poll interval lapses
+            # between two calls to consumer.poll(), rdkafka leaves the consumer
+            # group and terminates the connection to the brokers.
+            #
+            # We default to 1.5 times the session timeout
+            if 'max.poll.interval.ms' not in kwargs:
+                kwargs['max.poll.interval.ms'] = (
+                    kwargs['session.timeout.ms'] // 2 * 3
+                )
+
         consumer_settings = {
             **kwargs,
             'bootstrap.servers': ','.join(brokers),
@@ -111,6 +141,10 @@ class JournalClient:
             'enable.auto.commit': False,
             'logger': rdkafka_logger,
         }
+
+        self.stop_on_eof = stop_on_eof
+        if self.stop_on_eof:
+            consumer_settings['enable.partition.eof'] = True
 
         logger.debug('Consumer settings: %s', consumer_settings)
 
@@ -127,6 +161,7 @@ class JournalClient:
 
         self.max_messages = max_messages
         self.process_timeout = process_timeout
+        self.eof_reached = set()
 
         self._object_types = object_types
 
@@ -142,14 +177,18 @@ class JournalClient:
         start_time = time.monotonic()
         nb_messages = 0
 
-        objects = defaultdict(list)
-
         while True:
             # timeout for message poll
             timeout = 1.0
 
             elapsed = time.monotonic() - start_time
             if self.process_timeout:
+                # +0.01 to prevent busy-waiting on / spamming consumer.poll.
+                # consumer.consume() returns shortly before X expired
+                # (a matter of milliseconds), so after it returns a first
+                # time, it would then be called with a timeout in the order
+                # of milliseconds, therefore returning immediately, then be
+                # called again, etc.
                 if elapsed + 0.01 >= self.process_timeout:
                     break
 
@@ -167,28 +206,49 @@ class JournalClient:
             if not messages:
                 continue
 
-            for message in messages:
-                error = message.error()
-                if error is not None:
-                    _error_cb(error)
-                    continue
+            nb_processed, at_eof = self.handle_messages(messages, worker_fn)
+            nb_messages += nb_processed
+            if at_eof:
+                break
 
-                nb_messages += 1
-
-                object_type = message.topic().split('.')[-1]
-                # Got a message from a topic we did not subscribe to.
-                assert object_type in self._object_types, object_type
-
-                objects[object_type].append(
-                    self.value_deserializer(message.value())
-                )
-
-            if objects:
-                worker_fn(dict(objects))
-                objects.clear()
-
-                self.consumer.commit()
         return nb_messages
+
+    def handle_messages(self, messages, worker_fn):
+        objects = defaultdict(list)
+        nb_processed = 0
+
+        for message in messages:
+            error = message.error()
+            if error is not None:
+                if error.code() == KafkaError._PARTITION_EOF:
+                    self.eof_reached.add(
+                        (message.topic(), message.partition())
+                    )
+                else:
+                    _error_cb(error)
+                continue
+
+            nb_processed += 1
+
+            object_type = message.topic().split('.')[-1]
+            # Got a message from a topic we did not subscribe to.
+            assert object_type in self._object_types, object_type
+
+            objects[object_type].append(self.deserialize_message(message))
+
+        if objects:
+            worker_fn(dict(objects))
+            self.consumer.commit()
+
+        at_eof = (self.stop_on_eof and all(
+            (tp.topic, tp.partition) in self.eof_reached
+            for tp in self.consumer.assignment()
+        ))
+
+        return nb_processed, at_eof
+
+    def deserialize_message(self, message):
+        return self.value_deserializer(message.value())
 
     def close(self):
         self.consumer.close()
