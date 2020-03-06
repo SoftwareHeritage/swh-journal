@@ -1,23 +1,27 @@
-# Copyright (C) 2019 The Software Heritage developers
+# Copyright (C) 2019-2020 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 import copy
-from time import time
 import logging
-from contextlib import contextmanager
+from time import time
+from typing import Callable, Dict, List, Optional
 
 try:
     from systemd.daemon import notify
 except ImportError:
     notify = None
 
+from tenacity import retry, stop_after_attempt, wait_random_exponential
+
 from swh.core.statsd import statsd
 from swh.model.identifiers import normalize_timestamp
 from swh.model.hashutil import hash_to_hex
 from swh.model.model import SHA1_SIZE
-from swh.objstorage.objstorage import ID_HASH_ALGO
+from swh.objstorage.objstorage import (
+    ID_HASH_ALGO, ObjNotFoundError, ObjStorage,
+)
 from swh.storage import HashCollision
 
 logger = logging.getLogger(__name__)
@@ -231,12 +235,18 @@ def fix_objects(object_type, objects):
 def _insert_objects(object_type, objects, storage):
     objects = fix_objects(object_type, objects)
     if object_type == 'content':
-        # TODO: insert 'content' in batches
-        for object_ in objects:
-            try:
-                storage.content_add_metadata([object_])
-            except HashCollision as e:
-                logger.error('Hash collision: %s', e.args)
+        try:
+            storage.skipped_content_add(
+              (obj for obj in objects if obj.get('status') == 'absent'))
+        except HashCollision as e:
+            logger.error('(SkippedContent) Hash collision: %s', e.args)
+
+        try:
+            storage.content_add_metadata(
+              (obj for obj in objects if obj.get('status') != 'absent'))
+        except HashCollision as e:
+            logger.error('(Content) Hash collision: %s', e.args)
+
     elif object_type in ('directory', 'revision', 'release',
                          'snapshot', 'origin'):
         # TODO: split batches that are too large for the storage
@@ -302,41 +312,41 @@ def is_hash_in_bytearray(hash_, array, nb_hashes, hash_size=SHA1_SIZE):
     return get_hash(left) == hash_
 
 
-@contextmanager
-def retry(max_retries):
-    lasterror = None
-    for i in range(max_retries):
-        try:
-            yield
-            break
-        except Exception as exc:
-            lasterror = exc
-    else:
-        raise lasterror
-
-
-def copy_object(obj_id, src, dst, max_retries=3):
+def copy_object(obj_id, src, dst):
+    hex_obj_id = hash_to_hex(obj_id)
+    obj = ''
     try:
         with statsd.timed(CONTENT_DURATION_METRIC, tags={'request': 'get'}):
-            with retry(max_retries):
-                obj = src.get(obj_id)
-                logger.debug('retrieved %s', hash_to_hex(obj_id))
+            obj = src.get(obj_id)
+            logger.debug('retrieved %(obj_id)s', {'obj_id': hex_obj_id})
 
         with statsd.timed(CONTENT_DURATION_METRIC, tags={'request': 'put'}):
-            with retry(max_retries):
-                dst.add(obj, obj_id=obj_id, check_presence=False)
-                logger.debug('copied %s', hash_to_hex(obj_id))
-        statsd.increment(CONTENT_OPERATIONS_METRIC)
+            dst.add(obj, obj_id=obj_id, check_presence=False)
+            logger.debug('copied %(obj_id)s', {'obj_id': hex_obj_id})
         statsd.increment(CONTENT_BYTES_METRIC, len(obj))
-    except Exception:
-        obj = ''
-        logger.error('Failed to copy %s', hash_to_hex(obj_id))
+    except Exception as exc:
+        logger.error('Failed to copy %(obj_id)s: %(exc)s',
+                     {'obj_id': hex_obj_id, 'exc': str(exc)})
         raise
     return len(obj)
 
 
-def process_replay_objects_content(all_objects, *, src, dst,
-                                   exclude_fn=None):
+@retry(stop=stop_after_attempt(3),
+       reraise=True,
+       wait=wait_random_exponential(multiplier=1, max=60))
+def obj_in_objstorage(obj_id, dst):
+    """Check if an object is already in an objstorage, tenaciously"""
+    return obj_id in dst
+
+
+def process_replay_objects_content(
+        all_objects: Dict[str, List[dict]],
+        *,
+        src: ObjStorage,
+        dst: ObjStorage,
+        exclude_fn: Optional[Callable[[dict], bool]] = None,
+        check_dst: bool = True,
+):
     """
     Takes a list of records from Kafka (see
     :py:func:`swh.journal.client.JournalClient.process`) and copies them
@@ -344,15 +354,17 @@ def process_replay_objects_content(all_objects, *, src, dst,
 
     * `obj['status']` is `'visible'`
     * `exclude_fn(obj)` is `False` (if `exclude_fn` is provided)
+    * `obj['sha1'] not in dst` (if `check_dst` is True)
 
     Args:
-        all_objects Dict[str, List[dict]]: Objects passed by the Kafka client.
-            Most importantly, `all_objects['content'][*]['sha1']` is the
-            sha1 hash of each content
+        all_objects: Objects passed by the Kafka client. Most importantly,
+            `all_objects['content'][*]['sha1']` is the sha1 hash of each
+            content.
         src: An object storage (see :py:func:`swh.objstorage.get_objstorage`)
         dst: An object storage (see :py:func:`swh.objstorage.get_objstorage`)
-        exclude_fn Optional[Callable[dict, bool]]: Determines whether
-            an object should be copied.
+        exclude_fn: Determines whether an object should be copied.
+        check_dst: Determines whether we should check the destination
+            objstorage before copying.
 
     Example:
 
@@ -397,12 +409,31 @@ def process_replay_objects_content(all_objects, *, src, dst,
                 nb_skipped += 1
                 logger.debug('skipped %s (status=%s)',
                              hash_to_hex(obj_id), obj['status'])
+                statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                 tags={"decision": "skipped",
+                                       "status": obj["status"]})
             elif exclude_fn and exclude_fn(obj):
                 nb_skipped += 1
                 logger.debug('skipped %s (manually excluded)',
                              hash_to_hex(obj_id))
+                statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                 tags={"decision": "excluded"})
+            elif check_dst and obj_in_objstorage(obj_id, dst):
+                nb_skipped += 1
+                logger.debug('skipped %s (in dst)', hash_to_hex(obj_id))
+                statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                 tags={"decision": "in_dst"})
             else:
-                vol.append(copy_object(obj_id, src, dst))
+                try:
+                    copied = copy_object(obj_id, src, dst)
+                except ObjNotFoundError:
+                    nb_skipped += 1
+                    statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                     tags={"decision": "not_in_src"})
+                else:
+                    vol.append(copied)
+                    statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                     tags={"decision": "copied"})
 
     dt = time() - t0
     logger.info(
