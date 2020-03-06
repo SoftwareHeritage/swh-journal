@@ -382,6 +382,35 @@ def test_replay_content_check_dst(
         assert objstorages['dst'].get(sha1) == content
 
 
+class FlakyObjStorage(InMemoryObjStorage):
+    def __init__(self, *args, **kwargs):
+        state = kwargs.pop('state')
+        self.failures_left = Counter(kwargs.pop('failures'))
+        super().__init__(*args, **kwargs)
+        if state:
+            self.state = state
+
+    def flaky_operation(self, op, obj_id):
+        if self.failures_left[op, obj_id] > 0:
+            self.failures_left[op, obj_id] -= 1
+            raise RuntimeError(
+                'Failed %s on %s' % (op, hash_to_hex(obj_id))
+            )
+
+    def get(self, obj_id):
+        self.flaky_operation('get', obj_id)
+        return super().get(obj_id)
+
+    def add(self, data, obj_id=None, check_presence=True):
+        self.flaky_operation('add', obj_id)
+        return super().add(data, obj_id=obj_id,
+                           check_presence=check_presence)
+
+    def __contains__(self, obj_id):
+        self.flaky_operation('in', obj_id)
+        return super().__contains__(obj_id)
+
+
 @_patch_objstorages(['src', 'dst'])
 def test_replay_content_check_dst_retry(
         objstorages,
@@ -395,31 +424,17 @@ def test_replay_content_check_dst_retry(
     contents = _fill_objstorage_and_kafka(
         kafka_port, kafka_prefix, objstorages)
 
-    class FlakyMemoryObjStorage(InMemoryObjStorage):
-        def __init__(self, *args, **kwargs):
-            state = kwargs.pop('state')
-            super().__init__(*args, **kwargs)
-            if state:
-                self.state = state
-            self.contains_failed = Counter()
-
-        def __contains__(self, id):
-            if self.contains_failed[id] == 0:
-                self.contains_failed[id] += 1
-                raise ValueError('This contains is flaky')
-
-            return super().__contains__(id)
-
+    failures = {}
     for i, (sha1, content) in enumerate(contents.items()):
         if i >= NUM_CONTENTS_DST:
             break
 
         objstorages['dst'].add(content, obj_id=sha1)
+        failures['in', sha1] = 1
 
-    dst_state = objstorages['dst'].state
-    flaky_objstorage = FlakyMemoryObjStorage(state=dst_state)
-    objstorages['dst'] = flaky_objstorage
-    dst_contains_failed = flaky_objstorage.contains_failed
+    orig_dst = objstorages['dst']
+    objstorages['dst'] = FlakyObjStorage(state=orig_dst.state,
+                                         failures=failures)
 
     result = invoke(False, [
         'content-replay',
@@ -434,8 +449,8 @@ def test_replay_content_check_dst_retry(
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
 
     for (sha1, content) in contents.items():
-        assert dst_contains_failed[sha1] >= 0
-        assert dst_state[sha1] == content
+        assert sha1 in objstorages['dst'], sha1
+        assert objstorages['dst'].get(sha1) == content
 
 
 @_patch_objstorages(['src', 'dst'])
