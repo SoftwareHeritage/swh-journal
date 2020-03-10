@@ -23,7 +23,6 @@ from swh.model.hashutil import hash_to_bytes
 
 logger = logging.getLogger(__name__)
 
-
 CONTENTS = [
     {
         'length': 3,
@@ -35,6 +34,26 @@ CONTENTS = [
         'status': 'visible',
     },
 ]
+
+duplicate_content1 = {
+    'length': 4,
+    'sha1': hash_to_bytes(
+        '44973274ccef6ab4dfaaf86599792fa9c3fe4689'),
+    'sha1_git': b'another-foo',
+    'blake2s256': b'another-bar',
+    'sha256': b'another-baz',
+    'status': 'visible',
+}
+
+# Craft a sha1 collision
+duplicate_content2 = duplicate_content1.copy()
+sha1_array = bytearray(duplicate_content1['sha1_git'])
+sha1_array[0] += 1
+duplicate_content2['sha1_git'] = bytes(sha1_array)
+
+
+DUPLICATE_CONTENTS = [duplicate_content1, duplicate_content2]
+
 
 COMMITTERS = [
     {

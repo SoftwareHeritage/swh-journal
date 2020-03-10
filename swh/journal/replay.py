@@ -6,7 +6,7 @@
 import copy
 import logging
 from time import time
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from sentry_sdk import capture_exception, push_scope
 try:
@@ -22,7 +22,7 @@ from tenacity import (
 from swh.core.statsd import statsd
 from swh.model.identifiers import normalize_timestamp
 from swh.model.hashutil import hash_to_hex
-from swh.model.model import SHA1_SIZE
+from swh.model.model import BaseContent, SkippedContent, SHA1_SIZE
 from swh.objstorage.objstorage import (
     ID_HASH_ALGO, ObjNotFoundError, ObjStorage,
 )
@@ -237,20 +237,60 @@ def fix_objects(object_type, objects):
     return objects
 
 
+def collision_aware_content_add(
+        content_add_fn: Callable[[Iterable[Any]], None],
+        contents: List[BaseContent]) -> None:
+    """Add contents to storage. If a hash collision is detected, an error is
+       logged. Then this adds the other non colliding contents to the storage.
+
+    Args:
+        content_add_fn: Storage content callable
+        contents: List of contents or skipped contents to add to storage
+
+    """
+    if not contents:
+        return
+    colliding_content_hashes: List[Dict[str, Any]] = []
+    while True:
+        try:
+            content_add_fn(c.to_dict() for c in contents)
+        except HashCollision as e:
+            algo, hash_id, colliding_hashes = e.args
+            hash_id = hash_to_hex(hash_id)
+            colliding_content_hashes.append({
+                'algo': algo,
+                'hash': hash_to_hex(hash_id),
+                'objects': [{k: hash_to_hex(v) for k, v in collision.items()}
+                            for collision in colliding_hashes]
+            })
+            # Drop the colliding contents from the transaction
+            contents = [c for c in contents
+                        if c.hashes() not in colliding_hashes]
+        else:
+            # Successfully added contents, we are done
+            break
+    if colliding_content_hashes:
+        for collision in colliding_content_hashes:
+            logger.error('Collision detected: %(collision)s', {
+                'collision': collision
+            })
+
+
 def _insert_objects(object_type, objects, storage):
     objects = fix_objects(object_type, objects)
     if object_type == 'content':
-        try:
-            storage.skipped_content_add(
-              (obj for obj in objects if obj.get('status') == 'absent'))
-        except HashCollision as e:
-            logger.error('(SkippedContent) Hash collision: %s', e.args)
+        contents, skipped_contents = [], []
+        for content in objects:
+            c = BaseContent.from_dict(content)
+            if isinstance(c, SkippedContent):
+                skipped_contents.append(c)
+            else:
+                contents.append(c)
 
-        try:
-            storage.content_add_metadata(
-              (obj for obj in objects if obj.get('status') != 'absent'))
-        except HashCollision as e:
-            logger.error('(Content) Hash collision: %s', e.args)
+        collision_aware_content_add(
+            storage.skipped_content_add, skipped_contents)
+        collision_aware_content_add(
+            storage.content_add_metadata, contents)
 
     elif object_type in ('directory', 'revision', 'release',
                          'snapshot', 'origin'):
