@@ -115,7 +115,7 @@ def test_replay(
         '--broker', '127.0.0.1:%d' % port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
-        '--max-messages', '1',
+        '--stop-after-objects', '1',
     ])
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -191,7 +191,7 @@ def test_replay_content(
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
-        '--max-messages', str(NUM_CONTENTS),
+        '--stop-after-objects', str(NUM_CONTENTS),
     ])
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -225,7 +225,7 @@ def test_replay_content_structured_log(
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
-        '--max-messages', str(NUM_CONTENTS),
+        '--stop-after-objects', str(NUM_CONTENTS),
     ])
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -264,7 +264,7 @@ def test_replay_content_static_group_id(
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
-        '--max-messages', str(NUM_CONTENTS),
+        '--stop-after-objects', str(NUM_CONTENTS),
     ], {'KAFKA_GROUP_INSTANCE_ID': 'static-group-instance-id'})
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -313,7 +313,7 @@ def test_replay_content_exclude(
             '--broker', '127.0.0.1:%d' % kafka_port,
             '--group-id', kafka_consumer_group,
             '--prefix', kafka_prefix,
-            '--max-messages', str(NUM_CONTENTS),
+            '--stop-after-objects', str(NUM_CONTENTS),
             '--exclude-sha1-file', fd.name,
         ])
     expected = r'Done.\n'
@@ -365,7 +365,7 @@ def test_replay_content_check_dst(
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
-        '--max-messages', str(NUM_CONTENTS),
+        '--stop-after-objects', str(NUM_CONTENTS),
         '--check-dst' if check_dst else '--no-check-dst',
     ])
     expected = r'Done.\n'
@@ -450,7 +450,7 @@ def test_replay_content_check_dst_retry(
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
-        '--max-messages', str(NUM_CONTENTS),
+        '--stop-after-objects', str(NUM_CONTENTS),
         '--check-dst',
     ])
     expected = r'Done.\n'
@@ -524,7 +524,7 @@ def test_replay_content_failed_copy_retry(
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
-        '--max-messages', str(NUM_CONTENTS),
+        '--stop-after-objects', str(NUM_CONTENTS),
     ])
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -585,7 +585,7 @@ def test_replay_content_objnotfound(
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
-        '--max-messages', str(NUM_CONTENTS),
+        '--stop-after-objects', str(NUM_CONTENTS),
     ])
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output

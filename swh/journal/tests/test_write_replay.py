@@ -82,14 +82,13 @@ def test_write_replay_same_order_batches(objects):
     queue_size = len(queue)
     assert queue_size != 0, "No test objects found; hypothesis strategy bug?"
 
-    assert replayer.max_messages is None
-    replayer.max_messages = queue_size
+    assert replayer.stop_after_objects is None
+    replayer.stop_after_objects = queue_size
 
     storage2 = get_storage(**storage_config)
     worker_fn = functools.partial(process_replay_objects, storage=storage2)
-    nb_messages = 0
-    while nb_messages < queue_size:
-        nb_messages += replayer.process(worker_fn)
+
+    replayer.process(worker_fn)
 
     assert replayer.consumer.committed
 
@@ -137,8 +136,8 @@ def test_write_replay_content(objects):
     queue_size = len(queue)
     assert queue_size != 0, "No test objects found; hypothesis strategy bug?"
 
-    assert replayer.max_messages is None
-    replayer.max_messages = queue_size
+    assert replayer.stop_after_objects is None
+    replayer.stop_after_objects = queue_size
 
     storage2 = get_storage(**storage_config)
 
@@ -148,9 +147,8 @@ def test_write_replay_content(objects):
     worker_fn = functools.partial(process_replay_objects_content,
                                   src=objstorage1,
                                   dst=objstorage2)
-    nb_messages = 0
-    while nb_messages < queue_size:
-        nb_messages += replayer.process(worker_fn)
+
+    replayer.process(worker_fn)
 
     # only content with status visible will be copied in storage2
     expected_objstorage_state = {

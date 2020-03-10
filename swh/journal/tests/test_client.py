@@ -41,7 +41,7 @@ def test_client(
         brokers='localhost:%d' % kafka_server[1],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        max_messages=1,
+        stop_after_objects=1,
     )
     worker_fn = MagicMock()
     client.process(worker_fn)
@@ -75,7 +75,7 @@ def test_client_eof(
         brokers='localhost:%d' % kafka_server[1],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        max_messages=1,
+        stop_after_objects=None,
         stop_on_eof=True,
     )
 

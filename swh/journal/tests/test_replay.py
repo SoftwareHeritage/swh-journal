@@ -76,7 +76,7 @@ def test_storage_play(
         brokers='localhost:%d' % kafka_server[1],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        max_messages=nb_sent,
+        stop_after_objects=nb_sent,
     )
     worker_fn = functools.partial(process_replay_objects, storage=storage)
     nb_inserted = 0
@@ -146,14 +146,13 @@ def _test_write_replay_origin_visit(visits):
         writer.send('origin_visit', 'foo', visit)
 
     queue_size = len(queue)
-    assert replayer.max_messages is None
-    replayer.max_messages = queue_size
+    assert replayer.stop_after_objects is None
+    replayer.stop_after_objects = queue_size
 
     storage = get_storage(**storage_config)
     worker_fn = functools.partial(process_replay_objects, storage=storage)
-    nb_messages = 0
-    while nb_messages < queue_size:
-        nb_messages += replayer.process(worker_fn)
+
+    replayer.process(worker_fn)
 
     actual_visits = list(storage.origin_visit_get('http://example.com/'))
 

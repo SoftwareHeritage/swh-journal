@@ -7,7 +7,6 @@ import functools
 import logging
 import mmap
 import os
-import time
 
 import click
 
@@ -67,8 +66,8 @@ def get_journal_client(ctx, **kwargs):
 
 
 @cli.command()
-@click.option('--max-messages', '-m', default=None, type=int,
-              help='Maximum number of objects to replay. Default is to '
+@click.option('--stop-after-objects', '-n', default=None, type=int,
+              help='Stop after processing this many objects. Default is to '
                    'run forever.')
 @click.option('--broker', 'brokers', type=str, multiple=True,
               help='Kafka broker to connect to. '
@@ -80,13 +79,12 @@ def get_journal_client(ctx, **kwargs):
               help='Name of the group id for reading from Kafka. '
                    '(deprecated, use the config file instead)')
 @click.pass_context
-def replay(ctx, brokers, prefix, group_id, max_messages):
+def replay(ctx, brokers, prefix, group_id, stop_after_objects):
     """Fill a Storage by reading a Journal.
 
     There can be several 'replayers' filling a Storage as long as they use
     the same `group-id`.
     """
-    logger = logging.getLogger(__name__)
     conf = ctx.obj['config']
     try:
         storage = get_storage(**conf.pop('storage'))
@@ -95,23 +93,14 @@ def replay(ctx, brokers, prefix, group_id, max_messages):
 
     client = get_journal_client(
         ctx, brokers=brokers, prefix=prefix, group_id=group_id,
-        max_messages=max_messages)
+        stop_after_objects=stop_after_objects)
     worker_fn = functools.partial(process_replay_objects, storage=storage)
 
     if notify:
         notify('READY=1')
 
     try:
-        nb_messages = 0
-        last_log_time = 0
-        while not max_messages or nb_messages < max_messages:
-            nb_messages += client.process(worker_fn)
-            if notify:
-                notify('WATCHDOG=1')
-            if time.time() - last_log_time >= 60:
-                # Log at most once per minute.
-                logger.info('Processed %d messages.' % nb_messages)
-                last_log_time = time.time()
+        client.process(worker_fn)
     except KeyboardInterrupt:
         ctx.exit(0)
     else:
@@ -163,8 +152,8 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
 
 
 @cli.command('content-replay')
-@click.option('--max-messages', '-m', default=None, type=int,
-              help='Maximum number of objects to replay. Default is to '
+@click.option('--stop-after-objects', '-n', default=None, type=int,
+              help='Stop after processing this many objects. Default is to '
                    'run forever.')
 @click.option('--broker', 'brokers', type=str, multiple=True,
               help='Kafka broker to connect to.'
@@ -181,7 +170,7 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
               help='Check whether the destination contains the object before '
                    'copying.')
 @click.pass_context
-def content_replay(ctx, max_messages,
+def content_replay(ctx, stop_after_objects,
                    brokers, prefix, group_id, exclude_sha1_file, check_dst):
     """Fill a destination Object Storage (typically a mirror) by reading a Journal
     and retrieving objects from an existing source ObjStorage.
@@ -205,7 +194,6 @@ def content_replay(ctx, max_messages,
     ObjStorage before copying an object. You can turn that off if you know
     you're copying to an empty ObjStorage.
     """
-    logger = logging.getLogger(__name__)
     conf = ctx.obj['config']
     try:
         objstorage_src = get_objstorage(**conf.pop('objstorage_src'))
@@ -232,7 +220,7 @@ def content_replay(ctx, max_messages,
 
     client = get_journal_client(
         ctx, brokers=brokers, prefix=prefix, group_id=group_id,
-        max_messages=max_messages, object_types=('content',))
+        stop_after_objects=stop_after_objects, object_types=('content',))
     worker_fn = functools.partial(
         process_replay_objects_content,
         src=objstorage_src, dst=objstorage_dst, exclude_fn=exclude_fn,
@@ -242,16 +230,7 @@ def content_replay(ctx, max_messages,
         notify('READY=1')
 
     try:
-        nb_messages = 0
-        last_log_time = 0
-        while not max_messages or nb_messages < max_messages:
-            nb_messages += client.process(worker_fn)
-            if notify:
-                notify('WATCHDOG=1')
-            if time.time() - last_log_time >= 60:
-                # Log at most once per minute.
-                logger.info('Processed %d messages.' % nb_messages)
-                last_log_time = time.time()
+        client.process(worker_fn)
     except KeyboardInterrupt:
         ctx.exit(0)
     else:

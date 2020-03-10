@@ -58,9 +58,9 @@ class JournalClient:
 
     The current implementation of the journal uses Apache Kafka
     brokers to publish messages under a given topic prefix, with each
-    object type using a specific topic under that prefix. If the 'prefix'
+    object type using a specific topic under that prefix. If the `prefix`
     argument is None (default value), it will take the default value
-    'swh.journal.objects'.
+    `'swh.journal.objects'`.
 
     Clients subscribe to events specific to each object type as listed in the
     `object_types` argument (if unset, defaults to all accepted object types).
@@ -69,8 +69,17 @@ class JournalClient:
     value across instances. The journal will share the message
     throughput across the nodes sharing the same group_id.
 
-    Messages are processed by the `worker_fn` callback passed to the
-    `process` method, in batches of maximum `max_messages`.
+    Messages are processed by the `worker_fn` callback passed to the `process`
+    method, in batches of maximum 20 messages (currently hardcoded). If set,
+    the processing stops after processing `stop_after_objects` messages in
+    total.
+
+    `stop_on_eof` stops the processing when the client has reached the end of
+    each partition in turn.
+
+    `auto_offset_reset` sets the behavior of the client when the consumer group
+    initializes: `'earliest'` (the default) processes all objects since the
+    inception of the topics; `''`
 
     Any other named argument is passed directly to KafkaConsumer().
 
@@ -81,7 +90,7 @@ class JournalClient:
             group_id: str,
             prefix: Optional[str] = None,
             object_types: Optional[List[str]] = None,
-            max_messages: Optional[int] = None,
+            stop_after_objects: Optional[int] = None,
             process_timeout: Optional[float] = None,
             auto_offset_reset: str = 'earliest',
             stop_on_eof: bool = False,
@@ -168,7 +177,7 @@ class JournalClient:
 
         self.consumer.subscribe(topics=topics)
 
-        self.max_messages = max_messages
+        self.stop_after_objects = stop_after_objects
         self.process_timeout = process_timeout
         self.eof_reached: Set[Tuple[str, str]] = set()
 
@@ -184,7 +193,7 @@ class JournalClient:
                                                        argument.
         """
         start_time = time.monotonic()
-        nb_messages = 0
+        total_objects_processed = 0
 
         while True:
             # timeout for message poll
@@ -203,24 +212,29 @@ class JournalClient:
 
                 timeout = self.process_timeout - elapsed
 
-            num_messages = 20
+            batch_size = 20
 
-            if self.max_messages:
-                if nb_messages >= self.max_messages:
+            if self.stop_after_objects:
+                if total_objects_processed >= self.stop_after_objects:
                     break
-                num_messages = min(num_messages, self.max_messages-nb_messages)
+
+                # clamp batch size to avoid overrunning stop_after_objects
+                batch_size = min(
+                    self.stop_after_objects-total_objects_processed,
+                    batch_size,
+                )
 
             messages = self.consumer.consume(
-                timeout=timeout, num_messages=num_messages)
+                timeout=timeout, num_messages=batch_size)
             if not messages:
                 continue
 
-            nb_processed, at_eof = self.handle_messages(messages, worker_fn)
-            nb_messages += nb_processed
+            batch_processed, at_eof = self.handle_messages(messages, worker_fn)
+            total_objects_processed += batch_processed
             if at_eof:
                 break
 
-        return nb_messages
+        return total_objects_processed
 
     def handle_messages(self, messages, worker_fn):
         objects: Dict[str, List[Any]] = defaultdict(list)

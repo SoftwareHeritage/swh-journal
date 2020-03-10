@@ -197,7 +197,7 @@ def kafka_consumer_group(kafka_prefix: str):
 TEST_CONFIG = {
     'consumer_id': 'swh.journal.consumer',
     'object_types': OBJECT_TYPE_KEYS.keys(),
-    'max_messages': 1,  # will read 1 message and stops
+    'stop_after_objects': 1,  # will read 1 object and stop
     'storage': {'cls': 'memory', 'args': {}},
 }
 
