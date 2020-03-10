@@ -10,7 +10,7 @@ import attr
 from hypothesis import given, settings, HealthCheck
 from hypothesis.strategies import lists
 
-from swh.model.hypothesis_strategies import object_dicts
+from swh.model.hypothesis_strategies import object_dicts, present_contents
 from swh.storage import get_storage, HashCollision
 
 from swh.journal.replay import process_replay_objects
@@ -78,7 +78,10 @@ def test_write_replay_same_order_batches(objects):
             except HashCollision:
                 pass
 
+    # Bail out early if we didn't insert any relevant objects...
     queue_size = len(queue)
+    assert queue_size != 0, "No test objects found; hypothesis strategy bug?"
+
     assert replayer.max_messages is None
     replayer.max_messages = queue_size
 
@@ -113,7 +116,7 @@ def test_write_replay_same_order_batches(objects):
 # TODO: add test for hash collision
 
 
-@given(lists(object_dicts(), min_size=1))
+@given(lists(present_contents(), min_size=1))
 @settings(suppress_health_check=[HealthCheck.too_slow])
 def test_write_replay_content(objects):
 
@@ -125,16 +128,15 @@ def test_write_replay_content(objects):
         storage1 = get_storage(**storage_config)
 
     contents = []
-    for (obj_type, obj) in objects:
-        obj = obj.copy()
-        if obj_type == 'content':
-            # avoid hash collision
-            if not storage1.content_find(obj):
-                if obj.get('status') != 'absent':
-                    storage1.content_add([obj])
-                contents.append(obj)
+    for obj in objects:
+        obj = obj.to_dict()
+        storage1.content_add([obj])
+        contents.append(obj)
 
+    # Bail out early if we didn't insert any relevant objects...
     queue_size = len(queue)
+    assert queue_size != 0, "No test objects found; hypothesis strategy bug?"
+
     assert replayer.max_messages is None
     replayer.max_messages = queue_size
 
