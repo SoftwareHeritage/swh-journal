@@ -69,17 +69,8 @@ def get_journal_client(ctx, **kwargs):
 @click.option('--stop-after-objects', '-n', default=None, type=int,
               help='Stop after processing this many objects. Default is to '
                    'run forever.')
-@click.option('--broker', 'brokers', type=str, multiple=True,
-              help='Kafka broker to connect to. '
-                   '(deprecated, use the config file instead)')
-@click.option('--prefix', type=str, default=None,
-              help='Prefix of Kafka topic names to read from. '
-                   '(deprecated, use the config file instead)')
-@click.option('--group-id', type=str,
-              help='Name of the group id for reading from Kafka. '
-                   '(deprecated, use the config file instead)')
 @click.pass_context
-def replay(ctx, brokers, prefix, group_id, stop_after_objects):
+def replay(ctx, stop_after_objects):
     """Fill a Storage by reading a Journal.
 
     There can be several 'replayers' filling a Storage as long as they use
@@ -92,8 +83,7 @@ def replay(ctx, brokers, prefix, group_id, stop_after_objects):
         ctx.fail('You must have a storage configured in your config file.')
 
     client = get_journal_client(
-        ctx, brokers=brokers, prefix=prefix, group_id=group_id,
-        stop_after_objects=stop_after_objects)
+        ctx, stop_after_objects=stop_after_objects)
     worker_fn = functools.partial(process_replay_objects, storage=storage)
 
     if notify:
@@ -155,23 +145,13 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
 @click.option('--stop-after-objects', '-n', default=None, type=int,
               help='Stop after processing this many objects. Default is to '
                    'run forever.')
-@click.option('--broker', 'brokers', type=str, multiple=True,
-              help='Kafka broker to connect to.'
-                   '(deprecated, use the config file instead)')
-@click.option('--prefix', type=str, default=None,
-              help='Prefix of Kafka topic names to read from.'
-                   '(deprecated, use the config file instead)')
-@click.option('--group-id', type=str,
-              help='Name of the group id for reading from Kafka.'
-                   '(deprecated, use the config file instead)')
 @click.option('--exclude-sha1-file', default=None, type=click.File('rb'),
               help='File containing a sorted array of hashes to be excluded.')
 @click.option('--check-dst/--no-check-dst', default=True,
               help='Check whether the destination contains the object before '
                    'copying.')
 @click.pass_context
-def content_replay(ctx, stop_after_objects,
-                   brokers, prefix, group_id, exclude_sha1_file, check_dst):
+def content_replay(ctx, stop_after_objects, exclude_sha1_file, check_dst):
     """Fill a destination Object Storage (typically a mirror) by reading a Journal
     and retrieving objects from an existing source ObjStorage.
 
@@ -219,8 +199,7 @@ def content_replay(ctx, stop_after_objects,
         exclude_fn = None
 
     client = get_journal_client(
-        ctx, brokers=brokers, prefix=prefix, group_id=group_id,
-        stop_after_objects=stop_after_objects, object_types=('content',))
+        ctx, stop_after_objects=stop_after_objects, object_types=('content',))
     worker_fn = functools.partial(
         process_replay_objects_content,
         src=objstorage_src, dst=objstorage_dst, exclude_fn=exclude_fn,
