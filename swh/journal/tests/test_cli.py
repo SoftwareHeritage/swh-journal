@@ -4,6 +4,7 @@
 # See top-level LICENSE file for more information
 
 from collections import Counter
+import copy
 import functools
 import logging
 import re
@@ -15,6 +16,7 @@ from unittest.mock import patch
 from click.testing import CliRunner
 from confluent_kafka import Producer
 import pytest
+import yaml
 
 from swh.model.hashutil import hash_to_hex
 from swh.objstorage.backends.in_memory import InMemoryObjStorage
@@ -28,19 +30,19 @@ from swh.journal.serializers import key_to_kafka, value_to_kafka
 logger = logging.getLogger(__name__)
 
 
-CLI_CONFIG = '''
-storage:
-    cls: memory
-    args: {}
-objstorage_src:
-    cls: mocked
-    args:
-        name: src
-objstorage_dst:
-    cls: mocked
-    args:
-        name: dst
-'''
+CLI_CONFIG = {
+    'storage': {
+        'cls': 'memory',
+    },
+    'objstorage_src': {
+        'cls': 'mocked',
+        'name': 'src',
+    },
+    'objstorage_dst': {
+        'cls': 'mocked',
+        'name': 'dst',
+    },
+}
 
 
 @pytest.fixture
@@ -67,9 +69,11 @@ def monkeypatch_retry_sleep(monkeypatch):
 
 
 def invoke(catch_exceptions, args, env=None):
+    config = copy.deepcopy(CLI_CONFIG)
+
     runner = CliRunner()
     with tempfile.NamedTemporaryFile('a', suffix='.yml') as config_fd:
-        config_fd.write(CLI_CONFIG)
+        yaml.dump(config, config_fd)
         config_fd.seek(0)
         args = ['-C' + config_fd.name] + args
         result = runner.invoke(
@@ -128,7 +132,7 @@ def test_replay(
 def _patch_objstorages(names):
     objstorages = {name: InMemoryObjStorage() for name in names}
 
-    def get_mock_objstorage(cls, args):
+    def get_mock_objstorage(cls, **args):
         assert cls == 'mocked', cls
         return objstorages[args['name']]
 
