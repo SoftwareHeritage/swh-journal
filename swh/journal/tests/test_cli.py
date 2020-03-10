@@ -68,21 +68,17 @@ def monkeypatch_retry_sleep(monkeypatch):
     monkeypatch.setattr(obj_in_objstorage.retry, 'sleep', lambda x: None)
 
 
-def invoke(catch_exceptions, args, env=None):
+def invoke(*args, env=None):
     config = copy.deepcopy(CLI_CONFIG)
 
     runner = CliRunner()
     with tempfile.NamedTemporaryFile('a', suffix='.yml') as config_fd:
         yaml.dump(config, config_fd)
         config_fd.seek(0)
-        args = ['-C' + config_fd.name] + args
-        result = runner.invoke(
+        args = ['-C' + config_fd.name] + list(args)
+        return runner.invoke(
             cli, args, obj={'log_level': logging.DEBUG}, env=env,
         )
-    if not catch_exceptions and result.exception:
-        print(result.output)
-        raise result.exception
-    return result
 
 
 def test_replay(
@@ -114,13 +110,13 @@ def test_replay(
 
     logger.debug('Flushed producer')
 
-    result = invoke(False, [
+    result = invoke(
         'replay',
         '--broker', '127.0.0.1:%d' % port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--stop-after-objects', '1',
-    ])
+    )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
@@ -190,13 +186,13 @@ def test_replay_content(
     contents = _fill_objstorage_and_kafka(
         kafka_port, kafka_prefix, objstorages)
 
-    result = invoke(False, [
+    result = invoke(
         'content-replay',
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
-    ])
+    )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
@@ -224,13 +220,13 @@ def test_replay_content_structured_log(
 
     expected_obj_ids = set(hash_to_hex(sha1) for sha1 in contents)
 
-    result = invoke(False, [
+    result = invoke(
         'content-replay',
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
-    ])
+    )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
@@ -263,13 +259,13 @@ def test_replay_content_static_group_id(
     # Setup log capture to fish the consumer settings out of the log messages
     caplog.set_level(logging.DEBUG, 'swh.journal.client')
 
-    result = invoke(False, [
+    result = invoke(
         'content-replay',
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
-    ], {'KAFKA_GROUP_INSTANCE_ID': 'static-group-instance-id'})
+        env={'KAFKA_GROUP_INSTANCE_ID': 'static-group-instance-id'})
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
@@ -312,14 +308,14 @@ def test_replay_content_exclude(
 
         fd.seek(0)
 
-        result = invoke(False, [
+        result = invoke(
             'content-replay',
             '--broker', '127.0.0.1:%d' % kafka_port,
             '--group-id', kafka_consumer_group,
             '--prefix', kafka_prefix,
             '--stop-after-objects', str(NUM_CONTENTS),
             '--exclude-sha1-file', fd.name,
-        ])
+        )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
@@ -364,14 +360,14 @@ def test_replay_content_check_dst(
 
     caplog.set_level(logging.DEBUG, 'swh.journal.replay')
 
-    result = invoke(False, [
+    result = invoke(
         'content-replay',
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
         '--check-dst' if check_dst else '--no-check-dst',
-    ])
+    )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
@@ -449,14 +445,14 @@ def test_replay_content_check_dst_retry(
     objstorages['dst'] = FlakyObjStorage(state=orig_dst.state,
                                          failures=failures)
 
-    result = invoke(False, [
+    result = invoke(
         'content-replay',
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
         '--check-dst',
-    ])
+    )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
@@ -523,13 +519,13 @@ def test_replay_content_failed_copy_retry(
 
     caplog.set_level(logging.DEBUG, 'swh.journal.replay')
 
-    result = invoke(False, [
+    result = invoke(
         'content-replay',
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
-    ])
+    )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
@@ -584,13 +580,13 @@ def test_replay_content_objnotfound(
 
     caplog.set_level(logging.DEBUG, 'swh.journal.replay')
 
-    result = invoke(False, [
+    result = invoke(
         'content-replay',
         '--broker', '127.0.0.1:%d' % kafka_port,
         '--group-id', kafka_consumer_group,
         '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
-    ])
+    )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
