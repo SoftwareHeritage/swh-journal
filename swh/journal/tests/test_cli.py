@@ -68,8 +68,10 @@ def monkeypatch_retry_sleep(monkeypatch):
     monkeypatch.setattr(obj_in_objstorage.retry, 'sleep', lambda x: None)
 
 
-def invoke(*args, env=None):
+def invoke(*args, env=None, journal_config=None):
     config = copy.deepcopy(CLI_CONFIG)
+    if journal_config:
+        config['journal'] = journal_config
 
     runner = CliRunner()
     with tempfile.NamedTemporaryFile('a', suffix='.yml') as config_fd:
@@ -86,11 +88,11 @@ def test_replay(
         kafka_prefix: str,
         kafka_consumer_group: str,
         kafka_server: Tuple[Popen, int]):
-    (_, port) = kafka_server
+    (_, kafka_port) = kafka_server
     kafka_prefix += '.swh.journal.objects'
 
     producer = Producer({
-        'bootstrap.servers': 'localhost:{}'.format(port),
+        'bootstrap.servers': 'localhost:{}'.format(kafka_port),
         'client.id': 'test-producer',
         'enable.idempotence': 'true',
     })
@@ -112,11 +114,14 @@ def test_replay(
 
     result = invoke(
         'replay',
-        '--broker', '127.0.0.1:%d' % port,
-        '--group-id', kafka_consumer_group,
-        '--prefix', kafka_prefix,
         '--stop-after-objects', '1',
+        journal_config={
+            'brokers': ['127.0.0.1:%d' % kafka_port],
+            'group_id': kafka_consumer_group,
+            'prefix': kafka_prefix,
+        },
     )
+
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
@@ -188,11 +193,14 @@ def test_replay_content(
 
     result = invoke(
         'content-replay',
-        '--broker', '127.0.0.1:%d' % kafka_port,
-        '--group-id', kafka_consumer_group,
-        '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
+        journal_config={
+            'brokers': ['127.0.0.1:%d' % kafka_port],
+            'group_id': kafka_consumer_group,
+            'prefix': kafka_prefix,
+        },
     )
+
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
@@ -222,10 +230,12 @@ def test_replay_content_structured_log(
 
     result = invoke(
         'content-replay',
-        '--broker', '127.0.0.1:%d' % kafka_port,
-        '--group-id', kafka_consumer_group,
-        '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
+        journal_config={
+            'brokers': ['127.0.0.1:%d' % kafka_port],
+            'group_id': kafka_consumer_group,
+            'prefix': kafka_prefix,
+        },
     )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -261,11 +271,14 @@ def test_replay_content_static_group_id(
 
     result = invoke(
         'content-replay',
-        '--broker', '127.0.0.1:%d' % kafka_port,
-        '--group-id', kafka_consumer_group,
-        '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
-        env={'KAFKA_GROUP_INSTANCE_ID': 'static-group-instance-id'})
+        env={'KAFKA_GROUP_INSTANCE_ID': 'static-group-instance-id'},
+        journal_config={
+            'brokers': ['127.0.0.1:%d' % kafka_port],
+            'group_id': kafka_consumer_group,
+            'prefix': kafka_prefix,
+        },
+    )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
     assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
@@ -310,11 +323,13 @@ def test_replay_content_exclude(
 
         result = invoke(
             'content-replay',
-            '--broker', '127.0.0.1:%d' % kafka_port,
-            '--group-id', kafka_consumer_group,
-            '--prefix', kafka_prefix,
             '--stop-after-objects', str(NUM_CONTENTS),
             '--exclude-sha1-file', fd.name,
+            journal_config={
+                'brokers': ['127.0.0.1:%d' % kafka_port],
+                'group_id': kafka_consumer_group,
+                'prefix': kafka_prefix,
+            },
         )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -362,11 +377,13 @@ def test_replay_content_check_dst(
 
     result = invoke(
         'content-replay',
-        '--broker', '127.0.0.1:%d' % kafka_port,
-        '--group-id', kafka_consumer_group,
-        '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
         '--check-dst' if check_dst else '--no-check-dst',
+        journal_config={
+            'brokers': ['127.0.0.1:%d' % kafka_port],
+            'group_id': kafka_consumer_group,
+            'prefix': kafka_prefix,
+        },
     )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -447,11 +464,13 @@ def test_replay_content_check_dst_retry(
 
     result = invoke(
         'content-replay',
-        '--broker', '127.0.0.1:%d' % kafka_port,
-        '--group-id', kafka_consumer_group,
-        '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
         '--check-dst',
+        journal_config={
+            'brokers': ['127.0.0.1:%d' % kafka_port],
+            'group_id': kafka_consumer_group,
+            'prefix': kafka_prefix,
+        },
     )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -521,10 +540,12 @@ def test_replay_content_failed_copy_retry(
 
     result = invoke(
         'content-replay',
-        '--broker', '127.0.0.1:%d' % kafka_port,
-        '--group-id', kafka_consumer_group,
-        '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
+        journal_config={
+            'brokers': ['127.0.0.1:%d' % kafka_port],
+            'group_id': kafka_consumer_group,
+            'prefix': kafka_prefix,
+        },
     )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
@@ -582,10 +603,12 @@ def test_replay_content_objnotfound(
 
     result = invoke(
         'content-replay',
-        '--broker', '127.0.0.1:%d' % kafka_port,
-        '--group-id', kafka_consumer_group,
-        '--prefix', kafka_prefix,
         '--stop-after-objects', str(NUM_CONTENTS),
+        journal_config={
+            'brokers': ['127.0.0.1:%d' % kafka_port],
+            'group_id': kafka_consumer_group,
+            'prefix': kafka_prefix,
+        },
     )
     expected = r'Done.\n'
     assert result.exit_code == 0, result.output
