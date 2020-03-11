@@ -1,4 +1,4 @@
-# Copyright (C) 2018-2019 The Software Heritage developers
+# Copyright (C) 2018-2020 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -8,14 +8,17 @@ import datetime
 
 from confluent_kafka import Consumer, KafkaException
 from subprocess import Popen
-from typing import Tuple
+from typing import List, Tuple
 
 from swh.storage import get_storage
 
-from swh.journal.writer.kafka import KafkaJournalWriter
+from swh.journal.replay import object_converter_fn
 from swh.journal.serializers import (
     kafka_to_key, kafka_to_value
 )
+from swh.journal.writer.kafka import KafkaJournalWriter
+
+from swh.model.model import Content, Origin, BaseModel
 
 from .conftest import OBJECT_TYPE_KEYS
 
@@ -116,7 +119,6 @@ def test_storage_direct_writer(
     storage_config = {
         'cls': 'pipeline',
         'steps': [
-            {'cls': 'validate'},
             {'cls': 'memory', 'journal_writer': writer_config},
         ]
     }
@@ -129,15 +131,25 @@ def test_storage_direct_writer(
         method = getattr(storage, object_type + '_add')
         if object_type in ('content', 'directory', 'revision', 'release',
                            'snapshot', 'origin'):
+            objects_: List[BaseModel]
             if object_type == 'content':
-                objects = [{**obj, 'data': b''} for obj in objects]
-            method(objects)
+                objects_ = [
+                    Content.from_dict({
+                        **obj, 'data': b''})
+                    for obj in objects
+                ]
+            else:
+                objects_ = [
+                    object_converter_fn[object_type](obj)
+                    for obj in objects
+                ]
+            method(objects_)
             expected_messages += len(objects)
         elif object_type in ('origin_visit',):
             for object_ in objects:
                 object_ = object_.copy()
                 origin_url = object_.pop('origin')
-                storage.origin_add_one({'url': origin_url})
+                storage.origin_add_one(Origin(url=origin_url))
                 visit = method(origin=origin_url, date=object_.pop('date'),
                                type=object_.pop('type'))
                 expected_messages += 1

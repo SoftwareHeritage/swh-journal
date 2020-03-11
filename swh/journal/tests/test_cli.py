@@ -51,7 +51,6 @@ def storage():
     storage_config = {
         'cls': 'pipeline',
         'steps': [
-            {'cls': 'validate'},
             {'cls': 'memory'},
         ]
     }

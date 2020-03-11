@@ -1,4 +1,4 @@
-# Copyright (C) 2019 The Software Heritage developers
+# Copyright (C) 2019-2020 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -11,10 +11,12 @@ from hypothesis import given, settings, HealthCheck
 from hypothesis.strategies import lists
 
 from swh.model.hypothesis_strategies import object_dicts, present_contents
+from swh.model.model import Origin
 from swh.storage import get_storage, HashCollision
 
-from swh.journal.replay import process_replay_objects
-from swh.journal.replay import process_replay_objects_content
+from swh.journal.replay import (
+    process_replay_objects, process_replay_objects_content, object_converter_fn
+)
 
 from .utils import MockedJournalClient, MockedKafkaWriter
 
@@ -22,7 +24,6 @@ from .utils import MockedJournalClient, MockedKafkaWriter
 storage_config = {
     'cls': 'pipeline',
     'steps': [
-        {'cls': 'validate'},
         {'cls': 'memory', 'journal_writer': {'cls': 'memory'}},
     ]
 }
@@ -64,17 +65,18 @@ def test_write_replay_same_order_batches(objects):
                return_value=MockedKafkaWriter(queue)):
         storage1 = get_storage(**storage_config)
 
+    # Write objects to storage1
     for (obj_type, obj) in objects:
         obj = obj.copy()
         if obj_type == 'origin_visit':
-            storage1.origin_add_one({'url': obj['origin']})
+            storage1.origin_add_one(Origin(url=obj['origin']))
             storage1.origin_visit_upsert([obj])
         else:
             if obj_type == 'content' and obj.get('status') == 'absent':
                 obj_type = 'skipped_content'
             method = getattr(storage1, obj_type + '_add')
             try:
-                method([obj])
+                method([object_converter_fn[obj_type](obj)])
             except HashCollision:
                 pass
 
@@ -128,7 +130,6 @@ def test_write_replay_content(objects):
 
     contents = []
     for obj in objects:
-        obj = obj.to_dict()
         storage1.content_add([obj])
         contents.append(obj)
 
@@ -152,7 +153,7 @@ def test_write_replay_content(objects):
 
     # only content with status visible will be copied in storage2
     expected_objstorage_state = {
-        c['sha1']: c['data'] for c in contents if c['status'] == 'visible'
+        c.sha1: c.data for c in contents if c.status == 'visible'
     }
 
     assert expected_objstorage_state == objstorage2.state

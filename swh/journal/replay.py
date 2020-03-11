@@ -6,7 +6,9 @@
 import copy
 import logging
 from time import time
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import (
+    Any, Callable, Dict, Iterable, List, Optional
+)
 
 from sentry_sdk import capture_exception, push_scope
 try:
@@ -22,7 +24,11 @@ from tenacity import (
 from swh.core.statsd import statsd
 from swh.model.identifiers import normalize_timestamp
 from swh.model.hashutil import hash_to_hex
-from swh.model.model import BaseContent, SkippedContent, SHA1_SIZE
+
+from swh.model.model import (
+    BaseContent, BaseModel, Content, Directory, Origin, Revision,
+    SHA1_SIZE, SkippedContent, Snapshot, Release
+)
 from swh.objstorage.objstorage import (
     ID_HASH_ALGO, ObjNotFoundError, ObjStorage,
 )
@@ -36,6 +42,17 @@ CONTENT_OPERATIONS_METRIC = "swh_content_replayer_operations_total"
 CONTENT_RETRY_METRIC = "swh_content_replayer_retries_total"
 CONTENT_BYTES_METRIC = "swh_content_replayer_bytes"
 CONTENT_DURATION_METRIC = "swh_content_replayer_duration_seconds"
+
+
+object_converter_fn: Dict[str, Callable[[Dict], BaseModel]] = {
+    'origin': Origin.from_dict,
+    'snapshot': Snapshot.from_dict,
+    'revision': Revision.from_dict,
+    'release': Release.from_dict,
+    'directory': Directory.from_dict,
+    'content': Content.from_dict,
+    'skipped_content': SkippedContent.from_dict,
+}
 
 
 def process_replay_objects(all_objects, *, storage):
@@ -101,8 +118,82 @@ def _check_revision_date(rev):
     return _check_date(rev['date']) and _check_date(rev['committer_date'])
 
 
-def _fix_revisions(revisions):
-    good_revisions = []
+def _fix_revisions(revisions: List[Dict]) -> List[Dict]:
+    """Adapt revisions into a list of (current) storage compatible dicts.
+
+    >>> from pprint import pprint
+    >>> date = {
+    ...     'timestamp': {
+    ...         'seconds': 1565096932,
+    ...         'microseconds': 0,
+    ...     },
+    ...     'offset': 0,
+    ... }
+    >>> pprint(_fix_revisions([{
+    ...     'author': {'email': '', 'fullname': b'', 'name': ''},
+    ...     'committer': {'email': '', 'fullname': b'', 'name': ''},
+    ...     'date': date,
+    ...     'committer_date': date,
+    ... }]))
+    [{'author': {'email': b'', 'fullname': b'', 'name': b''},
+      'committer': {'email': b'', 'fullname': b'', 'name': b''},
+      'committer_date': {'offset': 0,
+                         'timestamp': {'microseconds': 0, 'seconds': 1565096932}},
+      'date': {'offset': 0,
+               'timestamp': {'microseconds': 0, 'seconds': 1565096932}}}]
+
+    Fix type of 'transplant_source' extra headers:
+
+    >>> revs = _fix_revisions([{
+    ...     'author': {'email': '', 'fullname': b'', 'name': ''},
+    ...     'committer': {'email': '', 'fullname': b'', 'name': ''},
+    ...     'date': date,
+    ...     'committer_date': date,
+    ...     'metadata': {
+    ...         'extra_headers': [
+    ...             ['time_offset_seconds', b'-3600'],
+    ...             ['transplant_source', '29c154a012a70f49df983625090434587622b39e']  # noqa
+    ...     ]}
+    ... }])
+    >>> pprint(revs[0]['metadata']['extra_headers'])
+    [['time_offset_seconds', b'-3600'],
+     ['transplant_source', b'29c154a012a70f49df983625090434587622b39e']]
+
+    Filter out revisions with invalid dates:
+
+    >>> from copy import deepcopy
+    >>> invalid_date1 = deepcopy(date)
+    >>> invalid_date1['timestamp']['microseconds'] = 1000000000  # > 10^6
+    >>> _fix_revisions([{
+    ...     'author': {'email': '', 'fullname': b'', 'name': b''},
+    ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
+    ...     'date': invalid_date1,
+    ...     'committer_date': date,
+    ... }])
+    []
+
+    >>> invalid_date2 = deepcopy(date)
+    >>> invalid_date2['timestamp']['seconds'] = 2**70  # > 10^63
+    >>> _fix_revisions([{
+    ...     'author': {'email': '', 'fullname': b'', 'name': b''},
+    ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
+    ...     'date': invalid_date2,
+    ...     'committer_date': date,
+    ... }])
+    []
+
+    >>> invalid_date3 = deepcopy(date)
+    >>> invalid_date3['offset'] = 2**20  # > 10^15
+    >>> _fix_revisions([{
+    ...     'author': {'email': '', 'fullname': b'', 'name': b''},
+    ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
+    ...     'date': date,
+    ...     'committer_date': invalid_date3,
+    ... }])
+    []
+
+    """
+    good_revisions: List = []
     for rev in revisions:
         rev = _fix_revision_pypi_empty_string(rev)
         rev = _fix_revision_transplant_source(rev)
@@ -114,7 +205,26 @@ def _fix_revisions(revisions):
     return good_revisions
 
 
-def _fix_origin_visits(visits):
+def _fix_origin_visits(visits: List[Dict]) -> List[Dict]:
+    """Adapt origin visits into a list of current storage compatible dicts.
+
+    `visit['origin']` is a dict instead of an URL:
+
+    >>> from pprint import pprint
+    >>> pprint(_fix_origin_visits([{
+    ...     'origin': {'url': 'http://foo'},
+    ...     'type': 'git',
+    ... }]))
+    [{'metadata': None, 'origin': 'http://foo', 'type': 'git'}]
+
+    `visit['type']` is missing , but `origin['visit']['type']` exists:
+
+    >>> pprint(_fix_origin_visits([
+    ...     {'origin': {'type': 'hg', 'url': 'http://foo'}
+    ... }]))
+    [{'metadata': None, 'origin': 'http://foo', 'type': 'hg'}]
+
+    """
     good_visits = []
     for visit in visits:
         visit = visit.copy()
@@ -130,111 +240,10 @@ def _fix_origin_visits(visits):
         if isinstance(visit['origin'], dict):
             # Old version of the schema: visit['origin'] was a dict.
             visit['origin'] = visit['origin']['url']
+        if 'metadata' not in visit:
+            visit['metadata'] = None
         good_visits.append(visit)
     return good_visits
-
-
-def fix_objects(object_type, objects):
-    """Converts a possibly old object from the journal to its current
-    expected format.
-
-    List of conversions:
-
-    Empty author name/email in PyPI releases:
-
-    >>> from pprint import pprint
-    >>> date = {
-    ...     'timestamp': {
-    ...         'seconds': 1565096932,
-    ...         'microseconds': 0,
-    ...     },
-    ...     'offset': 0,
-    ... }
-    >>> pprint(fix_objects('revision', [{
-    ...     'author': {'email': '', 'fullname': b'', 'name': ''},
-    ...     'committer': {'email': '', 'fullname': b'', 'name': ''},
-    ...     'date': date,
-    ...     'committer_date': date,
-    ... }]))
-    [{'author': {'email': b'', 'fullname': b'', 'name': b''},
-      'committer': {'email': b'', 'fullname': b'', 'name': b''},
-      'committer_date': {'offset': 0,
-                         'timestamp': {'microseconds': 0, 'seconds': 1565096932}},
-      'date': {'offset': 0,
-               'timestamp': {'microseconds': 0, 'seconds': 1565096932}}}]
-
-    Fix type of 'transplant_source' extra headers:
-
-    >>> revs = fix_objects('revision', [{
-    ...     'author': {'email': '', 'fullname': b'', 'name': ''},
-    ...     'committer': {'email': '', 'fullname': b'', 'name': ''},
-    ...     'date': date,
-    ...     'committer_date': date,
-    ...     'metadata': {
-    ...         'extra_headers': [
-    ...             ['time_offset_seconds', b'-3600'],
-    ...             ['transplant_source', '29c154a012a70f49df983625090434587622b39e']
-    ...     ]}
-    ... }])
-    >>> pprint(revs[0]['metadata']['extra_headers'])
-    [['time_offset_seconds', b'-3600'],
-     ['transplant_source', b'29c154a012a70f49df983625090434587622b39e']]
-
-    Filter out revisions with invalid dates:
-
-    >>> from copy import deepcopy
-    >>> invalid_date1 = deepcopy(date)
-    >>> invalid_date1['timestamp']['microseconds'] = 1000000000  # > 10^6
-    >>> fix_objects('revision', [{
-    ...     'author': {'email': '', 'fullname': b'', 'name': b''},
-    ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
-    ...     'date': invalid_date1,
-    ...     'committer_date': date,
-    ... }])
-    []
-
-    >>> invalid_date2 = deepcopy(date)
-    >>> invalid_date2['timestamp']['seconds'] = 2**70  # > 10^63
-    >>> fix_objects('revision', [{
-    ...     'author': {'email': '', 'fullname': b'', 'name': b''},
-    ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
-    ...     'date': invalid_date2,
-    ...     'committer_date': date,
-    ... }])
-    []
-
-    >>> invalid_date3 = deepcopy(date)
-    >>> invalid_date3['offset'] = 2**20  # > 10^15
-    >>> fix_objects('revision', [{
-    ...     'author': {'email': '', 'fullname': b'', 'name': b''},
-    ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
-    ...     'date': date,
-    ...     'committer_date': invalid_date3,
-    ... }])
-    []
-
-
-    `visit['origin']` is a dict instead of an URL:
-
-    >>> pprint(fix_objects('origin_visit', [{
-    ...     'origin': {'url': 'http://foo'},
-    ...     'type': 'git',
-    ... }]))
-    [{'origin': 'http://foo', 'type': 'git'}]
-
-    `visit['type']` is missing , but `origin['visit']['type']` exists:
-
-    >>> pprint(fix_objects('origin_visit', [
-    ...     {'origin': {'type': 'hg', 'url': 'http://foo'}
-    ... }]))
-    [{'origin': 'http://foo', 'type': 'hg'}]
-    """  # noqa
-
-    if object_type == 'revision':
-        objects = _fix_revisions(objects)
-    elif object_type == 'origin_visit':
-        objects = _fix_origin_visits(objects)
-    return objects
 
 
 def collision_aware_content_add(
@@ -253,7 +262,7 @@ def collision_aware_content_add(
     colliding_content_hashes: List[Dict[str, Any]] = []
     while True:
         try:
-            content_add_fn(c.to_dict() for c in contents)
+            content_add_fn(contents)
         except HashCollision as e:
             algo, hash_id, colliding_hashes = e.args
             hash_id = hash_to_hex(hash_id)
@@ -276,10 +285,13 @@ def collision_aware_content_add(
             })
 
 
-def _insert_objects(object_type, objects, storage):
-    objects = fix_objects(object_type, objects)
+def _insert_objects(object_type: str, objects: List[Dict], storage) -> None:
+    """Insert objects of type object_type in the storage.
+
+    """
     if object_type == 'content':
-        contents, skipped_contents = [], []
+        contents: List[BaseContent] = []
+        skipped_contents: List[BaseContent] = []
         for content in objects:
             c = BaseContent.from_dict(content)
             if isinstance(c, SkippedContent):
@@ -291,19 +303,19 @@ def _insert_objects(object_type, objects, storage):
             storage.skipped_content_add, skipped_contents)
         collision_aware_content_add(
             storage.content_add_metadata, contents)
-
-    elif object_type in ('directory', 'revision', 'release',
-                         'snapshot', 'origin'):
-        # TODO: split batches that are too large for the storage
-        # to handle?
-        method = getattr(storage, object_type + '_add')
-        method(objects)
+    elif object_type == 'revision':
+        storage.revision_add(
+            Revision.from_dict(r) for r in _fix_revisions(objects)
+        )
     elif object_type == 'origin_visit':
-        for visit in objects:
-            storage.origin_add_one({'url': visit['origin']})
-            if 'metadata' not in visit:
-                visit['metadata'] = None
-        storage.origin_visit_upsert(objects)
+        visits = _fix_origin_visits(objects)
+        storage.origin_add(Origin(url=v['origin']) for v in visits)
+        # FIXME: Should be List[OriginVisit], working on fixing
+        # swh.storage.origin_visit_upsert (D2813)
+        storage.origin_visit_upsert(visits)
+    elif object_type in ('directory', 'release', 'snapshot', 'origin'):
+        method = getattr(storage, object_type + '_add')
+        method(object_converter_fn[object_type](o) for o in objects)
     else:
         logger.warning('Received a series of %s, this should not happen',
                        object_type)

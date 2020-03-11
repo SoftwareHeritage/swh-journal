@@ -30,7 +30,6 @@ from .utils import MockedJournalClient, MockedKafkaWriter
 storage_config = {
     'cls': 'pipeline',
     'steps': [
-        {'cls': 'validate'},
         {'cls': 'memory'},
     ]
 }
