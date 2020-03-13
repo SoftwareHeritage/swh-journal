@@ -26,7 +26,7 @@ from swh.model.identifiers import normalize_timestamp
 from swh.model.hashutil import hash_to_hex
 
 from swh.model.model import (
-    BaseContent, BaseModel, Content, Directory, Origin, Revision,
+    BaseContent, BaseModel, Content, Directory, Origin, OriginVisit, Revision,
     SHA1_SIZE, SkippedContent, Snapshot, Release
 )
 from swh.objstorage.objstorage import (
@@ -46,6 +46,7 @@ CONTENT_DURATION_METRIC = "swh_content_replayer_duration_seconds"
 
 object_converter_fn: Dict[str, Callable[[Dict], BaseModel]] = {
     'origin': Origin.from_dict,
+    'origin_visit': OriginVisit.from_dict,
     'snapshot': Snapshot.from_dict,
     'revision': Revision.from_dict,
     'release': Release.from_dict,
@@ -205,45 +206,61 @@ def _fix_revisions(revisions: List[Dict]) -> List[Dict]:
     return good_revisions
 
 
-def _fix_origin_visits(visits: List[Dict]) -> List[Dict]:
-    """Adapt origin visits into a list of current storage compatible dicts.
+def _fix_origin_visit(visit: Dict) -> OriginVisit:
+    """Adapt origin visits into a list of current storage compatible
+       OriginVisits.
 
     `visit['origin']` is a dict instead of an URL:
 
+    >>> from datetime import datetime, timezone
     >>> from pprint import pprint
-    >>> pprint(_fix_origin_visits([{
+    >>> date = datetime(2020, 2, 27, 14, 39, 19, tzinfo=timezone.utc)
+    >>> pprint(_fix_origin_visit({
     ...     'origin': {'url': 'http://foo'},
+    ...     'date': date,
     ...     'type': 'git',
-    ... }]))
-    [{'metadata': None, 'origin': 'http://foo', 'type': 'git'}]
+    ...     'status': 'ongoing',
+    ...     'snapshot': None,
+    ... }).to_dict())
+    {'date': datetime.datetime(2020, 2, 27, 14, 39, 19, tzinfo=datetime.timezone.utc),
+     'metadata': None,
+     'origin': 'http://foo',
+     'snapshot': None,
+     'status': 'ongoing',
+     'type': 'git'}
 
     `visit['type']` is missing , but `origin['visit']['type']` exists:
 
-    >>> pprint(_fix_origin_visits([
-    ...     {'origin': {'type': 'hg', 'url': 'http://foo'}
-    ... }]))
-    [{'metadata': None, 'origin': 'http://foo', 'type': 'hg'}]
+    >>> pprint(_fix_origin_visit(
+    ...     {'origin': {'type': 'hg', 'url': 'http://foo'},
+    ...     'date': date,
+    ...     'status': 'ongoing',
+    ...     'snapshot': None,
+    ... }).to_dict())
+    {'date': datetime.datetime(2020, 2, 27, 14, 39, 19, tzinfo=datetime.timezone.utc),
+     'metadata': None,
+     'origin': 'http://foo',
+     'snapshot': None,
+     'status': 'ongoing',
+     'type': 'hg'}
 
-    """
-    good_visits = []
-    for visit in visits:
-        visit = visit.copy()
-        if 'type' not in visit:
-            if isinstance(visit['origin'], dict) and 'type' in visit['origin']:
-                # Very old version of the schema: visits did not have a type,
-                # but their 'origin' field was a dict with a 'type' key.
-                visit['type'] = visit['origin']['type']
-            else:
-                # Very very old version of the schema: 'type' is missing,
-                # so there is nothing we can do to fix it.
-                raise ValueError('Got an origin_visit too old to be replayed.')
-        if isinstance(visit['origin'], dict):
-            # Old version of the schema: visit['origin'] was a dict.
-            visit['origin'] = visit['origin']['url']
-        if 'metadata' not in visit:
-            visit['metadata'] = None
-        good_visits.append(visit)
-    return good_visits
+    """  # noqa
+    visit = visit.copy()
+    if 'type' not in visit:
+        if isinstance(visit['origin'], dict) and 'type' in visit['origin']:
+            # Very old version of the schema: visits did not have a type,
+            # but their 'origin' field was a dict with a 'type' key.
+            visit['type'] = visit['origin']['type']
+        else:
+            # Very very old version of the schema: 'type' is missing,
+            # so there is nothing we can do to fix it.
+            raise ValueError('Got an origin_visit too old to be replayed.')
+    if isinstance(visit['origin'], dict):
+        # Old version of the schema: visit['origin'] was a dict.
+        visit['origin'] = visit['origin']['url']
+    if 'metadata' not in visit:
+        visit['metadata'] = None
+    return OriginVisit.from_dict(visit)
 
 
 def collision_aware_content_add(
@@ -308,10 +325,8 @@ def _insert_objects(object_type: str, objects: List[Dict], storage) -> None:
             Revision.from_dict(r) for r in _fix_revisions(objects)
         )
     elif object_type == 'origin_visit':
-        visits = _fix_origin_visits(objects)
-        storage.origin_add(Origin(url=v['origin']) for v in visits)
-        # FIXME: Should be List[OriginVisit], working on fixing
-        # swh.storage.origin_visit_upsert (D2813)
+        visits = [_fix_origin_visit(v) for v in objects]
+        storage.origin_add(Origin(url=v.origin) for v in visits)
         storage.origin_visit_upsert(visits)
     elif object_type in ('directory', 'release', 'snapshot', 'origin'):
         method = getattr(storage, object_type + '_add')

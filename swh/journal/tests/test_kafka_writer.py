@@ -150,11 +150,10 @@ def test_storage_direct_writer(
                 object_ = object_.copy()
                 origin_url = object_.pop('origin')
                 storage.origin_add_one(Origin(url=origin_url))
-                visit = method(origin=origin_url, date=object_.pop('date'),
+                visit = method(origin_url, date=object_.pop('date'),
                                type=object_.pop('type'))
                 expected_messages += 1
-                visit_id = visit['visit']
-                storage.origin_visit_update(origin_url, visit_id, **object_)
+                storage.origin_visit_update(origin_url, visit.visit, **object_)
                 expected_messages += 1
         else:
             assert False, object_type

@@ -10,7 +10,9 @@ import attr
 from hypothesis import given, settings, HealthCheck
 from hypothesis.strategies import lists
 
-from swh.model.hypothesis_strategies import object_dicts, present_contents
+from swh.model.hypothesis_strategies import (
+    object_dicts, present_contents
+)
 from swh.model.model import Origin
 from swh.storage import get_storage, HashCollision
 
@@ -22,10 +24,8 @@ from .utils import MockedJournalClient, MockedKafkaWriter
 
 
 storage_config = {
-    'cls': 'pipeline',
-    'steps': [
-        {'cls': 'memory', 'journal_writer': {'cls': 'memory'}},
-    ]
+    'cls': 'memory',
+    'journal_writer': {'cls': 'memory'},
 }
 
 
@@ -67,16 +67,18 @@ def test_write_replay_same_order_batches(objects):
 
     # Write objects to storage1
     for (obj_type, obj) in objects:
-        obj = obj.copy()
+        if obj_type == 'content' and obj.get('status') == 'absent':
+            obj_type = 'skipped_content'
+
+        obj = object_converter_fn[obj_type](obj)
+
         if obj_type == 'origin_visit':
-            storage1.origin_add_one(Origin(url=obj['origin']))
+            storage1.origin_add_one(Origin(url=obj.origin))
             storage1.origin_visit_upsert([obj])
         else:
-            if obj_type == 'content' and obj.get('status') == 'absent':
-                obj_type = 'skipped_content'
             method = getattr(storage1, obj_type + '_add')
             try:
-                method([object_converter_fn[obj_type](obj)])
+                method([obj])
             except HashCollision:
                 pass
 
