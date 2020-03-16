@@ -34,7 +34,7 @@ class KafkaJournalWriter:
             'on_delivery': self._on_delivery,
             'error_cb': self._error_cb,
             'logger': logger,
-            'enable.idempotence': 'true',
+            'acks': 'all',
             **producer_config,
         })
 
@@ -90,25 +90,26 @@ class KafkaJournalWriter:
             assert 'id' not in object_
         return object_
 
-    def write_addition(self, object_type, object_, flush=True):
+    def _write_addition(self, object_type, object_):
         """Write a single object to the journal"""
         if isinstance(object_, BaseModel):
             object_ = object_.to_dict()
         topic = '%s.%s' % (self._prefix, object_type)
         key = self._get_key(object_type, object_)
-        object_ = self._sanitize_object(object_type, object_)
-        logger.debug('topic: %s, key: %s, value: %s', topic, key, object_)
-        self.send(topic, key=key, value=object_)
+        dict_ = self._sanitize_object(object_type, object_)
+        logger.debug('topic: %s, key: %s, value: %s', topic, key, dict_)
+        self.send(topic, key=key, value=dict_)
 
-        if flush:
-            self.flush()
+    def write_addition(self, object_type, object_):
+        """Write a single object to the journal"""
+        self._write_addition(object_type, object_)
+        self.flush()
 
     write_update = write_addition
 
-    def write_additions(self, object_type, objects, flush=True):
+    def write_additions(self, object_type, objects):
         """Write a set of objects to the journal"""
         for object_ in objects:
-            self.write_addition(object_type, object_, flush=False)
+            self._write_addition(object_type, object_)
 
-        if flush:
-            self.flush()
+        self.flush()

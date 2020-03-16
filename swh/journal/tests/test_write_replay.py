@@ -1,4 +1,4 @@
-# Copyright (C) 2019 The Software Heritage developers
+# Copyright (C) 2019-2020 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -10,21 +10,22 @@ import attr
 from hypothesis import given, settings, HealthCheck
 from hypothesis.strategies import lists
 
-from swh.model.hypothesis_strategies import object_dicts
+from swh.model.hypothesis_strategies import (
+    object_dicts, present_contents
+)
+from swh.model.model import Origin
 from swh.storage import get_storage, HashCollision
 
-from swh.journal.replay import process_replay_objects
-from swh.journal.replay import process_replay_objects_content
+from swh.journal.replay import (
+    process_replay_objects, process_replay_objects_content, object_converter_fn
+)
 
 from .utils import MockedJournalClient, MockedKafkaWriter
 
 
 storage_config = {
-    'cls': 'pipeline',
-    'steps': [
-        {'cls': 'validate'},
-        {'cls': 'memory', 'journal_writer': {'cls': 'memory'}},
-    ]
+    'cls': 'memory',
+    'journal_writer': {'cls': 'memory'},
 }
 
 
@@ -64,29 +65,34 @@ def test_write_replay_same_order_batches(objects):
                return_value=MockedKafkaWriter(queue)):
         storage1 = get_storage(**storage_config)
 
+    # Write objects to storage1
     for (obj_type, obj) in objects:
-        obj = obj.copy()
+        if obj_type == 'content' and obj.get('status') == 'absent':
+            obj_type = 'skipped_content'
+
+        obj = object_converter_fn[obj_type](obj)
+
         if obj_type == 'origin_visit':
-            storage1.origin_add_one({'url': obj['origin']})
+            storage1.origin_add_one(Origin(url=obj.origin))
             storage1.origin_visit_upsert([obj])
         else:
-            if obj_type == 'content' and obj.get('status') == 'absent':
-                obj_type = 'skipped_content'
             method = getattr(storage1, obj_type + '_add')
             try:
                 method([obj])
             except HashCollision:
                 pass
 
+    # Bail out early if we didn't insert any relevant objects...
     queue_size = len(queue)
-    assert replayer.max_messages == 0
-    replayer.max_messages = queue_size
+    assert queue_size != 0, "No test objects found; hypothesis strategy bug?"
+
+    assert replayer.stop_after_objects is None
+    replayer.stop_after_objects = queue_size
 
     storage2 = get_storage(**storage_config)
     worker_fn = functools.partial(process_replay_objects, storage=storage2)
-    nb_messages = 0
-    while nb_messages < queue_size:
-        nb_messages += replayer.process(worker_fn)
+
+    replayer.process(worker_fn)
 
     assert replayer.consumer.committed
 
@@ -113,7 +119,7 @@ def test_write_replay_same_order_batches(objects):
 # TODO: add test for hash collision
 
 
-@given(lists(object_dicts(), min_size=1))
+@given(lists(present_contents(), min_size=1))
 @settings(suppress_health_check=[HealthCheck.too_slow])
 def test_write_replay_content(objects):
 
@@ -125,18 +131,16 @@ def test_write_replay_content(objects):
         storage1 = get_storage(**storage_config)
 
     contents = []
-    for (obj_type, obj) in objects:
-        obj = obj.copy()
-        if obj_type == 'content':
-            # avoid hash collision
-            if not storage1.content_find(obj):
-                if obj.get('status') != 'absent':
-                    storage1.content_add([obj])
-                contents.append(obj)
+    for obj in objects:
+        storage1.content_add([obj])
+        contents.append(obj)
 
+    # Bail out early if we didn't insert any relevant objects...
     queue_size = len(queue)
-    assert replayer.max_messages == 0
-    replayer.max_messages = queue_size
+    assert queue_size != 0, "No test objects found; hypothesis strategy bug?"
+
+    assert replayer.stop_after_objects is None
+    replayer.stop_after_objects = queue_size
 
     storage2 = get_storage(**storage_config)
 
@@ -146,13 +150,12 @@ def test_write_replay_content(objects):
     worker_fn = functools.partial(process_replay_objects_content,
                                   src=objstorage1,
                                   dst=objstorage2)
-    nb_messages = 0
-    while nb_messages < queue_size:
-        nb_messages += replayer.process(worker_fn)
+
+    replayer.process(worker_fn)
 
     # only content with status visible will be copied in storage2
     expected_objstorage_state = {
-        c['sha1']: c['data'] for c in contents if c['status'] == 'visible'
+        c.sha1: c.data for c in contents if c.status == 'visible'
     }
 
     assert expected_objstorage_state == objstorage2.state
