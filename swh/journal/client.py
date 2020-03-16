@@ -7,6 +7,7 @@ from collections import defaultdict
 import logging
 import os
 import time
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from confluent_kafka import Consumer, KafkaException, KafkaError
 
@@ -57,9 +58,9 @@ class JournalClient:
 
     The current implementation of the journal uses Apache Kafka
     brokers to publish messages under a given topic prefix, with each
-    object type using a specific topic under that prefix. If the 'prefix'
+    object type using a specific topic under that prefix. If the `prefix`
     argument is None (default value), it will take the default value
-    'swh.journal.objects'.
+    `'swh.journal.objects'`.
 
     Clients subscribe to events specific to each object type as listed in the
     `object_types` argument (if unset, defaults to all accepted object types).
@@ -68,16 +69,35 @@ class JournalClient:
     value across instances. The journal will share the message
     throughput across the nodes sharing the same group_id.
 
-    Messages are processed by the `worker_fn` callback passed to the
-    `process` method, in batches of maximum `max_messages`.
+    Messages are processed by the `worker_fn` callback passed to the `process`
+    method, in batches of maximum `batch_size` messages (defaults to 200).
+
+    If set, the processing stops after processing `stop_after_objects` messages
+    in total.
+
+    `stop_on_eof` stops the processing when the client has reached the end of
+    each partition in turn.
+
+    `auto_offset_reset` sets the behavior of the client when the consumer group
+    initializes: `'earliest'` (the default) processes all objects since the
+    inception of the topics; `''`
 
     Any other named argument is passed directly to KafkaConsumer().
 
     """
     def __init__(
-            self, brokers, group_id, prefix=None, object_types=None,
-            max_messages=0, process_timeout=0, auto_offset_reset='earliest',
-            stop_on_eof=False, **kwargs):
+            self,
+            brokers: Union[str, List[str]],
+            group_id: str,
+            prefix: Optional[str] = None,
+            object_types: Optional[List[str]] = None,
+            stop_after_objects: Optional[int] = None,
+            batch_size: int = 200,
+            process_timeout: Optional[float] = None,
+            auto_offset_reset: str = 'earliest',
+            stop_on_eof: bool = False,
+            **kwargs
+    ):
         if prefix is None:
             prefix = DEFAULT_PREFIX
         if object_types is None:
@@ -92,6 +112,9 @@ class JournalClient:
                 raise ValueError(
                     'Option \'object_types\' only accepts %s, not %s.' %
                     (ACCEPTED_OBJECT_TYPES, object_type))
+
+        if batch_size <= 0:
+            raise ValueError("Option 'batch_size' needs to be positive")
 
         self.value_deserializer = kafka_to_value
 
@@ -159,9 +182,10 @@ class JournalClient:
 
         self.consumer.subscribe(topics=topics)
 
-        self.max_messages = max_messages
+        self.stop_after_objects = stop_after_objects
         self.process_timeout = process_timeout
-        self.eof_reached = set()
+        self.eof_reached: Set[Tuple[str, str]] = set()
+        self.batch_size = batch_size
 
         self._object_types = object_types
 
@@ -175,7 +199,7 @@ class JournalClient:
                                                        argument.
         """
         start_time = time.monotonic()
-        nb_messages = 0
+        total_objects_processed = 0
 
         while True:
             # timeout for message poll
@@ -194,27 +218,31 @@ class JournalClient:
 
                 timeout = self.process_timeout - elapsed
 
-            num_messages = 20
-
-            if self.max_messages:
-                if nb_messages >= self.max_messages:
+            batch_size = self.batch_size
+            if self.stop_after_objects:
+                if total_objects_processed >= self.stop_after_objects:
                     break
-                num_messages = min(num_messages, self.max_messages-nb_messages)
+
+                # clamp batch size to avoid overrunning stop_after_objects
+                batch_size = min(
+                    self.stop_after_objects-total_objects_processed,
+                    batch_size,
+                )
 
             messages = self.consumer.consume(
-                timeout=timeout, num_messages=num_messages)
+                timeout=timeout, num_messages=batch_size)
             if not messages:
                 continue
 
-            nb_processed, at_eof = self.handle_messages(messages, worker_fn)
-            nb_messages += nb_processed
+            batch_processed, at_eof = self.handle_messages(messages, worker_fn)
+            total_objects_processed += batch_processed
             if at_eof:
                 break
 
-        return nb_messages
+        return total_objects_processed
 
     def handle_messages(self, messages, worker_fn):
-        objects = defaultdict(list)
+        objects: Dict[str, List[Any]] = defaultdict(list)
         nb_processed = 0
 
         for message in messages:
