@@ -68,6 +68,23 @@ def process_replay_objects(all_objects, *, storage):
         notify('WATCHDOG=1')
 
 
+def _fix_contents(
+        contents: Iterable[Dict[str, Any]]) -> Iterable[Dict[str, Any]]:
+    """Filters-out invalid 'perms' key that leaked from swh.model.from_disk
+    to the journal.
+
+    >>> list(_fix_contents([
+    ...     {'perms': 0o100644, 'sha1_git': b'foo'},
+    ...     {'sha1_git': b'bar'},
+    ... ]))
+    [{'sha1_git': b'foo'}, {'sha1_git': b'bar'}]
+    """
+    for content in contents:
+        content = content.copy()
+        content.pop('perms', None)
+        yield content
+
+
 def _fix_revision_pypi_empty_string(rev):
     """PyPI loader failed to encode empty strings as bytes, see:
     swh:1:rev:8f0095ee0664867055d03de9bcc8f95b91d8a2b9
@@ -309,7 +326,7 @@ def _insert_objects(object_type: str, objects: List[Dict], storage) -> None:
     if object_type == 'content':
         contents: List[BaseContent] = []
         skipped_contents: List[BaseContent] = []
-        for content in objects:
+        for content in _fix_contents(objects):
             c = BaseContent.from_dict(content)
             if isinstance(c, SkippedContent):
                 skipped_contents.append(c)
