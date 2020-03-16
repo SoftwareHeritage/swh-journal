@@ -1,3 +1,28 @@
+swh-journal (0.0.27-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.0.27     - (tagged by Antoine R. Dumont
+    (@ardumont) <antoine.romain.dumont@gmail.com> on 2020-03-16 16:09:33
+    +0100)
+  * Upstream changes:     - v0.0.27     - Migrate to latest
+    origin_visit_upsert/add api changes     - journal: Use swh-model
+    objects instead of dicts in replay and writer     - replay: Filter
+    out colliding contents when replaying     - Use better kafka
+    producer semantics in the journal writers     - Make the number of
+    messages processed at a time by journal clients     - configurable
+    - Drop deprecated cli options     - Replace deprecated options with
+    a config file override in cli tests     - Clean up the signature of
+    test_cli's invoke method     - Migrate test cli config to a dict
+    instead of raw yaml     - kafka: normalize
+    KafkaJournalWriter.write_addition[s] API     - Rename
+    JournalClient.max_messages to JournalClient.stop_after_objects     -
+    Be more careful with content generation in test_write_replay     -
+    Add type annotations to swh.journal.client arguments     - Unify
+    tense for content replay statistics log entry     - Add missing
+    log4j.properties file from MANIFEST.in     - Unify retry/error
+    handling for content replay
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Mon, 16 Mar 2020 15:17:43 +0000
+
 swh-journal (0.0.26-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.0.26     - (tagged by David Douard
