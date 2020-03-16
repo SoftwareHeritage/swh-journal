@@ -6,19 +6,29 @@
 import copy
 import logging
 from time import time
-from typing import Callable, Dict, List, Optional
+from typing import (
+    Any, Callable, Dict, Iterable, List, Optional
+)
 
+from sentry_sdk import capture_exception, push_scope
 try:
     from systemd.daemon import notify
 except ImportError:
     notify = None
 
-from tenacity import retry, stop_after_attempt, wait_random_exponential
+from tenacity import (
+    retry, retry_if_exception_type, stop_after_attempt,
+    wait_random_exponential,
+)
 
 from swh.core.statsd import statsd
 from swh.model.identifiers import normalize_timestamp
 from swh.model.hashutil import hash_to_hex
-from swh.model.model import SHA1_SIZE
+
+from swh.model.model import (
+    BaseContent, BaseModel, Content, Directory, Origin, OriginVisit, Revision,
+    SHA1_SIZE, SkippedContent, Snapshot, Release
+)
 from swh.objstorage.objstorage import (
     ID_HASH_ALGO, ObjNotFoundError, ObjStorage,
 )
@@ -29,8 +39,21 @@ logger = logging.getLogger(__name__)
 GRAPH_OPERATIONS_METRIC = "swh_graph_replayer_operations_total"
 GRAPH_DURATION_METRIC = "swh_graph_replayer_duration_seconds"
 CONTENT_OPERATIONS_METRIC = "swh_content_replayer_operations_total"
+CONTENT_RETRY_METRIC = "swh_content_replayer_retries_total"
 CONTENT_BYTES_METRIC = "swh_content_replayer_bytes"
 CONTENT_DURATION_METRIC = "swh_content_replayer_duration_seconds"
+
+
+object_converter_fn: Dict[str, Callable[[Dict], BaseModel]] = {
+    'origin': Origin.from_dict,
+    'origin_visit': OriginVisit.from_dict,
+    'snapshot': Snapshot.from_dict,
+    'revision': Revision.from_dict,
+    'release': Release.from_dict,
+    'directory': Directory.from_dict,
+    'content': Content.from_dict,
+    'skipped_content': SkippedContent.from_dict,
+}
 
 
 def process_replay_objects(all_objects, *, storage):
@@ -96,46 +119,8 @@ def _check_revision_date(rev):
     return _check_date(rev['date']) and _check_date(rev['committer_date'])
 
 
-def _fix_revisions(revisions):
-    good_revisions = []
-    for rev in revisions:
-        rev = _fix_revision_pypi_empty_string(rev)
-        rev = _fix_revision_transplant_source(rev)
-        if not _check_revision_date(rev):
-            logging.warning('Excluding revision (invalid date): %r', rev)
-            continue
-        if rev not in good_revisions:
-            good_revisions.append(rev)
-    return good_revisions
-
-
-def _fix_origin_visits(visits):
-    good_visits = []
-    for visit in visits:
-        visit = visit.copy()
-        if 'type' not in visit:
-            if isinstance(visit['origin'], dict) and 'type' in visit['origin']:
-                # Very old version of the schema: visits did not have a type,
-                # but their 'origin' field was a dict with a 'type' key.
-                visit['type'] = visit['origin']['type']
-            else:
-                # Very very old version of the schema: 'type' is missing,
-                # so there is nothing we can do to fix it.
-                raise ValueError('Got an origin_visit too old to be replayed.')
-        if isinstance(visit['origin'], dict):
-            # Old version of the schema: visit['origin'] was a dict.
-            visit['origin'] = visit['origin']['url']
-        good_visits.append(visit)
-    return good_visits
-
-
-def fix_objects(object_type, objects):
-    """Converts a possibly old object from the journal to its current
-    expected format.
-
-    List of conversions:
-
-    Empty author name/email in PyPI releases:
+def _fix_revisions(revisions: List[Dict]) -> List[Dict]:
+    """Adapt revisions into a list of (current) storage compatible dicts.
 
     >>> from pprint import pprint
     >>> date = {
@@ -145,7 +130,7 @@ def fix_objects(object_type, objects):
     ...     },
     ...     'offset': 0,
     ... }
-    >>> pprint(fix_objects('revision', [{
+    >>> pprint(_fix_revisions([{
     ...     'author': {'email': '', 'fullname': b'', 'name': ''},
     ...     'committer': {'email': '', 'fullname': b'', 'name': ''},
     ...     'date': date,
@@ -160,7 +145,7 @@ def fix_objects(object_type, objects):
 
     Fix type of 'transplant_source' extra headers:
 
-    >>> revs = fix_objects('revision', [{
+    >>> revs = _fix_revisions([{
     ...     'author': {'email': '', 'fullname': b'', 'name': ''},
     ...     'committer': {'email': '', 'fullname': b'', 'name': ''},
     ...     'date': date,
@@ -168,7 +153,7 @@ def fix_objects(object_type, objects):
     ...     'metadata': {
     ...         'extra_headers': [
     ...             ['time_offset_seconds', b'-3600'],
-    ...             ['transplant_source', '29c154a012a70f49df983625090434587622b39e']
+    ...             ['transplant_source', '29c154a012a70f49df983625090434587622b39e']  # noqa
     ...     ]}
     ... }])
     >>> pprint(revs[0]['metadata']['extra_headers'])
@@ -180,7 +165,7 @@ def fix_objects(object_type, objects):
     >>> from copy import deepcopy
     >>> invalid_date1 = deepcopy(date)
     >>> invalid_date1['timestamp']['microseconds'] = 1000000000  # > 10^6
-    >>> fix_objects('revision', [{
+    >>> _fix_revisions([{
     ...     'author': {'email': '', 'fullname': b'', 'name': b''},
     ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
     ...     'date': invalid_date1,
@@ -190,7 +175,7 @@ def fix_objects(object_type, objects):
 
     >>> invalid_date2 = deepcopy(date)
     >>> invalid_date2['timestamp']['seconds'] = 2**70  # > 10^63
-    >>> fix_objects('revision', [{
+    >>> _fix_revisions([{
     ...     'author': {'email': '', 'fullname': b'', 'name': b''},
     ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
     ...     'date': invalid_date2,
@@ -200,7 +185,7 @@ def fix_objects(object_type, objects):
 
     >>> invalid_date3 = deepcopy(date)
     >>> invalid_date3['offset'] = 2**20  # > 10^15
-    >>> fix_objects('revision', [{
+    >>> _fix_revisions([{
     ...     'author': {'email': '', 'fullname': b'', 'name': b''},
     ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
     ...     'date': date,
@@ -208,57 +193,144 @@ def fix_objects(object_type, objects):
     ... }])
     []
 
+    """
+    good_revisions: List = []
+    for rev in revisions:
+        rev = _fix_revision_pypi_empty_string(rev)
+        rev = _fix_revision_transplant_source(rev)
+        if not _check_revision_date(rev):
+            logging.warning('Excluding revision (invalid date): %r', rev)
+            continue
+        if rev not in good_revisions:
+            good_revisions.append(rev)
+    return good_revisions
+
+
+def _fix_origin_visit(visit: Dict) -> OriginVisit:
+    """Adapt origin visits into a list of current storage compatible
+       OriginVisits.
 
     `visit['origin']` is a dict instead of an URL:
 
-    >>> pprint(fix_objects('origin_visit', [{
+    >>> from datetime import datetime, timezone
+    >>> from pprint import pprint
+    >>> date = datetime(2020, 2, 27, 14, 39, 19, tzinfo=timezone.utc)
+    >>> pprint(_fix_origin_visit({
     ...     'origin': {'url': 'http://foo'},
+    ...     'date': date,
     ...     'type': 'git',
-    ... }]))
-    [{'origin': 'http://foo', 'type': 'git'}]
+    ...     'status': 'ongoing',
+    ...     'snapshot': None,
+    ... }).to_dict())
+    {'date': datetime.datetime(2020, 2, 27, 14, 39, 19, tzinfo=datetime.timezone.utc),
+     'metadata': None,
+     'origin': 'http://foo',
+     'snapshot': None,
+     'status': 'ongoing',
+     'type': 'git'}
 
     `visit['type']` is missing , but `origin['visit']['type']` exists:
 
-    >>> pprint(fix_objects('origin_visit', [
-    ...     {'origin': {'type': 'hg', 'url': 'http://foo'}
-    ... }]))
-    [{'origin': 'http://foo', 'type': 'hg'}]
+    >>> pprint(_fix_origin_visit(
+    ...     {'origin': {'type': 'hg', 'url': 'http://foo'},
+    ...     'date': date,
+    ...     'status': 'ongoing',
+    ...     'snapshot': None,
+    ... }).to_dict())
+    {'date': datetime.datetime(2020, 2, 27, 14, 39, 19, tzinfo=datetime.timezone.utc),
+     'metadata': None,
+     'origin': 'http://foo',
+     'snapshot': None,
+     'status': 'ongoing',
+     'type': 'hg'}
+
     """  # noqa
+    visit = visit.copy()
+    if 'type' not in visit:
+        if isinstance(visit['origin'], dict) and 'type' in visit['origin']:
+            # Very old version of the schema: visits did not have a type,
+            # but their 'origin' field was a dict with a 'type' key.
+            visit['type'] = visit['origin']['type']
+        else:
+            # Very very old version of the schema: 'type' is missing,
+            # so there is nothing we can do to fix it.
+            raise ValueError('Got an origin_visit too old to be replayed.')
+    if isinstance(visit['origin'], dict):
+        # Old version of the schema: visit['origin'] was a dict.
+        visit['origin'] = visit['origin']['url']
+    if 'metadata' not in visit:
+        visit['metadata'] = None
+    return OriginVisit.from_dict(visit)
 
-    if object_type == 'revision':
-        objects = _fix_revisions(objects)
-    elif object_type == 'origin_visit':
-        objects = _fix_origin_visits(objects)
-    return objects
+
+def collision_aware_content_add(
+        content_add_fn: Callable[[Iterable[Any]], None],
+        contents: List[BaseContent]) -> None:
+    """Add contents to storage. If a hash collision is detected, an error is
+       logged. Then this adds the other non colliding contents to the storage.
+
+    Args:
+        content_add_fn: Storage content callable
+        contents: List of contents or skipped contents to add to storage
+
+    """
+    if not contents:
+        return
+    colliding_content_hashes: List[Dict[str, Any]] = []
+    while True:
+        try:
+            content_add_fn(contents)
+        except HashCollision as e:
+            algo, hash_id, colliding_hashes = e.args
+            hash_id = hash_to_hex(hash_id)
+            colliding_content_hashes.append({
+                'algo': algo,
+                'hash': hash_to_hex(hash_id),
+                'objects': [{k: hash_to_hex(v) for k, v in collision.items()}
+                            for collision in colliding_hashes]
+            })
+            # Drop the colliding contents from the transaction
+            contents = [c for c in contents
+                        if c.hashes() not in colliding_hashes]
+        else:
+            # Successfully added contents, we are done
+            break
+    if colliding_content_hashes:
+        for collision in colliding_content_hashes:
+            logger.error('Collision detected: %(collision)s', {
+                'collision': collision
+            })
 
 
-def _insert_objects(object_type, objects, storage):
-    objects = fix_objects(object_type, objects)
+def _insert_objects(object_type: str, objects: List[Dict], storage) -> None:
+    """Insert objects of type object_type in the storage.
+
+    """
     if object_type == 'content':
-        try:
-            storage.skipped_content_add(
-              (obj for obj in objects if obj.get('status') == 'absent'))
-        except HashCollision as e:
-            logger.error('(SkippedContent) Hash collision: %s', e.args)
+        contents: List[BaseContent] = []
+        skipped_contents: List[BaseContent] = []
+        for content in objects:
+            c = BaseContent.from_dict(content)
+            if isinstance(c, SkippedContent):
+                skipped_contents.append(c)
+            else:
+                contents.append(c)
 
-        try:
-            storage.content_add_metadata(
-              (obj for obj in objects if obj.get('status') != 'absent'))
-        except HashCollision as e:
-            logger.error('(Content) Hash collision: %s', e.args)
-
-    elif object_type in ('directory', 'revision', 'release',
-                         'snapshot', 'origin'):
-        # TODO: split batches that are too large for the storage
-        # to handle?
-        method = getattr(storage, object_type + '_add')
-        method(objects)
+        collision_aware_content_add(
+            storage.skipped_content_add, skipped_contents)
+        collision_aware_content_add(
+            storage.content_add_metadata, contents)
+    elif object_type == 'revision':
+        storage.revision_add(
+            Revision.from_dict(r) for r in _fix_revisions(objects)
+        )
     elif object_type == 'origin_visit':
-        for visit in objects:
-            storage.origin_add_one({'url': visit['origin']})
-            if 'metadata' not in visit:
-                visit['metadata'] = None
-        storage.origin_visit_upsert(objects)
+        visits = [_fix_origin_visit(v) for v in objects]
+        storage.origin_add(Origin(url=v.origin) for v in visits)
+        storage.origin_visit_upsert(visits)
+    elif object_type in ('directory', 'release', 'snapshot', 'origin'):
+        method = getattr(storage, object_type + '_add')
+        method(object_converter_fn[object_type](o) for o in objects)
     else:
         logger.warning('Received a series of %s, this should not happen',
                        object_type)
@@ -312,6 +384,62 @@ def is_hash_in_bytearray(hash_, array, nb_hashes, hash_size=SHA1_SIZE):
     return get_hash(left) == hash_
 
 
+class ReplayError(Exception):
+    """An error occurred during the replay of an object"""
+    def __init__(self, operation, *, obj_id, exc):
+        self.operation = operation
+        self.obj_id = hash_to_hex(obj_id)
+        self.exc = exc
+
+    def __str__(self):
+        return "ReplayError(doing %s, %s, %s)" % (
+            self.operation, self.obj_id, self.exc
+        )
+
+
+def log_replay_retry(retry_obj, sleep, last_result):
+    """Log a retry of the content replayer"""
+    exc = last_result.exception()
+    logger.debug('Retry operation %(operation)s on %(obj_id)s: %(exc)s',
+                 {'operation': exc.operation, 'obj_id': exc.obj_id,
+                  'exc': str(exc.exc)})
+
+    statsd.increment(CONTENT_RETRY_METRIC, tags={
+        'operation': exc.operation,
+        'attempt': str(retry_obj.statistics['attempt_number']),
+    })
+
+
+def log_replay_error(last_attempt):
+    """Log a replay error to sentry"""
+    exc = last_attempt.exception()
+    with push_scope() as scope:
+        scope.set_tag('operation', exc.operation)
+        scope.set_extra('obj_id', exc.obj_id)
+        capture_exception(exc.exc)
+
+    logger.error(
+        'Failed operation %(operation)s on %(obj_id)s after %(retries)s'
+        ' retries: %(exc)s', {
+            'obj_id': exc.obj_id, 'operation': exc.operation,
+            'exc': str(exc.exc), 'retries': last_attempt.attempt_number,
+        })
+
+    return None
+
+
+CONTENT_REPLAY_RETRIES = 3
+
+content_replay_retry = retry(
+    retry=retry_if_exception_type(ReplayError),
+    stop=stop_after_attempt(CONTENT_REPLAY_RETRIES),
+    wait=wait_random_exponential(multiplier=1, max=60),
+    before_sleep=log_replay_retry,
+    retry_error_callback=log_replay_error,
+)
+
+
+@content_replay_retry
 def copy_object(obj_id, src, dst):
     hex_obj_id = hash_to_hex(obj_id)
     obj = ''
@@ -324,19 +452,22 @@ def copy_object(obj_id, src, dst):
             dst.add(obj, obj_id=obj_id, check_presence=False)
             logger.debug('copied %(obj_id)s', {'obj_id': hex_obj_id})
         statsd.increment(CONTENT_BYTES_METRIC, len(obj))
-    except Exception as exc:
-        logger.error('Failed to copy %(obj_id)s: %(exc)s',
-                     {'obj_id': hex_obj_id, 'exc': str(exc)})
+    except ObjNotFoundError:
+        logger.error('Failed to copy %(obj_id)s: object not found',
+                     {'obj_id': hex_obj_id})
         raise
+    except Exception as exc:
+        raise ReplayError('copy', obj_id=obj_id, exc=exc) from None
     return len(obj)
 
 
-@retry(stop=stop_after_attempt(3),
-       reraise=True,
-       wait=wait_random_exponential(multiplier=1, max=60))
+@content_replay_retry
 def obj_in_objstorage(obj_id, dst):
     """Check if an object is already in an objstorage, tenaciously"""
-    return obj_id in dst
+    try:
+        return obj_id in dst
+    except Exception as exc:
+        raise ReplayError('in_dst', obj_id=obj_id, exc=exc) from None
 
 
 def process_replay_objects_content(
@@ -395,6 +526,7 @@ def process_replay_objects_content(
     """
     vol = []
     nb_skipped = 0
+    nb_failures = 0
     t0 = time()
 
     for (object_type, objects) in all_objects.items():
@@ -431,18 +563,23 @@ def process_replay_objects_content(
                     statsd.increment(CONTENT_OPERATIONS_METRIC,
                                      tags={"decision": "not_in_src"})
                 else:
-                    vol.append(copied)
-                    statsd.increment(CONTENT_OPERATIONS_METRIC,
-                                     tags={"decision": "copied"})
+                    if copied is None:
+                        nb_failures += 1
+                        statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                         tags={"decision": "failed"})
+                    else:
+                        vol.append(copied)
+                        statsd.increment(CONTENT_OPERATIONS_METRIC,
+                                         tags={"decision": "copied"})
 
     dt = time() - t0
     logger.info(
         'processed %s content objects in %.1fsec '
-        '(%.1f obj/sec, %.1fMB/sec) - %d failures - %d skipped',
+        '(%.1f obj/sec, %.1fMB/sec) - %d failed - %d skipped',
         len(vol), dt,
         len(vol)/dt,
         sum(vol)/1024/1024/dt,
-        len([x for x in vol if not x]),
+        nb_failures,
         nb_skipped)
 
     if notify:
