@@ -136,8 +136,11 @@ def _check_revision_date(rev):
     return _check_date(rev['date']) and _check_date(rev['committer_date'])
 
 
-def _fix_revisions(revisions: List[Dict]) -> List[Dict]:
-    """Adapt revisions into a list of (current) storage compatible dicts.
+def _fix_revision(revision: Dict[str, Any]) -> Optional[Revision]:
+    """Adapt revision into an swh revision model object (current storage
+       compatible).
+
+    Fix author/committer person:
 
     >>> from pprint import pprint
     >>> date = {
@@ -147,22 +150,26 @@ def _fix_revisions(revisions: List[Dict]) -> List[Dict]:
     ...     },
     ...     'offset': 0,
     ... }
-    >>> pprint(_fix_revisions([{
+    >>> rev0 = _fix_revision({
+    ...     'id': b'rev-id',
     ...     'author': {'email': '', 'fullname': b'', 'name': ''},
     ...     'committer': {'email': '', 'fullname': b'', 'name': ''},
     ...     'date': date,
     ...     'committer_date': date,
-    ... }]))
-    [{'author': {'email': b'', 'fullname': b'', 'name': b''},
-      'committer': {'email': b'', 'fullname': b'', 'name': b''},
-      'committer_date': {'offset': 0,
-                         'timestamp': {'microseconds': 0, 'seconds': 1565096932}},
-      'date': {'offset': 0,
-               'timestamp': {'microseconds': 0, 'seconds': 1565096932}}}]
+    ...     'type': 'git',
+    ...     'message': '',
+    ...     'directory': b'dir-id',
+    ...     'synthetic': False,
+    ... }).to_dict()
+    >>> rev0['author']
+    {'fullname': b'', 'name': b'', 'email': b''}
+    >>> rev0['committer']
+    {'fullname': b'', 'name': b'', 'email': b''}
 
     Fix type of 'transplant_source' extra headers:
 
-    >>> revs = _fix_revisions([{
+    >>> rev1 = _fix_revision({
+    ...     'id': b'rev-id',
     ...     'author': {'email': '', 'fullname': b'', 'name': ''},
     ...     'committer': {'email': '', 'fullname': b'', 'name': ''},
     ...     'date': date,
@@ -170,57 +177,62 @@ def _fix_revisions(revisions: List[Dict]) -> List[Dict]:
     ...     'metadata': {
     ...         'extra_headers': [
     ...             ['time_offset_seconds', b'-3600'],
-    ...             ['transplant_source', '29c154a012a70f49df983625090434587622b39e']  # noqa
-    ...     ]}
-    ... }])
-    >>> pprint(revs[0]['metadata']['extra_headers'])
+    ...             ['transplant_source', '29c154a012a70f49df983625090434587622b39e']
+    ...     ]},
+    ...     'type': 'git',
+    ...     'message': '',
+    ...     'directory': b'dir-id',
+    ...     'synthetic': False,
+    ... })
+    >>> pprint(rev1.metadata['extra_headers'])
     [['time_offset_seconds', b'-3600'],
      ['transplant_source', b'29c154a012a70f49df983625090434587622b39e']]
 
-    Filter out revisions with invalid dates:
+    Revision with invalid date are filtered:
 
     >>> from copy import deepcopy
     >>> invalid_date1 = deepcopy(date)
     >>> invalid_date1['timestamp']['microseconds'] = 1000000000  # > 10^6
-    >>> _fix_revisions([{
+    >>> rev = _fix_revision({
     ...     'author': {'email': '', 'fullname': b'', 'name': b''},
     ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
     ...     'date': invalid_date1,
     ...     'committer_date': date,
-    ... }])
-    []
+    ... })
+    >>> rev is None
+    True
 
     >>> invalid_date2 = deepcopy(date)
     >>> invalid_date2['timestamp']['seconds'] = 2**70  # > 10^63
-    >>> _fix_revisions([{
+    >>> rev = _fix_revision({
     ...     'author': {'email': '', 'fullname': b'', 'name': b''},
     ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
     ...     'date': invalid_date2,
     ...     'committer_date': date,
-    ... }])
-    []
+    ... })
+    >>> rev is None
+    True
 
     >>> invalid_date3 = deepcopy(date)
     >>> invalid_date3['offset'] = 2**20  # > 10^15
-    >>> _fix_revisions([{
+    >>> rev = _fix_revision({
     ...     'author': {'email': '', 'fullname': b'', 'name': b''},
     ...     'committer': {'email': '', 'fullname': b'', 'name': b''},
     ...     'date': date,
     ...     'committer_date': invalid_date3,
-    ... }])
-    []
+    ... })
+    >>> rev is None
+    True
 
-    """
-    good_revisions: List = []
-    for rev in revisions:
-        rev = _fix_revision_pypi_empty_string(rev)
-        rev = _fix_revision_transplant_source(rev)
-        if not _check_revision_date(rev):
-            logging.warning('Excluding revision (invalid date): %r', rev)
-            continue
-        if rev not in good_revisions:
-            good_revisions.append(rev)
-    return good_revisions
+    """  # noqa
+    rev = _fix_revision_pypi_empty_string(revision)
+    rev = _fix_revision_transplant_source(rev)
+    if not _check_revision_date(rev):
+        logger.warning('Invalid revision date detected: %(revision)s', {
+            'revision': rev
+        })
+        return None
+    return Revision.from_dict(rev)
 
 
 def _fix_origin_visit(visit: Dict) -> OriginVisit:
@@ -338,9 +350,12 @@ def _insert_objects(object_type: str, objects: List[Dict], storage) -> None:
         collision_aware_content_add(
             storage.content_add_metadata, contents)
     elif object_type == 'revision':
-        storage.revision_add(
-            Revision.from_dict(r) for r in _fix_revisions(objects)
-        )
+        revisions: List[Revision] = []
+        for revision in objects:
+            rev = _fix_revision(revision)
+            if rev:
+                revisions.append(rev)
+        storage.revision_add(revisions)
     elif object_type == 'origin_visit':
         visits = [_fix_origin_visit(v) for v in objects]
         storage.origin_add(Origin(url=v.origin) for v in visits)
