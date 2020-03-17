@@ -68,21 +68,20 @@ def process_replay_objects(all_objects, *, storage):
         notify('WATCHDOG=1')
 
 
-def _fix_contents(
-        contents: Iterable[Dict[str, Any]]) -> Iterable[Dict[str, Any]]:
+def _fix_content(content: Dict[str, Any]) -> Dict[str, Any]:
     """Filters-out invalid 'perms' key that leaked from swh.model.from_disk
     to the journal.
 
-    >>> list(_fix_contents([
-    ...     {'perms': 0o100644, 'sha1_git': b'foo'},
-    ...     {'sha1_git': b'bar'},
-    ... ]))
-    [{'sha1_git': b'foo'}, {'sha1_git': b'bar'}]
+    >>> _fix_content({'perms': 0o100644, 'sha1_git': b'foo'})
+    {'sha1_git': b'foo'}
+
+    >>> _fix_content({'sha1_git': b'bar'})
+    {'sha1_git': b'bar'}
+
     """
-    for content in contents:
-        content = content.copy()
-        content.pop('perms', None)
-        yield content
+    content = content.copy()
+    content.pop('perms', None)
+    return content
 
 
 def _fix_revision_pypi_empty_string(rev):
@@ -338,8 +337,8 @@ def _insert_objects(object_type: str, objects: List[Dict], storage) -> None:
     if object_type == 'content':
         contents: List[BaseContent] = []
         skipped_contents: List[BaseContent] = []
-        for content in _fix_contents(objects):
-            c = BaseContent.from_dict(content)
+        for content in objects:
+            c = BaseContent.from_dict(_fix_content(content))
             if isinstance(c, SkippedContent):
                 skipped_contents.append(c)
             else:
