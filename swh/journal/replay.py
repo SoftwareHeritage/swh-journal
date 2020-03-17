@@ -235,8 +235,7 @@ def _fix_revision(revision: Dict[str, Any]) -> Optional[Revision]:
 
 
 def _fix_origin_visit(visit: Dict) -> OriginVisit:
-    """Adapt origin visits into a list of current storage compatible
-       OriginVisits.
+    """Adapt origin visit into current storage compatible OriginVisit.
 
     `visit['origin']` is a dict instead of an URL:
 
@@ -272,6 +271,28 @@ def _fix_origin_visit(visit: Dict) -> OriginVisit:
      'status': 'ongoing',
      'type': 'hg'}
 
+    Old visit format (origin_visit with no type) raises:
+
+    >>> _fix_origin_visit({
+    ...     'origin': {'url': 'http://foo'},
+    ...     'date': date,
+    ...     'status': 'ongoing',
+    ...     'snapshot': None
+    ... })
+    Traceback (most recent call last):
+    ...
+    ValueError: Old origin visit format detected...
+
+    >>> _fix_origin_visit({
+    ...     'origin': 'http://foo',
+    ...     'date': date,
+    ...     'status': 'ongoing',
+    ...     'snapshot': None
+    ... })
+    Traceback (most recent call last):
+    ...
+    ValueError: Old origin visit format detected...
+
     """  # noqa
     visit = visit.copy()
     if 'type' not in visit:
@@ -280,9 +301,12 @@ def _fix_origin_visit(visit: Dict) -> OriginVisit:
             # but their 'origin' field was a dict with a 'type' key.
             visit['type'] = visit['origin']['type']
         else:
-            # Very very old version of the schema: 'type' is missing,
-            # so there is nothing we can do to fix it.
-            raise ValueError('Got an origin_visit too old to be replayed.')
+            # Very old schema version: 'type' is missing, stop early
+
+            # We expect the journal's origin_visit topic to no longer reference
+            # such visits. If it does, the replayer must crash so we can fix
+            # the journal's topic.
+            raise ValueError(f'Old origin visit format detected: {visit}')
     if isinstance(visit['origin'], dict):
         # Old version of the schema: visit['origin'] was a dict.
         visit['origin'] = visit['origin']['url']
@@ -356,8 +380,13 @@ def _insert_objects(object_type: str, objects: List[Dict], storage) -> None:
                 revisions.append(rev)
         storage.revision_add(revisions)
     elif object_type == 'origin_visit':
-        visits = [_fix_origin_visit(v) for v in objects]
-        storage.origin_add(Origin(url=v.origin) for v in visits)
+        visits: List[OriginVisit] = []
+        origins: List[Origin] = []
+        for obj in objects:
+            visit = _fix_origin_visit(obj)
+            visits.append(visit)
+            origins.append(Origin(url=visit.origin))
+        storage.origin_add(origins)
         storage.origin_visit_upsert(visits)
     elif object_type in ('directory', 'release', 'snapshot', 'origin'):
         method = getattr(storage, object_type + '_add')
