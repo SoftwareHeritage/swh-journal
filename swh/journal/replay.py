@@ -31,7 +31,7 @@ from swh.model.model import (
 from swh.objstorage.objstorage import (
     ID_HASH_ALGO, ObjNotFoundError, ObjStorage,
 )
-from swh.storage import HashCollision
+from swh.storage.exc import HashCollision
 
 logger = logging.getLogger(__name__)
 
@@ -85,14 +85,12 @@ def collision_aware_content_add(
         try:
             content_add_fn(contents)
         except HashCollision as e:
-            algo, hash_id, colliding_hashes = e.args
-            hash_id = hash_to_hex(hash_id)
             colliding_content_hashes.append({
-                'algo': algo,
-                'hash': hash_to_hex(hash_id),
-                'objects': [{k: hash_to_hex(v) for k, v in collision.items()}
-                            for collision in colliding_hashes]
+                'algo': e.algo,
+                'hash': e.hash_id,               # hex hash id
+                'objects': e.colliding_contents  # hex hashes
             })
+            colliding_hashes = e.colliding_content_hashes()
             # Drop the colliding contents from the transaction
             contents = [c for c in contents
                         if c.hashes() not in colliding_hashes]
