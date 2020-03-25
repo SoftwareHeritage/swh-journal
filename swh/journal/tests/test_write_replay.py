@@ -14,7 +14,8 @@ from swh.model.hypothesis_strategies import (
     object_dicts, present_contents
 )
 from swh.model.model import Origin
-from swh.storage import get_storage, HashCollision
+from swh.storage import get_storage
+from swh.storage.exc import HashCollision
 
 from swh.journal.replay import (
     process_replay_objects, process_replay_objects_content, object_converter_fn

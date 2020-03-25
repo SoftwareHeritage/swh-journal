@@ -1,8 +1,17 @@
-swh-journal (0.0.27-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-journal (0.0.28-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.0.28     - (tagged by Antoine R. Dumont
+    (@ardumont) <antoine.romain.dumont@gmail.com> on 2020-03-25 10:14:47
+    +0100)
+  * Upstream changes:     - v0.0.28     - journal.replay: Migrate to
+    latest HashCollision change     - replayer: factor out legacy
+    objects fixers     - journal.replay: Inline `_fix_origin_visit` for
+    loop in insert_object     - journal.replay: Align _fix_content with
+    other fix methods     - journal.replay: Align fix revision behavior
+    to other fix methods     - Remove extra 'perms' key of contents when
+    replaying.
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Mon, 16 Mar 2020 15:19:07 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 25 Mar 2020 09:23:55 +0000
 
 swh-journal (0.0.27-1~swh1) unstable-swh; urgency=medium
 
