@@ -8,9 +8,9 @@ Build-Depends: debhelper (>= 9),
                python3-confluent-kafka (>= 0.11),
                python3-pytest,
                python3-setuptools,
-               python3-swh.core (>= 0.0.55),
+               python3-swh.core (>= 0.0.60),
                python3-swh.model (>= 0.0.60),
-               python3-swh.storage (>= 0.0.178~),
+               python3-swh.storage (>= 0.0.181~),
                python3-vcversioner
 Standards-Version: 3.9.6
 Homepage: https://forge.softwareheritage.org/diffusion/DJNL/
@@ -18,8 +18,8 @@ Homepage: https://forge.softwareheritage.org/diffusion/DJNL/
 Package: python3-swh.journal
 Architecture: all
 Depends: python3-confluent-kafka (>= 0.11),
-         python3-swh.core (>= 0.0.55),
+         python3-swh.core (>= 0.0.60),
          python3-swh.model (>= 0.0.60),
-         python3-swh.storage (>= 0.0.178~),
+         python3-swh.storage (>= 0.0.181~),
          ${misc:Depends}, ${python3:Depends}
 Description: Software Heritage Journal utilities
