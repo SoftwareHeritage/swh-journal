@@ -18,6 +18,7 @@ swh/journal/backfill.py
 swh/journal/cli.py
 swh/journal/client.py
 swh/journal/direct_writer.py
+swh/journal/fixer.py
 swh/journal/py.typed
 swh/journal/replay.py
 swh/journal/serializers.py

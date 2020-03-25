@@ -8,12 +8,13 @@ import functools
 import logging
 import random
 from subprocess import Popen
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 import dateutil
+import pytest
+
 from confluent_kafka import Producer
 from hypothesis import strategies, given, settings
-import pytest
 
 from swh.storage import get_storage
 
@@ -276,7 +277,7 @@ def test_storage_play_with_collision(
         assert expected_content_hashes in actual_colliding_hashes
 
 
-def _test_write_replay_origin_visit(visits):
+def _test_write_replay_origin_visit(visits: List[Dict]):
     """Helper function to write tests for origin_visit.
 
     Each visit (a dict) given in the 'visits' argument will be sent to
@@ -284,10 +285,10 @@ def _test_write_replay_origin_visit(visits):
     listening to.
 
     Check that corresponding origin visits entities are present in the storage
-    and have correct values.
+    and have correct values if they are not skipped.
 
     """
-    queue = []
+    queue: List = []
     replayer = MockedJournalClient(queue)
     writer = MockedKafkaWriter(queue)
 
@@ -339,17 +340,33 @@ def test_write_replay_origin_visit():
 
 
 def test_write_replay_legacy_origin_visit1():
-    """Test origin_visit when there is no type."""
+    """Origin_visit with no types should make the replayer crash
+
+    We expect the journal's origin_visit topic to no longer reference such
+    visits. If it does, the replayer must crash so we can fix the journal's
+    topic.
+
+    """
     now = datetime.datetime.now()
-    visits = [{
+    visit = {
         'visit': 1,
         'origin': 'http://example.com/',
         'date': now,
         'status': 'partial',
         'snapshot': None,
-    }]
-    with pytest.raises(ValueError, match='too old'):
-        _test_write_replay_origin_visit(visits)
+    }
+    now2 = datetime.datetime.now()
+    visit2 = {
+        'visit': 2,
+        'origin': {'url': 'http://example.com/'},
+        'date': now2,
+        'status': 'partial',
+        'snapshot': None,
+    }
+
+    for origin_visit in [visit, visit2]:
+        with pytest.raises(ValueError, match='Old origin visit format'):
+            _test_write_replay_origin_visit([origin_visit])
 
 
 def test_write_replay_legacy_origin_visit2():
