@@ -297,7 +297,7 @@ def _test_write_replay_origin_visit(visits: List[Dict]):
     # the origin when needed (type is missing)
     writer.send('origin', 'foo', {
         'url': 'http://example.com/',
-        'type': 'git',
+        'type': 'git',  # test the legacy origin format is accepted
     })
     for visit in visits:
         writer.send('origin_visit', 'foo', visit)
