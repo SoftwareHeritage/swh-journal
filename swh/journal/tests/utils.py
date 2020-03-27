@@ -64,6 +64,9 @@ class MockedKafkaConsumer:
         if unknown_topics:
             raise ValueError('Unknown topics %s' % ', '.join(unknown_topics))
 
+    def close(self):
+        pass
+
 
 class MockedJournalClient(JournalClient):
     def __init__(self, queue, object_types=ACCEPTED_OBJECT_TYPES):
