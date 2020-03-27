@@ -171,6 +171,26 @@ def _fix_revision(revision: Dict[str, Any]) -> Optional[Dict]:
     return rev
 
 
+def _fix_origin(origin: Dict) -> Dict:
+    """Fix legacy origin with type which is no longer part of the model.
+
+    >>> from pprint import pprint
+    >>> pprint(_fix_origin({
+    ...     'url': 'http://foo',
+    ... }))
+    {'url': 'http://foo'}
+    >>> pprint(_fix_origin({
+    ...     'url': 'http://bar',
+    ...     'type': 'foo',
+    ... }))
+    {'url': 'http://bar'}
+
+    """
+    o = origin.copy()
+    o.pop('type', None)
+    return o
+
+
 def _fix_origin_visit(visit: Dict) -> Dict:
     """Fix various legacy origin visit issues.
 
@@ -262,6 +282,8 @@ def fix_objects(object_type: str, objects: List[Dict]) -> List[Dict]:
     elif object_type == 'revision':
         revisions = [_fix_revision(v) for v in objects]
         return [rev for rev in revisions if rev is not None]
+    elif object_type == 'origin':
+        return [_fix_origin(v) for v in objects]
     elif object_type == 'origin_visit':
         return [_fix_origin_visit(v) for v in objects]
     else:
