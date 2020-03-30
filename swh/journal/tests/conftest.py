@@ -10,6 +10,7 @@ import random
 import string
 
 from confluent_kafka import Consumer
+from hypothesis.strategies import one_of
 from subprocess import Popen
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -18,6 +19,7 @@ from pytest_kafka import (
     make_zookeeper_process, make_kafka_server, ZOOKEEPER_CONFIG_TEMPLATE,
 )
 
+from swh.model import hypothesis_strategies as strategies
 from swh.model.hashutil import hash_to_bytes
 
 
@@ -262,3 +264,24 @@ def consumer(
     yield consumer
 
     consumer.close()
+
+
+def objects_d():
+    return one_of(
+        strategies.origins().map(
+            lambda x: ('origin', x.to_dict())),
+        strategies.origin_visits().map(
+            lambda x: ('origin_visit', x.to_dict())),
+        strategies.snapshots().map(
+            lambda x: ('snapshot', x.to_dict())),
+        strategies.releases().map(
+            lambda x: ('release', x.to_dict())),
+        strategies.revisions().map(
+            lambda x: ('revision', x.to_dict())),
+        strategies.directories().map(
+            lambda x: ('directory', x.to_dict())),
+        strategies.skipped_contents().map(
+            lambda x: ('skipped_content', x.to_dict())),
+        strategies.present_contents().map(
+            lambda x: ('content', x.to_dict())),
+    )

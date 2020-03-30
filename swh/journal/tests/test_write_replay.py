@@ -10,9 +10,7 @@ import attr
 from hypothesis import given, settings, HealthCheck
 from hypothesis.strategies import lists
 
-from swh.model.hypothesis_strategies import (
-    object_dicts, present_contents
-)
+from swh.model.hypothesis_strategies import present_contents
 from swh.model.model import Origin
 from swh.storage import get_storage
 from swh.storage.exc import HashCollision
@@ -22,7 +20,7 @@ from swh.journal.replay import (
 )
 
 from .utils import MockedJournalClient, MockedKafkaWriter
-
+from .conftest import objects_d
 
 storage_config = {
     'cls': 'memory',
@@ -56,7 +54,7 @@ def empty_person_name_email(rev_or_rel):
     return rev_or_rel
 
 
-@given(lists(object_dicts(), min_size=1))
+@given(lists(objects_d(), min_size=1))
 @settings(suppress_health_check=[HealthCheck.too_slow])
 def test_write_replay_same_order_batches(objects):
     queue = []
