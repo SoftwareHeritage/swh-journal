@@ -75,7 +75,7 @@ DATES = [
             'microseconds': 0,
         },
         'offset': 120,
-        'negative_utc': None,
+        'negative_utc': False,
     },
     {
         'timestamp': {
@@ -83,7 +83,7 @@ DATES = [
             'microseconds': 0,
         },
         'offset': 120,
-        'negative_utc': None,
+        'negative_utc': False,
     }
 ]
 
@@ -96,7 +96,7 @@ REVISIONS = [
         'author':  COMMITTERS[0],
         'committer_date': DATES[0],
         'type': 'git',
-        'directory': '\x01'*20,
+        'directory': b'\x01'*20,
         'synthetic': False,
         'metadata': None,
         'parents': [],
@@ -109,7 +109,7 @@ REVISIONS = [
         'author':  COMMITTERS[1],
         'committer_date': DATES[1],
         'type': 'hg',
-        'directory': '\x02'*20,
+        'directory': b'\x02'*20,
         'synthetic': False,
         'metadata': None,
         'parents': [],
@@ -126,7 +126,7 @@ RELEASES = [
                 'microseconds': 0,
             },
             'offset': 120,
-            'negative_utc': None,
+            'negative_utc': False,
         },
         'author': COMMITTERS[0],
         'target_type': 'revision',
