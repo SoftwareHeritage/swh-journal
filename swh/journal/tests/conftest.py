@@ -20,19 +20,15 @@ from pytest_kafka import (
 )
 
 from swh.model import hypothesis_strategies as strategies
-from swh.model.hashutil import hash_to_bytes
+from swh.model.hashutil import MultiHash, hash_to_bytes
 
 
 logger = logging.getLogger(__name__)
 
 CONTENTS = [
     {
+        **MultiHash.from_data(b'foo').digest(),
         'length': 3,
-        'sha1': hash_to_bytes(
-            '34973274ccef6ab4dfaaf86599792fa9c3fe4689'),
-        'sha1_git': b'foo',
-        'blake2s256': b'bar',
-        'sha256': b'baz',
         'status': 'visible',
     },
 ]
