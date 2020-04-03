@@ -3,12 +3,14 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from typing import Any, Dict, Union
+
 import msgpack
 
 from swh.core.api.serializers import msgpack_dumps, msgpack_loads
 
 
-def key_to_kafka(key):
+def key_to_kafka(key: Union[bytes, Dict]) -> bytes:
     """Serialize a key, possibly a dict, in a predictable way"""
     p = msgpack.Packer(use_bin_type=True)
     if isinstance(key, dict):
@@ -17,16 +19,16 @@ def key_to_kafka(key):
         return p.pack(key)
 
 
-def kafka_to_key(kafka_key):
+def kafka_to_key(kafka_key: bytes) -> Union[bytes, Dict]:
     """Deserialize a key"""
     return msgpack.loads(kafka_key)
 
 
-def value_to_kafka(value):
+def value_to_kafka(value: Any) -> bytes:
     """Serialize some data for storage in kafka"""
     return msgpack_dumps(value)
 
 
-def kafka_to_value(kafka_value):
+def kafka_to_value(kafka_value: bytes) -> Any:
     """Deserialize some data stored in kafka"""
     return msgpack_loads(kafka_value)

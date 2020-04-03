@@ -16,11 +16,13 @@ from swh.journal.replay import object_converter_fn
 from swh.journal.serializers import (
     kafka_to_key, kafka_to_value
 )
-from swh.journal.writer.kafka import KafkaJournalWriter
+from swh.journal.writer.kafka import KafkaJournalWriter, OBJECT_TYPES
 
 from swh.model.model import Content, Origin, BaseModel
 
 from .conftest import OBJECT_TYPE_KEYS
+
+MODEL_OBJECTS = {v: k for (k, v) in OBJECT_TYPES.items()}
 
 
 def assert_written(consumer, kafka_prefix, expected_messages):
@@ -76,25 +78,24 @@ def test_kafka_writer(
         consumer: Consumer):
     kafka_prefix += '.swh.journal.objects'
 
-    config = {
-        'brokers': ['localhost:%d' % kafka_server[1]],
-        'client_id': 'kafka_writer',
-        'prefix': kafka_prefix,
-        'producer_config': {
+    writer = KafkaJournalWriter(
+        brokers=[f'localhost:{kafka_server[1]}'],
+        client_id='kafka_writer',
+        prefix=kafka_prefix,
+        producer_config={
             'message.max.bytes': 100000000,
-        }
-    }
-
-    writer = KafkaJournalWriter(**config)
+        })
 
     expected_messages = 0
 
     for (object_type, (_, objects)) in OBJECT_TYPE_KEYS.items():
-        for (num, object_) in enumerate(objects):
+        for (num, object_d) in enumerate(objects):
             if object_type == 'origin_visit':
-                object_ = {**object_, 'visit': num}
+                object_d = {**object_d, 'visit': num}
             if object_type == 'content':
-                object_ = {**object_, 'ctime': datetime.datetime.now()}
+                object_d = {**object_d, 'ctime': datetime.datetime.now()}
+            object_ = MODEL_OBJECTS[object_type].from_dict(object_d)
+
             writer.write_addition(object_type, object_)
             expected_messages += 1
 
