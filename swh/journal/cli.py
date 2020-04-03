@@ -191,7 +191,7 @@ def content_replay(ctx, stop_after_objects, exclude_sha1_file, check_dst):
         if map_.size() % SHA1_SIZE != 0:
             ctx.fail('--exclude-sha1 must link to a file whose size is an '
                      'exact multiple of %d bytes.' % SHA1_SIZE)
-        nb_excluded_hashes = int(map_.size()/SHA1_SIZE)
+        nb_excluded_hashes = int(map_.size() / SHA1_SIZE)
 
         def exclude_fn(obj):
             return is_hash_in_bytearray(obj['sha1'], map_, nb_excluded_hashes)

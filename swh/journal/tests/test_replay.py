@@ -109,7 +109,7 @@ def test_storage_play(
             [rel['id'] for rel in OBJECT_TYPE_KEYS['release'][1]]))
 
     origins = list(storage.origin_get(
-            [orig for orig in OBJECT_TYPE_KEYS['origin'][1]]))
+        [orig for orig in OBJECT_TYPE_KEYS['origin'][1]]))
     assert OBJECT_TYPE_KEYS['origin'][1] == \
         [{'url': orig['url']} for orig in origins]
     for origin in origins:
@@ -131,7 +131,7 @@ def test_storage_play(
 
     input_contents = OBJECT_TYPE_KEYS['content'][1]
     contents = storage.content_get_metadata(
-            [cont['sha1'] for cont in input_contents])
+        [cont['sha1'] for cont in input_contents])
     assert len(contents) == len(input_contents)
     assert contents == {cont['sha1']: [cont] for cont in input_contents}
 
@@ -225,7 +225,7 @@ def test_storage_play_with_collision(
             [rel['id'] for rel in OBJECT_TYPE_KEYS['release'][1]]))
 
     origins = list(storage.origin_get(
-            [orig for orig in OBJECT_TYPE_KEYS['origin'][1]]))
+        [orig for orig in OBJECT_TYPE_KEYS['origin'][1]]))
     assert OBJECT_TYPE_KEYS['origin'][1] == \
         [{'url': orig['url']} for orig in origins]
     for origin in origins:
@@ -247,7 +247,7 @@ def test_storage_play_with_collision(
 
     input_contents = OBJECT_TYPE_KEYS['content'][1]
     contents = storage.content_get_metadata(
-            [cont['sha1'] for cont in input_contents])
+        [cont['sha1'] for cont in input_contents])
     assert len(contents) == len(input_contents)
     assert contents == {cont['sha1']: [cont] for cont in input_contents}
 

@@ -174,13 +174,13 @@ def is_hash_in_bytearray(hash_, array, nb_hashes, hash_size=SHA1_SIZE):
         raise ValueError('hash_ does not match the provided hash_size.')
 
     def get_hash(position):
-        return array[position*hash_size:(position+1)*hash_size]
+        return array[position * hash_size:(position + 1) * hash_size]
 
     # Regular dichotomy:
     left = 0
     right = nb_hashes
-    while left < right-1:
-        middle = int((right+left)/2)
+    while left < right - 1:
+        middle = int((right + left) / 2)
         pivot = get_hash(middle)
         if pivot == hash_:
             return True
@@ -384,8 +384,8 @@ def process_replay_objects_content(
         'processed %s content objects in %.1fsec '
         '(%.1f obj/sec, %.1fMB/sec) - %d failed - %d skipped',
         len(vol), dt,
-        len(vol)/dt,
-        sum(vol)/1024/1024/dt,
+        len(vol) / dt,
+        sum(vol) / 1024 / 1024 / dt,
         nb_failures,
         nb_skipped)
 

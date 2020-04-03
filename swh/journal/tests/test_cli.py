@@ -99,11 +99,11 @@ def test_replay(
     snapshot = {'id': b'foo', 'branches': {
         b'HEAD': {
             'target_type': 'revision',
-            'target': b'\x01'*20,
+            'target': b'\x01' * 20,
         }
     }}  # type: Dict[str, Any]
     producer.produce(
-        topic=kafka_prefix+'.snapshot',
+        topic=kafka_prefix + '.snapshot',
         key=key_to_kafka(snapshot['id']),
         value=value_to_kafka(snapshot),
     )
@@ -160,11 +160,11 @@ def _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages):
 
     contents = {}
     for i in range(NUM_CONTENTS):
-        content = b'\x00'*19 + bytes([i])
+        content = b'\x00' * 19 + bytes([i])
         sha1 = objstorages['src'].add(content)
         contents[sha1] = content
         producer.produce(
-            topic=kafka_prefix+'.content',
+            topic=kafka_prefix + '.content',
             key=key_to_kafka(sha1),
             value=key_to_kafka({
                 'sha1': sha1,
