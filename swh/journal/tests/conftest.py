@@ -16,7 +16,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pathlib import Path
 from pytest_kafka import (
-    make_zookeeper_process, make_kafka_server, ZOOKEEPER_CONFIG_TEMPLATE,
+    make_zookeeper_process, make_kafka_server, KAFKA_SERVER_CONFIG_TEMPLATE,
+    ZOOKEEPER_CONFIG_TEMPLATE,
 )
 
 from swh.model import hypothesis_strategies as strategies
@@ -185,6 +186,9 @@ KAFKA_BIN = str(KAFKA_SCRIPTS / 'kafka-server-start.sh')
 ZOOKEEPER_BIN = str(KAFKA_SCRIPTS / 'zookeeper-server-start.sh')
 
 ZK_CONFIG_TEMPLATE = ZOOKEEPER_CONFIG_TEMPLATE + '\nadmin.enableServer=false\n'
+KAFKA_CONFIG_TEMPLATE = (
+    KAFKA_SERVER_CONFIG_TEMPLATE + '\nmessage.max.bytes=104857600\n'
+)
 
 # Those defines fixtures
 zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN,
@@ -193,7 +197,9 @@ zookeeper_proc = make_zookeeper_process(ZOOKEEPER_BIN,
 os.environ['KAFKA_LOG4J_OPTS'] = \
     '-Dlog4j.configuration=file:%s/log4j.properties' % \
     os.path.dirname(__file__)
-kafka_server = make_kafka_server(KAFKA_BIN, 'zookeeper_proc', scope='session')
+kafka_server = make_kafka_server(KAFKA_BIN, 'zookeeper_proc',
+                                 kafka_config_template=KAFKA_CONFIG_TEMPLATE,
+                                 scope='session')
 
 kafka_logger = logging.getLogger('kafka')
 kafka_logger.setLevel(logging.WARN)
