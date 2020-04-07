@@ -4,7 +4,6 @@
 # See top-level LICENSE file for more information
 
 import logging
-import copy
 
 from multiprocessing import Manager
 from typing import List
@@ -24,7 +23,7 @@ class InMemoryJournalWriter:
 
     def write_addition(self, object_type: str, object_: ModelObject) -> None:
         assert isinstance(object_, BaseModel)
-        self.objects.append((object_type, copy.deepcopy(object_)))
+        self.objects.append((object_type, object_))
 
     write_update = write_addition
 
