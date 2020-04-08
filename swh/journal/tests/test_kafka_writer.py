@@ -89,7 +89,6 @@ def test_kafka_writer(
         brokers=[f"localhost:{kafka_server[1]}"],
         client_id="kafka_writer",
         prefix=kafka_prefix,
-        producer_config={"message.max.bytes": 100000000,},
     )
 
     expected_messages = 0
@@ -119,7 +118,6 @@ def test_storage_direct_writer(
         "brokers": ["localhost:%d" % kafka_server[1]],
         "client_id": "kafka_writer",
         "prefix": kafka_prefix,
-        "producer_config": {"message.max.bytes": 100000000,},
     }
     storage_config = {
         "cls": "pipeline",

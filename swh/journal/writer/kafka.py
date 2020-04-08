@@ -58,6 +58,12 @@ class KafkaJournalWriter:
         if not producer_config:
             producer_config = {}
 
+        if "message.max.bytes" not in producer_config:
+            producer_config = {
+                "message.max.bytes": 100 * 1024 * 1024,
+                **producer_config,
+            }
+
         self.producer = Producer(
             {
                 "bootstrap.servers": ",".join(brokers),
