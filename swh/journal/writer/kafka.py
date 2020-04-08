@@ -4,7 +4,7 @@
 # See top-level LICENSE file for more information
 
 import logging
-from typing import Dict, Iterable, Type, Union, overload
+from typing import Dict, Iterable, Optional, Type, Union, overload
 
 from confluent_kafka import Producer, KafkaException
 
@@ -51,7 +51,7 @@ class KafkaJournalWriter:
         brokers: Iterable[str],
         prefix: str,
         client_id: str,
-        producer_config: Dict = Union[None, Dict],
+        producer_config: Optional[Dict] = None,
     ):
         self._prefix = prefix
 
