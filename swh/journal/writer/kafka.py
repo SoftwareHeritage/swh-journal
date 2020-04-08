@@ -4,7 +4,7 @@
 # See top-level LICENSE file for more information
 
 import logging
-from typing import Dict, Iterable, List, Type, Union, overload
+from typing import Dict, Iterable, Type, Union, overload
 
 from confluent_kafka import Producer, KafkaException
 
@@ -155,7 +155,7 @@ class KafkaJournalWriter:
 
     write_update = write_addition
 
-    def write_additions(self, object_type: str, objects: List[ModelObject]) -> None:
+    def write_additions(self, object_type: str, objects: Iterable[ModelObject]) -> None:
         """Write a set of objects to the journal"""
         for object_ in objects:
             self._write_addition(object_type, object_)
