@@ -14,9 +14,9 @@ class TestSerializers(unittest.TestCase):
     def test_key_to_kafka_repeatable(self):
         """Check the kafka key encoding is repeatable"""
         base_dict = {
-            'a': 'foo',
-            'b': 'bar',
-            'c': 'baz',
+            "a": "foo",
+            "b": "bar",
+            "c": "baz",
         }
 
         key = serializers.key_to_kafka(base_dict)

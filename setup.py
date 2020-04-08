@@ -12,15 +12,15 @@ from io import open
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the README file
-with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+with open(path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
 
 def parse_requirements(name=None):
     if name:
-        reqf = 'requirements-%s.txt' % name
+        reqf = "requirements-%s.txt" % name
     else:
-        reqf = 'requirements.txt'
+        reqf = "requirements.txt"
 
     requirements = []
     if not path.exists(reqf):
@@ -29,31 +29,31 @@ def parse_requirements(name=None):
     with open(reqf) as f:
         for line in f.readlines():
             line = line.strip()
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
             requirements.append(line)
     return requirements
 
 
 setup(
-    name='swh.journal',
-    description='Software Heritage Journal utilities',
+    name="swh.journal",
+    description="Software Heritage Journal utilities",
     long_description=long_description,
-    long_description_content_type='text/markdown',
-    author='Software Heritage developers',
-    author_email='swh-devel@inria.fr',
-    url='https://forge.softwareheritage.org/diffusion/DJNL/',
+    long_description_content_type="text/markdown",
+    author="Software Heritage developers",
+    author_email="swh-devel@inria.fr",
+    url="https://forge.softwareheritage.org/diffusion/DJNL/",
     packages=find_packages(),
     scripts=[],
-    entry_points='''
+    entry_points="""
         [console_scripts]
         swh-journal=swh.journal.cli:main
         [swh.cli.subcommands]
         journal=swh.journal.cli:cli
-    ''',
-    install_requires=parse_requirements() + parse_requirements('swh'),
-    setup_requires=['vcversioner'],
-    extras_require={'testing': parse_requirements('test')},
+    """,
+    install_requires=parse_requirements() + parse_requirements("swh"),
+    setup_requires=["vcversioner"],
+    extras_require={"testing": parse_requirements("test")},
     vcversioner={},
     include_package_data=True,
     classifiers=[
@@ -64,8 +64,8 @@ setup(
         "Development Status :: 5 - Production/Stable",
     ],
     project_urls={
-        'Bug Reports': 'https://forge.softwareheritage.org/maniphest',
-        'Funding': 'https://www.softwareheritage.org/donate',
-        'Source': 'https://forge.softwareheritage.org/source/swh-journal',
+        "Bug Reports": "https://forge.softwareheritage.org/maniphest",
+        "Funding": "https://www.softwareheritage.org/donate",
+        "Source": "https://forge.softwareheritage.org/source/swh-journal",
     },
 )

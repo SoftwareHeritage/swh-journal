@@ -4,4 +4,4 @@
 # See top-level LICENSE file for more information
 
 # the default prefix for kafka's topics
-DEFAULT_PREFIX = 'swh.journal.objects'
+DEFAULT_PREFIX = "swh.journal.objects"
