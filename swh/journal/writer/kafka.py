@@ -21,7 +21,7 @@ from swh.model.model import (
     Snapshot,
 )
 
-from swh.journal.serializers import key_to_kafka, value_to_kafka
+from swh.journal.serializers import KeyType, key_to_kafka, value_to_kafka
 
 logger = logging.getLogger(__name__)
 
@@ -79,9 +79,10 @@ class KafkaJournalWriter:
         if error is not None:
             self._error_cb(error)
 
-    def send(self, topic: str, key, value):
+    def send(self, topic: str, key: KeyType, value):
+        kafka_key = key_to_kafka(key)
         self.producer.produce(
-            topic=topic, key=key_to_kafka(key), value=value_to_kafka(value),
+            topic=topic, key=kafka_key, value=value_to_kafka(value),
         )
 
         # Need to service the callbacks regularly by calling poll
@@ -114,7 +115,7 @@ class KafkaJournalWriter:
     def _get_key(self, object_type: str, object_: OriginVisit) -> Dict[str, str]:
         ...
 
-    def _get_key(self, object_type, object_):
+    def _get_key(self, object_type: str, object_) -> KeyType:
         if object_type in ("revision", "release", "directory", "snapshot"):
             return object_.id
         elif object_type == "content":

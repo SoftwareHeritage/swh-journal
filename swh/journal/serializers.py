@@ -9,8 +9,10 @@ import msgpack
 
 from swh.core.api.serializers import msgpack_dumps, msgpack_loads
 
+KeyType = Union[Dict[str, str], Dict[str, bytes], bytes]
 
-def key_to_kafka(key: Union[bytes, Dict]) -> bytes:
+
+def key_to_kafka(key: KeyType) -> bytes:
     """Serialize a key, possibly a dict, in a predictable way"""
     p = msgpack.Packer(use_bin_type=True)
     if isinstance(key, dict):
@@ -19,7 +21,7 @@ def key_to_kafka(key: Union[bytes, Dict]) -> bytes:
         return p.pack(key)
 
 
-def kafka_to_key(kafka_key: bytes) -> Union[bytes, Dict]:
+def kafka_to_key(kafka_key: bytes) -> KeyType:
     """Deserialize a key"""
     return msgpack.loads(kafka_key)
 
