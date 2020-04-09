@@ -141,14 +141,13 @@ ORIGIN_VISITS = [
     },
 ]
 
-# From type to tuple (id, <objects instances to test>)
-OBJECT_TYPE_KEYS = {
+TEST_OBJECT_DICTS: Dict[str, Tuple[Optional[str], List[Dict[str, Any]]]] = {
     "content": ("sha1", CONTENTS),
     "revision": ("id", REVISIONS),
     "release": ("id", RELEASES),
     "origin": (None, ORIGINS),
     "origin_visit": (None, ORIGIN_VISITS),
-}  # type: Dict[str, Tuple[Optional[str], List[Dict[str, Any]]]]
+}
 
 
 KAFKA_ROOT = os.environ.get("SWH_KAFKA_ROOT")
@@ -276,7 +275,7 @@ def kafka_server(
 
 TEST_CONFIG = {
     "consumer_id": "swh.journal.consumer",
-    "object_types": OBJECT_TYPE_KEYS.keys(),
+    "object_types": TEST_OBJECT_DICTS.keys(),
     "stop_after_objects": 1,  # will read 1 object and stop
     "storage": {"cls": "memory", "args": {}},
 }

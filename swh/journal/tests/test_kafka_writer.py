@@ -18,7 +18,7 @@ from swh.journal.writer.kafka import KafkaJournalWriter, OBJECT_TYPES
 
 from swh.model.model import Content, Origin, BaseModel
 
-from .conftest import OBJECT_TYPE_KEYS
+from .conftest import TEST_OBJECT_DICTS
 
 MODEL_OBJECTS = {v: k for (k, v) in OBJECT_TYPES.items()}
 
@@ -61,8 +61,8 @@ def consume_messages(consumer, kafka_prefix, expected_messages):
 
 
 def assert_all_objects_consumed(consumed_messages):
-    """Check whether all objects from OBJECT_TYPE_KEYS have been consumed"""
-    for (object_type, (key_name, objects)) in OBJECT_TYPE_KEYS.items():
+    """Check whether all objects from TEST_OBJECT_DICTS have been consumed"""
+    for (object_type, (key_name, objects)) in TEST_OBJECT_DICTS.items():
         (keys, values) = zip(*consumed_messages[object_type])
         if key_name:
             assert list(keys) == [object_[key_name] for object_ in objects]
@@ -93,7 +93,7 @@ def test_kafka_writer(
 
     expected_messages = 0
 
-    for (object_type, (_, objects)) in OBJECT_TYPE_KEYS.items():
+    for (object_type, (_, objects)) in TEST_OBJECT_DICTS.items():
         for (num, object_d) in enumerate(objects):
             if object_type == "origin_visit":
                 object_d = {**object_d, "visit": num}
@@ -128,7 +128,7 @@ def test_storage_direct_writer(
 
     expected_messages = 0
 
-    for (object_type, (_, objects)) in OBJECT_TYPE_KEYS.items():
+    for (object_type, (_, objects)) in TEST_OBJECT_DICTS.items():
         method = getattr(storage, object_type + "_add")
         if object_type in (
             "content",
