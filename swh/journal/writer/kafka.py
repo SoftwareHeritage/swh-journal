@@ -1,4 +1,4 @@
-# Copyright (C) 2019 The Software Heritage developers
+# Copyright (C) 2019-2020 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -44,7 +44,15 @@ ModelObject = Union[
 class KafkaJournalWriter:
     """This class is instantiated and used by swh-storage to write incoming
     new objects to Kafka before adding them to the storage backend
-    (eg. postgresql) itself."""
+    (eg. postgresql) itself.
+
+    Args:
+      brokers: list of broker addresses and ports
+      prefix: the prefix used to build the topic names for objects
+      client_id: the id of the writer sent to kafka
+      producer_config: extra configuration keys passed to the `Producer`
+
+    """
 
     def __init__(
         self,
