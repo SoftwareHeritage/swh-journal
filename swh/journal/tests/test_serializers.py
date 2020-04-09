@@ -5,25 +5,23 @@
 
 from collections import OrderedDict
 import itertools
-import unittest
 
 from swh.journal import serializers
 
 
-class TestSerializers(unittest.TestCase):
-    def test_key_to_kafka_repeatable(self):
-        """Check the kafka key encoding is repeatable"""
-        base_dict = {
-            "a": "foo",
-            "b": "bar",
-            "c": "baz",
-        }
+def test_key_to_kafka_repeatable():
+    """Check the kafka key encoding is repeatable"""
+    base_dict = {
+        "a": "foo",
+        "b": "bar",
+        "c": "baz",
+    }
 
-        key = serializers.key_to_kafka(base_dict)
+    key = serializers.key_to_kafka(base_dict)
 
-        for dict_keys in itertools.permutations(base_dict):
-            d = OrderedDict()
-            for k in dict_keys:
-                d[k] = base_dict[k]
+    for dict_keys in itertools.permutations(base_dict):
+        d = OrderedDict()
+        for k in dict_keys:
+            d[k] = base_dict[k]
 
-            self.assertEqual(key, serializers.key_to_kafka(d))
+        assert key == serializers.key_to_kafka(d)
