@@ -97,7 +97,7 @@ class JournalClient:
         process_timeout: Optional[float] = None,
         auto_offset_reset: str = "earliest",
         stop_on_eof: bool = False,
-        **kwargs
+        **kwargs,
     ):
         if prefix is None:
             prefix = DEFAULT_PREFIX
