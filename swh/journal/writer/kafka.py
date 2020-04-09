@@ -4,11 +4,10 @@
 # See top-level LICENSE file for more information
 
 import logging
-from typing import Dict, Iterable, Optional, Type, Union, overload
+from typing import Dict, Iterable, Optional, Type
 
 from confluent_kafka import Producer, KafkaException
 
-from swh.model.hashutil import DEFAULT_ALGORITHMS
 from swh.model.model import (
     BaseModel,
     Content,
@@ -21,7 +20,13 @@ from swh.model.model import (
     Snapshot,
 )
 
-from swh.journal.serializers import KeyType, key_to_kafka, value_to_kafka
+from swh.journal.serializers import (
+    KeyType,
+    ModelObject,
+    object_key,
+    key_to_kafka,
+    value_to_kafka,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +40,6 @@ OBJECT_TYPES: Dict[Type[BaseModel], str] = {
     SkippedContent: "skipped_content",
     Snapshot: "snapshot",
 }
-
-ModelObject = Union[
-    Content, Directory, Origin, OriginVisit, Release, Revision, SkippedContent, Snapshot
-]
 
 
 class KafkaJournalWriter:
@@ -105,47 +106,6 @@ class KafkaJournalWriter:
     def flush(self):
         self.producer.flush()
 
-    # these @overload'ed versions of the _get_key method aim at helping mypy figuring
-    # the correct type-ing.
-    @overload
-    def _get_key(
-        self, object_type: str, object_: Union[Revision, Release, Directory, Snapshot]
-    ) -> bytes:
-        ...
-
-    @overload
-    def _get_key(self, object_type: str, object_: Content) -> bytes:
-        ...
-
-    @overload
-    def _get_key(self, object_type: str, object_: SkippedContent) -> Dict[str, bytes]:
-        ...
-
-    @overload
-    def _get_key(self, object_type: str, object_: Origin) -> Dict[str, bytes]:
-        ...
-
-    @overload
-    def _get_key(self, object_type: str, object_: OriginVisit) -> Dict[str, str]:
-        ...
-
-    def _get_key(self, object_type: str, object_) -> KeyType:
-        if object_type in ("revision", "release", "directory", "snapshot"):
-            return object_.id
-        elif object_type == "content":
-            return object_.sha1  # TODO: use a dict of hashes
-        elif object_type == "skipped_content":
-            return {hash: getattr(object_, hash) for hash in DEFAULT_ALGORITHMS}
-        elif object_type == "origin":
-            return {"url": object_.url}
-        elif object_type == "origin_visit":
-            return {
-                "origin": object_.origin,
-                "date": str(object_.date),
-            }
-        else:
-            raise ValueError("Unknown object type: %s." % object_type)
-
     def _sanitize_object(
         self, object_type: str, object_: ModelObject
     ) -> Dict[str, str]:
@@ -160,7 +120,7 @@ class KafkaJournalWriter:
     def _write_addition(self, object_type: str, object_: ModelObject) -> None:
         """Write a single object to the journal"""
         topic = f"{self._prefix}.{object_type}"
-        key = self._get_key(object_type, object_)
+        key = object_key(object_type, object_)
         dict_ = self._sanitize_object(object_type, object_)
         logger.debug("topic: %s, key: %s, value: %s", topic, key, dict_)
         self.send(topic, key=key, value=dict_)

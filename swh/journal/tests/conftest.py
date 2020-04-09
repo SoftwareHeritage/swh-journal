@@ -28,8 +28,8 @@ from pytest_kafka import (
 from swh.model import hypothesis_strategies as strategies
 from swh.model.hashutil import MultiHash, hash_to_bytes
 
-
-from swh.journal.writer.kafka import OBJECT_TYPES, ModelObject
+from swh.journal.serializers import ModelObject
+from swh.journal.writer.kafka import OBJECT_TYPES
 
 
 logger = logging.getLogger(__name__)

@@ -8,6 +8,8 @@ import itertools
 
 from swh.journal import serializers
 
+from .conftest import TEST_OBJECTS
+
 
 def test_key_to_kafka_repeatable():
     """Check the kafka key encoding is repeatable"""
@@ -25,3 +27,10 @@ def test_key_to_kafka_repeatable():
             d[k] = base_dict[k]
 
         assert key == serializers.key_to_kafka(d)
+
+
+def test_get_key():
+    """Test whether get_key works on all our objects"""
+    for object_type, objects in TEST_OBJECTS.items():
+        for obj in objects:
+            assert serializers.object_key(object_type, obj) is not None

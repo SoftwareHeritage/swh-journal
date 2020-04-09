@@ -3,13 +3,67 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, overload
 
 import msgpack
 
 from swh.core.api.serializers import msgpack_dumps, msgpack_loads
+from swh.model.hashutil import DEFAULT_ALGORITHMS
+from swh.model.model import (
+    Content,
+    Directory,
+    Origin,
+    OriginVisit,
+    Release,
+    Revision,
+    SkippedContent,
+    Snapshot,
+)
+
+ModelObject = Union[
+    Content, Directory, Origin, OriginVisit, Release, Revision, SkippedContent, Snapshot
+]
 
 KeyType = Union[Dict[str, str], Dict[str, bytes], bytes]
+
+
+# these @overload'ed versions of the object_key method aim at helping mypy figuring
+# the correct type-ing.
+@overload
+def object_key(
+    object_type: str, object_: Union[Content, Directory, Revision, Release, Snapshot]
+) -> bytes:
+    ...
+
+
+@overload
+def object_key(
+    object_type: str, object_: Union[Origin, SkippedContent]
+) -> Dict[str, bytes]:
+    ...
+
+
+@overload
+def object_key(object_type: str, object_: OriginVisit) -> Dict[str, str]:
+    ...
+
+
+def object_key(object_type: str, object_) -> KeyType:
+    if object_type in ("revision", "release", "directory", "snapshot"):
+        return object_.id
+    elif object_type == "content":
+        return object_.sha1  # TODO: use a dict of hashes
+    elif object_type == "skipped_content":
+        return {hash: getattr(object_, hash) for hash in DEFAULT_ALGORITHMS}
+    elif object_type == "origin":
+        return {"url": object_.url}
+    elif object_type == "origin_visit":
+        return {
+            "origin": object_.origin,
+            "date": str(object_.date),
+        }
+    else:
+        raise ValueError("Unknown object type: %s." % object_type)
 
 
 def key_to_kafka(key: KeyType) -> bytes:
