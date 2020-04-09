@@ -4,7 +4,8 @@
 # See top-level LICENSE file for more information
 
 import logging
-from typing import Dict, Iterable, Optional, Type
+import time
+from typing import Dict, Iterable, List, NamedTuple, Optional, Type
 
 from confluent_kafka import Producer, KafkaException
 
@@ -24,6 +25,7 @@ from swh.journal.serializers import (
     KeyType,
     ModelObject,
     object_key,
+    pprint_key,
     key_to_kafka,
     value_to_kafka,
 )
@@ -42,6 +44,44 @@ OBJECT_TYPES: Dict[Type[BaseModel], str] = {
 }
 
 
+class DeliveryTag(NamedTuple):
+    """Unique tag allowing us to check for a message delivery"""
+
+    topic: str
+    kafka_key: bytes
+
+
+class DeliveryFailureInfo(NamedTuple):
+    """Verbose information for failed deliveries"""
+
+    object_type: str
+    key: KeyType
+    message: str
+    code: str
+
+
+def get_object_type(topic: str) -> str:
+    """Get the object type from a topic string"""
+    return topic.rsplit(".", 1)[-1]
+
+
+class KafkaDeliveryError(Exception):
+    """Delivery failed on some kafka messages."""
+
+    def __init__(self, message: str, delivery_failures: Iterable[DeliveryFailureInfo]):
+        self.message = message
+        self.delivery_failures = list(delivery_failures)
+
+    def pretty_failures(self) -> str:
+        return ", ".join(
+            f"{f.object_type} {pprint_key(f.key)} ({f.message})"
+            for f in self.delivery_failures
+        )
+
+    def __str__(self):
+        return f"KafkaDeliveryError({self.message}, [{self.pretty_failures()}])"
+
+
 class KafkaJournalWriter:
     """This class is instantiated and used by swh-storage to write incoming
     new objects to Kafka before adding them to the storage backend
@@ -52,6 +92,8 @@ class KafkaJournalWriter:
       prefix: the prefix used to build the topic names for objects
       client_id: the id of the writer sent to kafka
       producer_config: extra configuration keys passed to the `Producer`
+      flush_timeout: timeout, in seconds, after which the `flush` operation
+        will fail if some message deliveries are still pending.
       producer_class: override for the kafka producer class
 
     """
@@ -62,6 +104,7 @@ class KafkaJournalWriter:
         prefix: str,
         client_id: str,
         producer_config: Optional[Dict] = None,
+        flush_timeout: float = 120,
         producer_class: Type[Producer] = Producer,
     ):
         self._prefix = prefix
@@ -87,14 +130,30 @@ class KafkaJournalWriter:
             }
         )
 
+        # Delivery management
+        self.flush_timeout = flush_timeout
+
+        # delivery tag -> original object "key" mapping
+        self.deliveries_pending: Dict[DeliveryTag, KeyType] = {}
+
+        # List of (object_type, key, error_msg, error_name) for failed deliveries
+        self.delivery_failures: List[DeliveryFailureInfo] = []
+
     def _error_cb(self, error):
         if error.fatal():
             raise KafkaException(error)
         logger.info("Received non-fatal kafka error: %s", error)
 
     def _on_delivery(self, error, message):
+        (topic, key) = delivery_tag = DeliveryTag(message.topic(), message.key())
+        sent_key = self.deliveries_pending.pop(delivery_tag, None)
+
         if error is not None:
-            self._error_cb(error)
+            self.delivery_failures.append(
+                DeliveryFailureInfo(
+                    get_object_type(topic), sent_key, error.str(), error.name()
+                )
+            )
 
     def send(self, topic: str, key: KeyType, value):
         kafka_key = key_to_kafka(key)
@@ -102,11 +161,44 @@ class KafkaJournalWriter:
             topic=topic, key=kafka_key, value=value_to_kafka(value),
         )
 
-        # Need to service the callbacks regularly by calling poll
-        self.producer.poll(0)
+        self.deliveries_pending[DeliveryTag(topic, kafka_key)] = key
+
+    def delivery_error(self, message) -> KafkaDeliveryError:
+        """Get all failed deliveries, and clear them"""
+        ret = self.delivery_failures
+        self.delivery_failures = []
+
+        while self.deliveries_pending:
+            delivery_tag, orig_key = self.deliveries_pending.popitem()
+            (topic, kafka_key) = delivery_tag
+            ret.append(
+                DeliveryFailureInfo(
+                    get_object_type(topic),
+                    orig_key,
+                    "No delivery before flush() timeout",
+                    "SWH_FLUSH_TIMEOUT",
+                )
+            )
+
+        return KafkaDeliveryError(message, ret)
 
     def flush(self):
-        self.producer.flush()
+        start = time.monotonic()
+
+        self.producer.flush(self.flush_timeout)
+
+        while self.deliveries_pending:
+            if time.monotonic() - start > self.flush_timeout:
+                break
+            self.producer.poll(0.1)
+
+        if self.deliveries_pending:
+            # Delivery timeout
+            raise self.delivery_error(
+                "flush() exceeded timeout (%ss)" % self.flush_timeout,
+            )
+        elif self.delivery_failures:
+            raise self.delivery_error("Failed deliveries after flush()")
 
     def _sanitize_object(
         self, object_type: str, object_: ModelObject
