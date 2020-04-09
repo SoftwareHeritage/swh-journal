@@ -34,3 +34,20 @@ def test_get_key():
     for object_type, objects in TEST_OBJECTS.items():
         for obj in objects:
             assert serializers.object_key(object_type, obj) is not None
+
+
+def test_pprint_key():
+    """Test whether get_key works on all our objects"""
+    for object_type, objects in TEST_OBJECTS.items():
+        for obj in objects:
+            key = serializers.object_key(object_type, obj)
+            pprinted_key = serializers.pprint_key(key)
+            assert isinstance(pprinted_key, str)
+
+            if isinstance(key, dict):
+                assert pprinted_key[0], pprinted_key[-1] == "{}"
+                for dict_key in key.keys():
+                    assert f"{dict_key}:" in pprinted_key
+
+            if isinstance(key, bytes):
+                assert pprinted_key == key.hex()

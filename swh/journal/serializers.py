@@ -66,6 +66,28 @@ def object_key(object_type: str, object_) -> KeyType:
         raise ValueError("Unknown object type: %s." % object_type)
 
 
+def stringify_key_item(k: str, v: Union[str, bytes]) -> str:
+    """Turn the item of a dict key into a string"""
+    if isinstance(v, str):
+        return v
+    if k == "url":
+        return v.decode("utf-8")
+    return v.hex()
+
+
+def pprint_key(key: KeyType) -> str:
+    """Pretty-print a kafka key"""
+
+    if isinstance(key, dict):
+        return "{%s}" % ", ".join(
+            f"{k}: {stringify_key_item(k, v)}" for k, v in key.items()
+        )
+    elif isinstance(key, bytes):
+        return key.hex()
+    else:
+        return key
+
+
 def key_to_kafka(key: KeyType) -> bytes:
     """Serialize a key, possibly a dict, in a predictable way"""
     p = msgpack.Packer(use_bin_type=True)
