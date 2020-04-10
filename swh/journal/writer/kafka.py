@@ -52,6 +52,7 @@ class KafkaJournalWriter:
       prefix: the prefix used to build the topic names for objects
       client_id: the id of the writer sent to kafka
       producer_config: extra configuration keys passed to the `Producer`
+      producer_class: override for the kafka producer class
 
     """
 
@@ -61,6 +62,7 @@ class KafkaJournalWriter:
         prefix: str,
         client_id: str,
         producer_config: Optional[Dict] = None,
+        producer_class: Type[Producer] = Producer,
     ):
         self._prefix = prefix
 
@@ -73,7 +75,7 @@ class KafkaJournalWriter:
                 **producer_config,
             }
 
-        self.producer = Producer(
+        self.producer = producer_class(
             {
                 "bootstrap.servers": ",".join(brokers),
                 "client.id": client_id,
