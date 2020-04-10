@@ -77,7 +77,7 @@ def key_to_kafka(key: KeyType) -> bytes:
 
 def kafka_to_key(kafka_key: bytes) -> KeyType:
     """Deserialize a key"""
-    return msgpack.loads(kafka_key)
+    return msgpack.loads(kafka_key, raw=False, strict_map_key=False)
 
 
 def value_to_kafka(value: Any) -> bytes:

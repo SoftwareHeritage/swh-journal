@@ -66,7 +66,7 @@ def test_storage_play(
     # Fill Kafka
     nb_sent = 0
     nb_visits = 0
-    for (object_type, (_, objects)) in TEST_OBJECT_DICTS.items():
+    for object_type, objects in TEST_OBJECT_DICTS.items():
         topic = make_topic(kafka_prefix, object_type)
         for object_ in objects:
             key = bytes(random.randint(0, 255) for _ in range(40))
@@ -98,17 +98,15 @@ def test_storage_play(
     assert nb_sent == nb_inserted
 
     # Check the objects were actually inserted in the storage
-    assert TEST_OBJECT_DICTS["revision"][1] == list(
-        storage.revision_get([rev["id"] for rev in TEST_OBJECT_DICTS["revision"][1]])
+    assert TEST_OBJECT_DICTS["revision"] == list(
+        storage.revision_get([rev["id"] for rev in TEST_OBJECT_DICTS["revision"]])
     )
-    assert TEST_OBJECT_DICTS["release"][1] == list(
-        storage.release_get([rel["id"] for rel in TEST_OBJECT_DICTS["release"][1]])
+    assert TEST_OBJECT_DICTS["release"] == list(
+        storage.release_get([rel["id"] for rel in TEST_OBJECT_DICTS["release"]])
     )
 
-    origins = list(
-        storage.origin_get([orig for orig in TEST_OBJECT_DICTS["origin"][1]])
-    )
-    assert TEST_OBJECT_DICTS["origin"][1] == [{"url": orig["url"]} for orig in origins]
+    origins = list(storage.origin_get([orig for orig in TEST_OBJECT_DICTS["origin"]]))
+    assert TEST_OBJECT_DICTS["origin"] == [{"url": orig["url"]} for orig in origins]
     for origin in origins:
         origin_url = origin["url"]
         expected_visits = [
@@ -117,7 +115,7 @@ def test_storage_play(
                 "origin": origin_url,
                 "date": dateutil.parser.parse(visit["date"]),
             }
-            for visit in TEST_OBJECT_DICTS["origin_visit"][1]
+            for visit in TEST_OBJECT_DICTS["origin_visit"]
             if visit["origin"] == origin["url"]
         ]
         actual_visits = list(storage.origin_visit_get(origin_url))
@@ -125,7 +123,7 @@ def test_storage_play(
             del visit["visit"]  # opaque identifier
         assert expected_visits == actual_visits
 
-    input_contents = TEST_OBJECT_DICTS["content"][1]
+    input_contents = TEST_OBJECT_DICTS["content"]
     contents = storage.content_get_metadata([cont["sha1"] for cont in input_contents])
     assert len(contents) == len(input_contents)
     assert contents == {cont["sha1"]: [cont] for cont in input_contents}
@@ -171,7 +169,7 @@ def test_storage_play_with_collision(
     # Fill Kafka
     nb_sent = 0
     nb_visits = 0
-    for (object_type, (_, objects)) in TEST_OBJECT_DICTS.items():
+    for object_type, objects in TEST_OBJECT_DICTS.items():
         topic = make_topic(kafka_prefix, object_type)
         for object_ in objects:
             key = bytes(random.randint(0, 255) for _ in range(40))
@@ -213,17 +211,15 @@ def test_storage_play_with_collision(
     assert nb_sent == nb_inserted
 
     # Check the objects were actually inserted in the storage
-    assert TEST_OBJECT_DICTS["revision"][1] == list(
-        storage.revision_get([rev["id"] for rev in TEST_OBJECT_DICTS["revision"][1]])
+    assert TEST_OBJECT_DICTS["revision"] == list(
+        storage.revision_get([rev["id"] for rev in TEST_OBJECT_DICTS["revision"]])
     )
-    assert TEST_OBJECT_DICTS["release"][1] == list(
-        storage.release_get([rel["id"] for rel in TEST_OBJECT_DICTS["release"][1]])
+    assert TEST_OBJECT_DICTS["release"] == list(
+        storage.release_get([rel["id"] for rel in TEST_OBJECT_DICTS["release"]])
     )
 
-    origins = list(
-        storage.origin_get([orig for orig in TEST_OBJECT_DICTS["origin"][1]])
-    )
-    assert TEST_OBJECT_DICTS["origin"][1] == [{"url": orig["url"]} for orig in origins]
+    origins = list(storage.origin_get([orig for orig in TEST_OBJECT_DICTS["origin"]]))
+    assert TEST_OBJECT_DICTS["origin"] == [{"url": orig["url"]} for orig in origins]
     for origin in origins:
         origin_url = origin["url"]
         expected_visits = [
@@ -232,7 +228,7 @@ def test_storage_play_with_collision(
                 "origin": origin_url,
                 "date": dateutil.parser.parse(visit["date"]),
             }
-            for visit in TEST_OBJECT_DICTS["origin_visit"][1]
+            for visit in TEST_OBJECT_DICTS["origin_visit"]
             if visit["origin"] == origin["url"]
         ]
         actual_visits = list(storage.origin_visit_get(origin_url))
@@ -240,7 +236,7 @@ def test_storage_play_with_collision(
             del visit["visit"]  # opaque identifier
         assert expected_visits == actual_visits
 
-    input_contents = TEST_OBJECT_DICTS["content"][1]
+    input_contents = TEST_OBJECT_DICTS["content"]
     contents = storage.content_get_metadata([cont["sha1"] for cont in input_contents])
     assert len(contents) == len(input_contents)
     assert contents == {cont["sha1"]: [cont] for cont in input_contents}

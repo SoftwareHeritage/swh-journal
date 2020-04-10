@@ -15,7 +15,7 @@ from confluent_kafka.admin import AdminClient, ConfigResource
 
 from hypothesis.strategies import one_of
 from subprocess import Popen
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Tuple
 
 from pathlib import Path
 from pytest_kafka import (
@@ -145,19 +145,19 @@ ORIGIN_VISITS = [
     },
 ]
 
-TEST_OBJECT_DICTS: Dict[str, Tuple[Optional[str], List[Dict[str, Any]]]] = {
-    "content": ("sha1", CONTENTS),
-    "revision": ("id", REVISIONS),
-    "release": ("id", RELEASES),
-    "origin": (None, ORIGINS),
-    "origin_visit": (None, ORIGIN_VISITS),
+TEST_OBJECT_DICTS: Dict[str, List[Dict[str, Any]]] = {
+    "content": CONTENTS,
+    "revision": REVISIONS,
+    "release": RELEASES,
+    "origin": ORIGINS,
+    "origin_visit": ORIGIN_VISITS,
 }
 
 MODEL_OBJECTS = {v: k for (k, v) in OBJECT_TYPES.items()}
 
 TEST_OBJECTS: Dict[str, List[ModelObject]] = {}
 
-for object_type, (_, objects) in TEST_OBJECT_DICTS.items():
+for object_type, objects in TEST_OBJECT_DICTS.items():
     converted_objects: List[ModelObject] = []
     model = MODEL_OBJECTS[object_type]
 

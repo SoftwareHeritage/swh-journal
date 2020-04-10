@@ -11,7 +11,7 @@ from typing import Tuple
 
 from swh.storage import get_storage
 
-from swh.journal.serializers import kafka_to_key, kafka_to_value
+from swh.journal.serializers import object_key, kafka_to_key, kafka_to_value
 from swh.journal.writer.kafka import KafkaJournalWriter
 
 from swh.model.model import Origin, OriginVisit
@@ -58,22 +58,23 @@ def consume_messages(consumer, kafka_prefix, expected_messages):
 
 def assert_all_objects_consumed(consumed_messages):
     """Check whether all objects from TEST_OBJECT_DICTS have been consumed"""
-    for (object_type, (key_name, objects)) in TEST_OBJECT_DICTS.items():
-        (keys, values) = zip(*consumed_messages[object_type])
-        if key_name:
-            assert list(keys) == [object_[key_name] for object_ in objects]
-        else:
-            pass  # TODO
+    for object_type, known_values in TEST_OBJECT_DICTS.items():
+        known_keys = [object_key(object_type, obj) for obj in TEST_OBJECTS[object_type]]
+
+        (received_keys, received_values) = zip(*consumed_messages[object_type])
 
         if object_type == "origin_visit":
-            for value in values:
+            for value in received_values:
                 del value["visit"]
         elif object_type == "content":
-            for value in values:
+            for value in received_values:
                 del value["ctime"]
 
-        for object_ in objects:
-            assert object_ in values
+        for key in known_keys:
+            assert key in received_keys
+
+        for value in known_values:
+            assert value in received_values
 
 
 def test_kafka_writer(
