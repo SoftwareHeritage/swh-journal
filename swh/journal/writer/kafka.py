@@ -153,6 +153,8 @@ class KafkaJournalWriter:
         if object_type == "origin_visit":
             # :(
             dict_["date"] = str(dict_["date"])
+        if object_type == "content":
+            dict_.pop("data", None)
         return dict_
 
     def _write_addition(self, object_type: str, object_: ModelObject) -> None:

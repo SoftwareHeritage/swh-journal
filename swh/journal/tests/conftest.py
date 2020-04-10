@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import datetime
 import os
 import pytest
 import logging
@@ -26,6 +27,9 @@ from pytest_kafka import (
 
 from swh.model import hypothesis_strategies as strategies
 from swh.model.hashutil import MultiHash, hash_to_bytes
+
+
+from swh.journal.writer.kafka import OBJECT_TYPES, ModelObject
 
 
 logger = logging.getLogger(__name__)
@@ -148,6 +152,24 @@ TEST_OBJECT_DICTS: Dict[str, Tuple[Optional[str], List[Dict[str, Any]]]] = {
     "origin": (None, ORIGINS),
     "origin_visit": (None, ORIGIN_VISITS),
 }
+
+MODEL_OBJECTS = {v: k for (k, v) in OBJECT_TYPES.items()}
+
+TEST_OBJECTS: Dict[str, List[ModelObject]] = {}
+
+for object_type, (_, objects) in TEST_OBJECT_DICTS.items():
+    converted_objects: List[ModelObject] = []
+    model = MODEL_OBJECTS[object_type]
+
+    for (num, obj_d) in enumerate(objects):
+        if object_type == "origin_visit":
+            obj_d = {**obj_d, "visit": num}
+        elif object_type == "content":
+            obj_d = {**obj_d, "data": b"", "ctime": datetime.datetime.now()}
+
+        converted_objects.append(model.from_dict(obj_d))
+
+    TEST_OBJECTS[object_type] = converted_objects
 
 
 KAFKA_ROOT = os.environ.get("SWH_KAFKA_ROOT")
