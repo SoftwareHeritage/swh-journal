@@ -9,7 +9,6 @@ import functools
 import logging
 import re
 import tempfile
-from typing import Any, Dict
 from unittest.mock import patch, MagicMock
 
 from click.testing import CliRunner
@@ -23,7 +22,7 @@ from swh.storage import get_storage
 
 from swh.journal.cli import cli, get_journal_client
 from swh.journal.replay import CONTENT_REPLAY_RETRIES
-from swh.journal.serializers import key_to_kafka, value_to_kafka
+from swh.journal.serializers import key_to_kafka
 
 
 logger = logging.getLogger(__name__)
@@ -41,7 +40,7 @@ def storage():
     """An swh-storage object that gets injected into the CLI functions."""
     storage_config = {"cls": "pipeline", "steps": [{"cls": "memory"},]}
     storage = get_storage(**storage_config)
-    with patch("swh.journal.cli.get_storage") as get_storage_mock:
+    with patch("swh.storage.get_storage") as get_storage_mock:
         get_storage_mock.return_value = storage
         yield storage
 
@@ -102,50 +101,6 @@ def test_get_journal_client_config(kafka_server):
     assert client.subscription == ["prefix.content"]
     assert client.stop_after_objects == 10
     assert client.batch_size == 50
-
-
-def test_replay(
-    storage, kafka_prefix: str, kafka_consumer_group: str, kafka_server: str,
-):
-    kafka_prefix += ".swh.journal.objects"
-
-    producer = Producer(
-        {
-            "bootstrap.servers": kafka_server,
-            "client.id": "test-producer",
-            "acks": "all",
-        }
-    )
-
-    snapshot = {
-        "id": b"foo",
-        "branches": {b"HEAD": {"target_type": "revision", "target": b"\x01" * 20,}},
-    }  # type: Dict[str, Any]
-    producer.produce(
-        topic=kafka_prefix + ".snapshot",
-        key=key_to_kafka(snapshot["id"]),
-        value=value_to_kafka(snapshot),
-    )
-    producer.flush()
-
-    logger.debug("Flushed producer")
-
-    result = invoke(
-        "replay",
-        "--stop-after-objects",
-        "1",
-        journal_config={
-            "brokers": [kafka_server],
-            "group_id": kafka_consumer_group,
-            "prefix": kafka_prefix,
-        },
-    )
-
-    expected = r"Done.\n"
-    assert result.exit_code == 0, result.output
-    assert re.fullmatch(expected, result.output, re.MULTILINE), result.output
-
-    assert storage.snapshot_get(snapshot["id"]) == {**snapshot, "next_branch": None}
 
 
 def _patch_objstorages(names):

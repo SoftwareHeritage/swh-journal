@@ -19,14 +19,11 @@ except ImportError:
 from swh.core import config
 from swh.core.cli import CONTEXT_SETTINGS
 from swh.model.model import SHA1_SIZE
-from swh.storage import get_storage
 from swh.objstorage import get_objstorage
 
 from swh.journal.client import get_journal_client as get_client
 from swh.journal.replay import is_hash_in_bytearray
-from swh.journal.replay import process_replay_objects
 from swh.journal.replay import process_replay_objects_content
-from swh.journal.backfill import JournalBackfiller
 
 
 @click.group(name="journal", context_settings=CONTEXT_SETTINGS)
@@ -89,33 +86,11 @@ def get_journal_client(ctx, **kwargs):
 )
 @click.pass_context
 def replay(ctx, stop_after_objects):
-    """Fill a Storage by reading a Journal.
+    """DEPRECATED: use `swh storage replay` instead.
 
-    There can be several 'replayers' filling a Storage as long as they use
-    the same `group-id`.
+    Requires swh.storage >= 0.0.188.
     """
-    conf = ctx.obj["config"]
-    try:
-        storage = get_storage(**conf.pop("storage"))
-    except KeyError:
-        ctx.fail("You must have a storage configured in your config file.")
-
-    client = get_journal_client(ctx, stop_after_objects=stop_after_objects)
-    worker_fn = functools.partial(process_replay_objects, storage=storage)
-
-    if notify:
-        notify("READY=1")
-
-    try:
-        client.process(worker_fn)
-    except KeyboardInterrupt:
-        ctx.exit(0)
-    else:
-        print("Done.")
-    finally:
-        if notify:
-            notify("STOPPING=1")
-        client.close()
+    ctx.fail("DEPRECATED")
 
 
 @cli.command()
@@ -125,39 +100,12 @@ def replay(ctx, stop_after_objects):
 @click.option("--dry-run", is_flag=True, default=False)
 @click.pass_context
 def backfiller(ctx, object_type, start_object, end_object, dry_run):
-    """Run the backfiller
+    """DEPRECATED: use `swh storage backfill` instead.
 
-    The backfiller list objects from a Storage and produce journal entries from
-    there.
-
-    Typically used to rebuild a journal or compensate for missing objects in a
-    journal (eg. due to a downtime of this later).
-
-    The configuration file requires the following entries:
-    - brokers: a list of kafka endpoints (the journal) in which entries will be
-               added.
-    - storage_dbconn: URL to connect to the storage DB.
-    - prefix: the prefix of the topics (topics will be <prefix>.<object_type>).
-    - client_id: the kafka client ID.
+    Requires swh.storage >= 0.0.188.
 
     """
-    conf = ctx.obj["config"]
-    backfiller = JournalBackfiller(conf)
-
-    if notify:
-        notify("READY=1")
-
-    try:
-        backfiller.run(
-            object_type=object_type,
-            start_object=start_object,
-            end_object=end_object,
-            dry_run=dry_run,
-        )
-    except KeyboardInterrupt:
-        if notify:
-            notify("STOPPING=1")
-        ctx.exit(0)
+    ctx.fail("DEPRECATED")
 
 
 @cli.command("content-replay")
