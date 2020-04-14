@@ -28,10 +28,14 @@ from swh.journal.replay import process_replay_objects_content
 from swh.journal.backfill import JournalBackfiller
 
 
-@click.group(name='journal', context_settings=CONTEXT_SETTINGS)
-@click.option('--config-file', '-C', default=None,
-              type=click.Path(exists=True, dir_okay=False,),
-              help="Configuration file.")
+@click.group(name="journal", context_settings=CONTEXT_SETTINGS)
+@click.option(
+    "--config-file",
+    "-C",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False,),
+    help="Configuration file.",
+)
 @click.pass_context
 def cli(ctx, config_file):
     """Software Heritage Journal tools.
@@ -41,34 +45,38 @@ def cli(ctx, config_file):
 
     """
     if not config_file:
-        config_file = os.environ.get('SWH_CONFIG_FILENAME')
+        config_file = os.environ.get("SWH_CONFIG_FILENAME")
 
     if config_file:
         if not os.path.exists(config_file):
-            raise ValueError('%s does not exist' % config_file)
+            raise ValueError("%s does not exist" % config_file)
         conf = config.read(config_file)
     else:
         conf = {}
 
     ctx.ensure_object(dict)
 
-    ctx.obj['config'] = conf
+    ctx.obj["config"] = conf
 
 
 def get_journal_client(ctx, **kwargs):
-    conf = ctx.obj['config'].get('journal', {})
+    conf = ctx.obj["config"].get("journal", {})
     conf.update({k: v for (k, v) in kwargs.items() if v not in (None, ())})
-    if not conf.get('brokers'):
-        ctx.fail('You must specify at least one kafka broker.')
-    if not isinstance(conf['brokers'], (list, tuple)):
-        conf['brokers'] = [conf['brokers']]
+    if not conf.get("brokers"):
+        ctx.fail("You must specify at least one kafka broker.")
+    if not isinstance(conf["brokers"], (list, tuple)):
+        conf["brokers"] = [conf["brokers"]]
     return JournalClient(**conf)
 
 
 @cli.command()
-@click.option('--stop-after-objects', '-n', default=None, type=int,
-              help='Stop after processing this many objects. Default is to '
-                   'run forever.')
+@click.option(
+    "--stop-after-objects",
+    "-n",
+    default=None,
+    type=int,
+    help="Stop after processing this many objects. Default is to " "run forever.",
+)
 @click.pass_context
 def replay(ctx, stop_after_objects):
     """Fill a Storage by reading a Journal.
@@ -76,36 +84,35 @@ def replay(ctx, stop_after_objects):
     There can be several 'replayers' filling a Storage as long as they use
     the same `group-id`.
     """
-    conf = ctx.obj['config']
+    conf = ctx.obj["config"]
     try:
-        storage = get_storage(**conf.pop('storage'))
+        storage = get_storage(**conf.pop("storage"))
     except KeyError:
-        ctx.fail('You must have a storage configured in your config file.')
+        ctx.fail("You must have a storage configured in your config file.")
 
-    client = get_journal_client(
-        ctx, stop_after_objects=stop_after_objects)
+    client = get_journal_client(ctx, stop_after_objects=stop_after_objects)
     worker_fn = functools.partial(process_replay_objects, storage=storage)
 
     if notify:
-        notify('READY=1')
+        notify("READY=1")
 
     try:
         client.process(worker_fn)
     except KeyboardInterrupt:
         ctx.exit(0)
     else:
-        print('Done.')
+        print("Done.")
     finally:
         if notify:
-            notify('STOPPING=1')
+            notify("STOPPING=1")
         client.close()
 
 
 @cli.command()
-@click.argument('object_type')
-@click.option('--start-object', default=None)
-@click.option('--end-object', default=None)
-@click.option('--dry-run', is_flag=True, default=False)
+@click.argument("object_type")
+@click.option("--start-object", default=None)
+@click.option("--end-object", default=None)
+@click.option("--dry-run", is_flag=True, default=False)
 @click.pass_context
 def backfiller(ctx, object_type, start_object, end_object, dry_run):
     """Run the backfiller
@@ -124,32 +131,44 @@ def backfiller(ctx, object_type, start_object, end_object, dry_run):
     - client_id: the kafka client ID.
 
     """
-    conf = ctx.obj['config']
+    conf = ctx.obj["config"]
     backfiller = JournalBackfiller(conf)
 
     if notify:
-        notify('READY=1')
+        notify("READY=1")
 
     try:
         backfiller.run(
             object_type=object_type,
-            start_object=start_object, end_object=end_object,
-            dry_run=dry_run)
+            start_object=start_object,
+            end_object=end_object,
+            dry_run=dry_run,
+        )
     except KeyboardInterrupt:
         if notify:
-            notify('STOPPING=1')
+            notify("STOPPING=1")
         ctx.exit(0)
 
 
-@cli.command('content-replay')
-@click.option('--stop-after-objects', '-n', default=None, type=int,
-              help='Stop after processing this many objects. Default is to '
-                   'run forever.')
-@click.option('--exclude-sha1-file', default=None, type=click.File('rb'),
-              help='File containing a sorted array of hashes to be excluded.')
-@click.option('--check-dst/--no-check-dst', default=True,
-              help='Check whether the destination contains the object before '
-                   'copying.')
+@cli.command("content-replay")
+@click.option(
+    "--stop-after-objects",
+    "-n",
+    default=None,
+    type=int,
+    help="Stop after processing this many objects. Default is to " "run forever.",
+)
+@click.option(
+    "--exclude-sha1-file",
+    default=None,
+    type=click.File("rb"),
+    help="File containing a sorted array of hashes to be excluded.",
+)
+@click.option(
+    "--check-dst/--no-check-dst",
+    default=True,
+    help="Check whether the destination contains the object before " "copying.",
+)
 @click.pass_context
 def content_replay(ctx, stop_after_objects, exclude_sha1_file, check_dst):
     """Fill a destination Object Storage (typically a mirror) by reading a Journal
@@ -174,56 +193,63 @@ def content_replay(ctx, stop_after_objects, exclude_sha1_file, check_dst):
     ObjStorage before copying an object. You can turn that off if you know
     you're copying to an empty ObjStorage.
     """
-    conf = ctx.obj['config']
+    conf = ctx.obj["config"]
     try:
-        objstorage_src = get_objstorage(**conf.pop('objstorage_src'))
+        objstorage_src = get_objstorage(**conf.pop("objstorage_src"))
     except KeyError:
-        ctx.fail('You must have a source objstorage configured in '
-                 'your config file.')
+        ctx.fail("You must have a source objstorage configured in " "your config file.")
     try:
-        objstorage_dst = get_objstorage(**conf.pop('objstorage_dst'))
+        objstorage_dst = get_objstorage(**conf.pop("objstorage_dst"))
     except KeyError:
-        ctx.fail('You must have a destination objstorage configured '
-                 'in your config file.')
+        ctx.fail(
+            "You must have a destination objstorage configured " "in your config file."
+        )
 
     if exclude_sha1_file:
         map_ = mmap.mmap(exclude_sha1_file.fileno(), 0, prot=mmap.PROT_READ)
         if map_.size() % SHA1_SIZE != 0:
-            ctx.fail('--exclude-sha1 must link to a file whose size is an '
-                     'exact multiple of %d bytes.' % SHA1_SIZE)
-        nb_excluded_hashes = int(map_.size()/SHA1_SIZE)
+            ctx.fail(
+                "--exclude-sha1 must link to a file whose size is an "
+                "exact multiple of %d bytes." % SHA1_SIZE
+            )
+        nb_excluded_hashes = int(map_.size() / SHA1_SIZE)
 
         def exclude_fn(obj):
-            return is_hash_in_bytearray(obj['sha1'], map_, nb_excluded_hashes)
+            return is_hash_in_bytearray(obj["sha1"], map_, nb_excluded_hashes)
+
     else:
         exclude_fn = None
 
     client = get_journal_client(
-        ctx, stop_after_objects=stop_after_objects, object_types=('content',))
+        ctx, stop_after_objects=stop_after_objects, object_types=("content",)
+    )
     worker_fn = functools.partial(
         process_replay_objects_content,
-        src=objstorage_src, dst=objstorage_dst, exclude_fn=exclude_fn,
-        check_dst=check_dst)
+        src=objstorage_src,
+        dst=objstorage_dst,
+        exclude_fn=exclude_fn,
+        check_dst=check_dst,
+    )
 
     if notify:
-        notify('READY=1')
+        notify("READY=1")
 
     try:
         client.process(worker_fn)
     except KeyboardInterrupt:
         ctx.exit(0)
     else:
-        print('Done.')
+        print("Done.")
     finally:
         if notify:
-            notify('STOPPING=1')
+            notify("STOPPING=1")
         client.close()
 
 
 def main():
     logging.basicConfig()
-    return cli(auto_envvar_prefix='SWH_JOURNAL')
+    return cli(auto_envvar_prefix="SWH_JOURNAL")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
