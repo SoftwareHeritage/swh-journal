@@ -1,7 +1,6 @@
 from swh.journal.client import JournalClient, ACCEPTED_OBJECT_TYPES
 from swh.journal.writer.kafka import KafkaJournalWriter
-from swh.journal.serializers import (kafka_to_value, key_to_kafka,
-                                     value_to_kafka)
+from swh.journal.serializers import kafka_to_value, key_to_kafka, value_to_kafka
 
 
 class FakeKafkaMessage:
@@ -25,7 +24,7 @@ class FakeKafkaMessage:
 
 class MockedKafkaWriter(KafkaJournalWriter):
     def __init__(self, queue):
-        self._prefix = 'prefix'
+        self._prefix = "prefix"
         self.queue = queue
 
     def send(self, topic, key, value):
@@ -43,6 +42,7 @@ class MockedKafkaConsumer:
        You're only allowed to subscribe to topics in which the queue has
        messages.
     """
+
     def __init__(self, queue):
         self.queue = queue
         self.committed = False
@@ -62,7 +62,7 @@ class MockedKafkaConsumer:
     def subscribe(self, topics):
         unknown_topics = set(topics) - self.list_topics()
         if unknown_topics:
-            raise ValueError('Unknown topics %s' % ', '.join(unknown_topics))
+            raise ValueError("Unknown topics %s" % ", ".join(unknown_topics))
 
     def close(self):
         pass

@@ -18,29 +18,31 @@ from swh.journal.serializers import key_to_kafka, value_to_kafka
 
 
 def test_client(
-        kafka_prefix: str,
-        kafka_consumer_group: str,
-        kafka_server: Tuple[Popen, int]):
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server: Tuple[Popen, int]
+):
     (_, port) = kafka_server
-    kafka_prefix += '.swh.journal.objects'
+    kafka_prefix += ".swh.journal.objects"
 
-    producer = Producer({
-        'bootstrap.servers': 'localhost:{}'.format(port),
-        'client.id': 'test producer',
-        'acks': 'all',
-    })
+    producer = Producer(
+        {
+            "bootstrap.servers": "localhost:{}".format(port),
+            "client.id": "test producer",
+            "acks": "all",
+        }
+    )
 
     rev = revisions().example()
 
     # Fill Kafka
     producer.produce(
-        topic=kafka_prefix + '.revision', key=key_to_kafka(rev.id),
+        topic=kafka_prefix + ".revision",
+        key=key_to_kafka(rev.id),
         value=value_to_kafka(rev.to_dict()),
     )
     producer.flush()
 
     client = JournalClient(
-        brokers='localhost:%d' % kafka_server[1],
+        brokers="localhost:%d" % kafka_server[1],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
         stop_after_objects=1,
@@ -48,33 +50,35 @@ def test_client(
     worker_fn = MagicMock()
     client.process(worker_fn)
 
-    worker_fn.assert_called_once_with({'revision': [rev.to_dict()]})
+    worker_fn.assert_called_once_with({"revision": [rev.to_dict()]})
 
 
 def test_client_eof(
-        kafka_prefix: str,
-        kafka_consumer_group: str,
-        kafka_server: Tuple[Popen, int]):
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server: Tuple[Popen, int]
+):
     (_, port) = kafka_server
-    kafka_prefix += '.swh.journal.objects'
+    kafka_prefix += ".swh.journal.objects"
 
-    producer = Producer({
-        'bootstrap.servers': 'localhost:{}'.format(port),
-        'client.id': 'test producer',
-        'acks': 'all',
-    })
+    producer = Producer(
+        {
+            "bootstrap.servers": "localhost:{}".format(port),
+            "client.id": "test producer",
+            "acks": "all",
+        }
+    )
 
     rev = revisions().example()
 
     # Fill Kafka
     producer.produce(
-        topic=kafka_prefix + '.revision', key=key_to_kafka(rev.id),
+        topic=kafka_prefix + ".revision",
+        key=key_to_kafka(rev.id),
         value=value_to_kafka(rev.to_dict()),
     )
     producer.flush()
 
     client = JournalClient(
-        brokers='localhost:%d' % kafka_server[1],
+        brokers="localhost:%d" % kafka_server[1],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
         stop_after_objects=None,
@@ -84,34 +88,36 @@ def test_client_eof(
     worker_fn = MagicMock()
     client.process(worker_fn)
 
-    worker_fn.assert_called_once_with({'revision': [rev.to_dict()]})
+    worker_fn.assert_called_once_with({"revision": [rev.to_dict()]})
 
 
 @pytest.mark.parametrize("batch_size", [1, 5, 100])
 def test_client_batch_size(
-        kafka_prefix: str,
-        kafka_consumer_group: str,
-        kafka_server: Tuple[Popen, int],
-        batch_size: int,
+    kafka_prefix: str,
+    kafka_consumer_group: str,
+    kafka_server: Tuple[Popen, int],
+    batch_size: int,
 ):
     (_, port) = kafka_server
-    kafka_prefix += '.swh.journal.objects'
+    kafka_prefix += ".swh.journal.objects"
 
     num_objects = 2 * batch_size + 1
     assert num_objects < 256, "Too many objects, generation will fail"
 
-    producer = Producer({
-        'bootstrap.servers': 'localhost:{}'.format(port),
-        'client.id': 'test producer',
-        'acks': 'all',
-    })
+    producer = Producer(
+        {
+            "bootstrap.servers": "localhost:{}".format(port),
+            "client.id": "test producer",
+            "acks": "all",
+        }
+    )
 
     contents = [Content.from_data(bytes([i])) for i in range(num_objects)]
 
     # Fill Kafka
     for content in contents:
         producer.produce(
-            topic=kafka_prefix + '.content',
+            topic=kafka_prefix + ".content",
             key=key_to_kafka(content.sha1),
             value=value_to_kafka(content.to_dict()),
         )
@@ -119,7 +125,7 @@ def test_client_batch_size(
     producer.flush()
 
     client = JournalClient(
-        brokers=['localhost:%d' % kafka_server[1]],
+        brokers=["localhost:%d" % kafka_server[1]],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
         stop_after_objects=num_objects,
@@ -129,7 +135,7 @@ def test_client_batch_size(
     collected_output: List[Dict] = []
 
     def worker_fn(objects):
-        received = objects['content']
+        received = objects["content"]
         assert len(received) <= batch_size
         collected_output.extend(received)
 
