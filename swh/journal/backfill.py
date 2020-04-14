@@ -25,27 +25,38 @@ from swh.storage.converters import db_to_release, db_to_revision
 logger = logging.getLogger(__name__)
 
 PARTITION_KEY = {
-    'content': 'sha1',
-    'skipped_content': None,  # unused
-    'directory': 'id',
-    'revision': 'revision.id',
-    'release': 'release.id',
-    'snapshot': 'id',
-    'origin': 'id',
-    'origin_visit': 'origin_visit.origin',
+    "content": "sha1",
+    "skipped_content": None,  # unused
+    "directory": "id",
+    "revision": "revision.id",
+    "release": "release.id",
+    "snapshot": "id",
+    "origin": "id",
+    "origin_visit": "origin_visit.origin",
 }
 
 COLUMNS = {
-    'content': [
-        'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'status',
-        'ctime'
+    "content": [
+        "sha1",
+        "sha1_git",
+        "sha256",
+        "blake2s256",
+        "length",
+        "status",
+        "ctime",
     ],
-    'skipped_content': [
-        'sha1', 'sha1_git', 'sha256', 'blake2s256', 'length', 'ctime',
-        'status', 'reason',
+    "skipped_content": [
+        "sha1",
+        "sha1_git",
+        "sha256",
+        "blake2s256",
+        "length",
+        "ctime",
+        "status",
+        "reason",
     ],
-    'directory': ['id', 'dir_entries', 'file_entries', 'rev_entries'],
-    'revision': [
+    "directory": ["id", "dir_entries", "file_entries", "rev_entries"],
+    "revision": [
         ("revision.id", "id"),
         "date",
         "date_offset",
@@ -58,9 +69,11 @@ COLUMNS = {
         "metadata",
         "date_neg_utc_offset",
         "committer_date_neg_utc_offset",
-        ("array(select parent_id::bytea from revision_history rh "
-         "where rh.id = revision.id order by rh.parent_rank asc)",
-         "parents"),
+        (
+            "array(select parent_id::bytea from revision_history rh "
+            "where rh.id = revision.id order by rh.parent_rank asc)",
+            "parents",
+        ),
         ("a.id", "author_id"),
         ("a.name", "author_name"),
         ("a.email", "author_email"),
@@ -70,7 +83,7 @@ COLUMNS = {
         ("c.email", "committer_email"),
         ("c.fullname", "committer_fullname"),
     ],
-    'release': [
+    "release": [
         ("release.id", "id"),
         "date",
         "date_offset",
@@ -85,18 +98,28 @@ COLUMNS = {
         ("a.email", "author_email"),
         ("a.fullname", "author_fullname"),
     ],
-    'snapshot': ['id', 'object_id'],
-    'origin': ['type', 'url'],
-    'origin_visit': ['visit', 'origin.type', 'origin_visit.type',
-                     'url', 'date', 'snapshot', 'status', 'metadata'],
+    "snapshot": ["id", "object_id"],
+    "origin": ["type", "url"],
+    "origin_visit": [
+        "visit",
+        "origin.type",
+        "origin_visit.type",
+        "url",
+        "date",
+        "snapshot",
+        "status",
+        "metadata",
+    ],
 }
 
 
 JOINS = {
-    'release': ['person a on release.author=a.id'],
-    'revision': ['person a on revision.author=a.id',
-                 'person c on revision.committer=c.id'],
-    'origin_visit': ['origin on origin_visit.origin=origin.id'],
+    "release": ["person a on release.author=a.id"],
+    "revision": [
+        "person a on revision.author=a.id",
+        "person c on revision.committer=c.id",
+    ],
+    "origin_visit": ["origin on origin_visit.origin=origin.id"],
 }
 
 
@@ -105,32 +128,32 @@ def directory_converter(db, directory):
        compatible objects.
 
     """
-    columns = ['target', 'name', 'perms']
-    query_template = '''
+    columns = ["target", "name", "perms"]
+    query_template = """
     select %(columns)s
     from directory_entry_%(type)s
     where id in %%s
-    '''
+    """
 
-    types = ['file', 'dir', 'rev']
+    types = ["file", "dir", "rev"]
 
     entries = []
     with db.cursor() as cur:
         for type in types:
-            ids = directory.pop('%s_entries' % type)
+            ids = directory.pop("%s_entries" % type)
             if not ids:
                 continue
             query = query_template % {
-                'columns': ','.join(columns),
-                'type': type,
+                "columns": ",".join(columns),
+                "type": type,
             }
-            cur.execute(query, (tuple(ids), ))
+            cur.execute(query, (tuple(ids),))
             for row in cur:
                 entry = dict(zip(columns, row))
-                entry['type'] = type
+                entry["type"] = type
                 entries.append(entry)
 
-    directory['entries'] = entries
+    directory["entries"] = entries
     return directory
 
 
@@ -148,8 +171,8 @@ def release_converter(db, release):
 
     """
     release = db_to_release(release)
-    if 'author' in release and release['author']:
-        del release['author']['id']
+    if "author" in release and release["author"]:
+        del release["author"]["id"]
     return release
 
 
@@ -158,42 +181,44 @@ def snapshot_converter(db, snapshot):
        compatible objects.
 
     """
-    columns = ['name', 'target', 'target_type']
-    query = '''
+    columns = ["name", "target", "target_type"]
+    query = """
     select %s
     from snapshot_branches sbs
     inner join snapshot_branch sb on sb.object_id=sbs.branch_id
     where sbs.snapshot_id=%%s
-    ''' % ', '.join(columns)
+    """ % ", ".join(
+        columns
+    )
     with db.cursor() as cur:
-        cur.execute(query, (snapshot.pop('object_id'), ))
+        cur.execute(query, (snapshot.pop("object_id"),))
         branches = {}
         for name, *row in cur:
             branch = dict(zip(columns[1:], row))
-            if not branch['target'] and not branch['target_type']:
+            if not branch["target"] and not branch["target_type"]:
                 branch = None
             branches[name] = branch
 
-    snapshot['branches'] = branches
+    snapshot["branches"] = branches
     return snapshot
 
 
 def origin_visit_converter(db, origin_visit):
     origin = {
-        'type': origin_visit.pop('origin.type'),
-        'url': origin_visit.pop('url'),
+        "type": origin_visit.pop("origin.type"),
+        "url": origin_visit.pop("url"),
     }
-    origin_visit['origin'] = origin
-    origin_visit['type'] = origin_visit.pop('origin_visit.type')
+    origin_visit["origin"] = origin
+    origin_visit["type"] = origin_visit.pop("origin_visit.type")
     return origin_visit
 
 
 CONVERTERS = {
-    'directory': directory_converter,
-    'revision': revision_converter,
-    'release': release_converter,
-    'snapshot': snapshot_converter,
-    'origin_visit': origin_visit_converter,
+    "directory": directory_converter,
+    "revision": revision_converter,
+    "release": release_converter,
+    "snapshot": snapshot_converter,
+    "origin_visit": origin_visit_converter,
 }
 
 
@@ -213,12 +238,12 @@ def object_to_offset(object_id, numbits):
     length = q + (r != 0)
     shift_bits = 8 - r if r else 0
 
-    truncated_id = object_id[:length * 2]
+    truncated_id = object_id[: length * 2]
     if len(truncated_id) < length * 2:
-        truncated_id += '0' * (length * 2 - len(truncated_id))
+        truncated_id += "0" * (length * 2 - len(truncated_id))
 
     truncated_id_bytes = bytes.fromhex(truncated_id)
-    return int.from_bytes(truncated_id_bytes, byteorder='big') >> shift_bits
+    return int.from_bytes(truncated_id_bytes, byteorder="big") >> shift_bits
 
 
 def byte_ranges(numbits, start_object=None, end_object=None):
@@ -241,7 +266,7 @@ def byte_ranges(numbits, start_object=None, end_object=None):
     shift_bits = 8 - r if r else 0
 
     def to_bytes(i):
-        return int.to_bytes(i << shift_bits, length=length, byteorder='big')
+        return int.to_bytes(i << shift_bits, length=length, byteorder="big")
 
     start_offset = 0
     end_offset = 1 << numbits
@@ -273,35 +298,35 @@ def integer_ranges(start, end, block_size=1000):
 
 
 RANGE_GENERATORS = {
-    'content': lambda start, end: byte_ranges(24, start, end),
-    'skipped_content': lambda start, end: [(None, None)],
-    'directory': lambda start, end: byte_ranges(24, start, end),
-    'revision': lambda start, end: byte_ranges(24, start, end),
-    'release': lambda start, end: byte_ranges(16, start, end),
-    'snapshot': lambda start, end: byte_ranges(16, start, end),
-    'origin': integer_ranges,
-    'origin_visit': integer_ranges,
+    "content": lambda start, end: byte_ranges(24, start, end),
+    "skipped_content": lambda start, end: [(None, None)],
+    "directory": lambda start, end: byte_ranges(24, start, end),
+    "revision": lambda start, end: byte_ranges(24, start, end),
+    "release": lambda start, end: byte_ranges(16, start, end),
+    "snapshot": lambda start, end: byte_ranges(16, start, end),
+    "origin": integer_ranges,
+    "origin_visit": integer_ranges,
 }
 
 
 def compute_query(obj_type, start, end):
     columns = COLUMNS.get(obj_type)
     join_specs = JOINS.get(obj_type, [])
-    join_clause = '\n'.join('left join %s' % clause for clause in join_specs)
+    join_clause = "\n".join("left join %s" % clause for clause in join_specs)
 
     where = []
     where_args = []
     if start:
-        where.append('%(keys)s >= %%s')
+        where.append("%(keys)s >= %%s")
         where_args.append(start)
     if end:
-        where.append('%(keys)s < %%s')
+        where.append("%(keys)s < %%s")
         where_args.append(end)
 
-    where_clause = ''
+    where_clause = ""
     if where:
-        where_clause = ('where ' + ' and '.join(where)) % {
-            'keys': '(%s)' % PARTITION_KEY[obj_type]
+        where_clause = ("where " + " and ".join(where)) % {
+            "keys": "(%s)" % PARTITION_KEY[obj_type]
         }
 
     column_specs = []
@@ -311,19 +336,19 @@ def compute_query(obj_type, start, end):
             column_specs.append(column)
             column_aliases.append(column)
         else:
-            column_specs.append('%s as %s' % column)
+            column_specs.append("%s as %s" % column)
             column_aliases.append(column[1])
 
-    query = '''
+    query = """
 select %(columns)s
 from %(table)s
 %(join)s
 %(where)s
-    ''' % {
-        'columns': ','.join(column_specs),
-        'table': obj_type,
-        'join': join_clause,
-        'where': where_clause,
+    """ % {
+        "columns": ",".join(column_specs),
+        "table": obj_type,
+        "join": join_clause,
+        "where": where_clause,
     }
 
     return query, where_args, column_aliases
@@ -351,15 +376,15 @@ def fetch(db, obj_type, start, end):
     query, where_args, column_aliases = compute_query(obj_type, start, end)
     converter = CONVERTERS.get(obj_type)
     with db.cursor() as cursor:
-        logger.debug('Fetching data for table %s', obj_type)
-        logger.debug('query: %s %s', query, where_args)
+        logger.debug("Fetching data for table %s", obj_type)
+        logger.debug("query: %s %s", query, where_args)
         cursor.execute(query, where_args)
         for row in cursor:
             record = dict(zip(column_aliases, row))
             if converter:
                 record = converter(db, record)
 
-            logger.debug('record: %s' % record)
+            logger.debug("record: %s" % record)
             yield record
 
 
@@ -370,7 +395,7 @@ def _format_range_bound(bound):
         return str(bound)
 
 
-MANDATORY_KEYS = ['brokers', 'storage_dbconn', 'prefix', 'client_id']
+MANDATORY_KEYS = ["brokers", "storage_dbconn", "prefix", "client_id"]
 
 
 class JournalBackfiller:
@@ -380,6 +405,7 @@ class JournalBackfiller:
        This is designed to be run periodically.
 
     """
+
     def __init__(self, config=None):
         self.config = config
         self.check_config(config)
@@ -392,8 +418,9 @@ class JournalBackfiller:
 
         if missing_keys:
             raise ValueError(
-                'Configuration error: The following keys must be'
-                ' provided: %s' % (','.join(missing_keys), ))
+                "Configuration error: The following keys must be"
+                " provided: %s" % (",".join(missing_keys),)
+            )
 
     def parse_arguments(self, object_type, start_object, end_object):
         """Parse arguments
@@ -407,11 +434,13 @@ class JournalBackfiller:
 
         """
         if object_type not in COLUMNS:
-            raise ValueError('Object type %s is not supported. '
-                             'The only possible values are %s' % (
-                                 object_type, ', '.join(COLUMNS.keys())))
+            raise ValueError(
+                "Object type %s is not supported. "
+                "The only possible values are %s"
+                % (object_type, ", ".join(COLUMNS.keys()))
+            )
 
-        if object_type in ['origin', 'origin_visit']:
+        if object_type in ["origin", "origin_visit"]:
             if start_object:
                 start_object = int(start_object)
             else:
@@ -429,30 +458,32 @@ class JournalBackfiller:
 
         """
         start_object, end_object = self.parse_arguments(
-            object_type, start_object, end_object)
+            object_type, start_object, end_object
+        )
 
-        db = BaseDb.connect(self.config['storage_dbconn'])
+        db = BaseDb.connect(self.config["storage_dbconn"])
         writer = KafkaJournalWriter(
-            brokers=self.config['brokers'],
-            prefix=self.config['prefix'],
-            client_id=self.config['client_id']
+            brokers=self.config["brokers"],
+            prefix=self.config["prefix"],
+            client_id=self.config["client_id"],
         )
         for range_start, range_end in RANGE_GENERATORS[object_type](
-                start_object, end_object):
-            logger.info('Processing %s range %s to %s', object_type,
-                        _format_range_bound(range_start),
-                        _format_range_bound(range_end))
+            start_object, end_object
+        ):
+            logger.info(
+                "Processing %s range %s to %s",
+                object_type,
+                _format_range_bound(range_start),
+                _format_range_bound(range_end),
+            )
 
-            for obj in fetch(
-                db, object_type, start=range_start, end=range_end,
-            ):
+            for obj in fetch(db, object_type, start=range_start, end=range_end,):
                 if dry_run:
                     continue
-                writer.write_addition(object_type=object_type,
-                                      object_=obj)
+                writer.write_addition(object_type=object_type, object_=obj)
 
             writer.producer.flush()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print('Please use the "swh-journal backfiller run" command')

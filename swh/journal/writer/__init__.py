@@ -7,21 +7,23 @@ import warnings
 
 
 def get_journal_writer(cls, **kwargs):
-    if 'args' in kwargs:
+    if "args" in kwargs:
         warnings.warn(
             'Explicit "args" key is deprecated, use keys directly instead.',
-            DeprecationWarning)
-        kwargs = kwargs['args']
+            DeprecationWarning,
+        )
+        kwargs = kwargs["args"]
 
-    if cls == 'inmemory':  # FIXME: Remove inmemory in due time
-        warnings.warn("cls = 'inmemory' is deprecated, use 'memory' instead",
-                      DeprecationWarning)
-        cls = 'memory'
-    if cls == 'memory':
+    if cls == "inmemory":  # FIXME: Remove inmemory in due time
+        warnings.warn(
+            "cls = 'inmemory' is deprecated, use 'memory' instead", DeprecationWarning
+        )
+        cls = "memory"
+    if cls == "memory":
         from .inmemory import InMemoryJournalWriter as JournalWriter
-    elif cls == 'kafka':
+    elif cls == "kafka":
         from .kafka import KafkaJournalWriter as JournalWriter
     else:
-        raise ValueError('Unknown journal writer class `%s`' % cls)
+        raise ValueError("Unknown journal writer class `%s`" % cls)
 
     return JournalWriter(**kwargs)

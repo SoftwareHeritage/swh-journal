@@ -4,10 +4,13 @@
 # See top-level LICENSE file for more information
 
 import logging
-import copy
+
 from multiprocessing import Manager
+from typing import List
 
 from swh.model.model import BaseModel
+
+from .kafka import ModelObject
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +21,12 @@ class InMemoryJournalWriter:
         self.manager = Manager()
         self.objects = self.manager.list()
 
-    def write_addition(self, object_type, object_):
-        if isinstance(object_, BaseModel):
-            object_ = object_.to_dict()
-        self.objects.append((object_type, copy.deepcopy(object_)))
+    def write_addition(self, object_type: str, object_: ModelObject) -> None:
+        assert isinstance(object_, BaseModel)
+        self.objects.append((object_type, object_))
 
     write_update = write_addition
 
-    def write_additions(self, object_type, objects):
+    def write_additions(self, object_type: str, objects: List[ModelObject]) -> None:
         for object_ in objects:
             self.write_addition(object_type, object_)

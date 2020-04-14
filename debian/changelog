@@ -1,8 +1,14 @@
-swh-journal (0.0.29-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-journal (0.0.30-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.0.30     - (tagged by Nicolas Dandrimont
+    <nicolas@dandrimont.eu> on 2020-04-14 15:57:34 +0200)
+  * Upstream changes:     - Release swh.journal v0.0.30     - various
+    test refactorings     - enable black on the source code     - accept
+    swh.model objects in the journal writers     - listen to delivery
+    notifications after writing messages     - default to
+    message.max.bytes = 100 MB in the kafka writer
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 27 Mar 2020 09:52:25 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Tue, 14 Apr 2020 14:10:54 +0000
 
 swh-journal (0.0.29-1~swh1) unstable-swh; urgency=medium
 
