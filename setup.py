@@ -51,6 +51,8 @@ setup(
         swh-journal=swh.journal.cli:main
         [swh.cli.subcommands]
         journal=swh.journal.cli:cli
+        [pytest11]
+        pytest_swh_journal = swh.journal.pytest_plugin
     """,
     install_requires=parse_requirements() + parse_requirements("swh"),
     setup_requires=["vcversioner"],
