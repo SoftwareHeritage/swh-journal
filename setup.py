@@ -47,10 +47,6 @@ setup(
     packages=find_packages(),
     scripts=[],
     entry_points="""
-        [console_scripts]
-        swh-journal=swh.journal.cli:main
-        [swh.cli.subcommands]
-        journal=swh.journal.cli:cli
         [pytest11]
         pytest_swh_journal = swh.journal.pytest_plugin
     """,
