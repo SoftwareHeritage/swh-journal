@@ -5,11 +5,8 @@
 
 from collections import defaultdict
 
-from confluent_kafka import Consumer, Producer, KafkaException
-
 import pytest
-from subprocess import Popen
-from typing import Tuple
+from confluent_kafka import Consumer, Producer, KafkaException
 
 from swh.storage import get_storage
 
@@ -79,15 +76,11 @@ def assert_all_objects_consumed(consumed_messages):
             assert value in received_values
 
 
-def test_kafka_writer(
-    kafka_prefix: str, kafka_server: Tuple[Popen, int], consumer: Consumer
-):
+def test_kafka_writer(kafka_prefix: str, kafka_server: str, consumer: Consumer):
     kafka_prefix += ".swh.journal.objects"
 
     writer = KafkaJournalWriter(
-        brokers=[f"localhost:{kafka_server[1]}"],
-        client_id="kafka_writer",
-        prefix=kafka_prefix,
+        brokers=[kafka_server], client_id="kafka_writer", prefix=kafka_prefix,
     )
 
     expected_messages = 0
@@ -100,14 +93,12 @@ def test_kafka_writer(
     assert_all_objects_consumed(consumed_messages)
 
 
-def test_storage_direct_writer(
-    kafka_prefix: str, kafka_server: Tuple[Popen, int], consumer: Consumer
-):
+def test_storage_direct_writer(kafka_prefix: str, kafka_server, consumer: Consumer):
     kafka_prefix += ".swh.journal.objects"
 
     writer_config = {
         "cls": "kafka",
-        "brokers": ["localhost:%d" % kafka_server[1]],
+        "brokers": [kafka_server],
         "client_id": "kafka_writer",
         "prefix": kafka_prefix,
     }
@@ -152,7 +143,7 @@ def test_storage_direct_writer(
 
 
 def test_write_delivery_failure(
-    kafka_prefix: str, kafka_server: Tuple[Popen, int], consumer: Consumer,
+    kafka_prefix: str, kafka_server: str, consumer: Consumer
 ):
     class MockKafkaError:
         """A mocked kafka error"""
@@ -172,9 +163,7 @@ def test_write_delivery_failure(
 
     kafka_prefix += ".swh.journal.objects"
     writer = KafkaJournalWriterFailDelivery(
-        brokers=["localhost:%d" % kafka_server[1]],
-        client_id="kafka_writer",
-        prefix=kafka_prefix,
+        brokers=[kafka_server], client_id="kafka_writer", prefix=kafka_prefix,
     )
 
     empty_dir = Directory(entries=[])
@@ -189,7 +178,7 @@ def test_write_delivery_failure(
 
 
 def test_write_delivery_timeout(
-    kafka_prefix: str, kafka_server: Tuple[Popen, int], consumer: Consumer
+    kafka_prefix: str, kafka_server: str, consumer: Consumer
 ):
 
     produced = []
@@ -203,7 +192,7 @@ def test_write_delivery_timeout(
 
     kafka_prefix += ".swh.journal.objects"
     writer = KafkaJournalWriter(
-        brokers=["localhost:%d" % kafka_server[1]],
+        brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,
         flush_timeout=1,

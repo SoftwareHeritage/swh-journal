@@ -9,8 +9,7 @@ import functools
 import logging
 import re
 import tempfile
-from subprocess import Popen
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 from unittest.mock import patch
 
 from click.testing import CliRunner
@@ -69,17 +68,13 @@ def invoke(*args, env=None, journal_config=None):
 
 
 def test_replay(
-    storage,
-    kafka_prefix: str,
-    kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
+    storage, kafka_prefix: str, kafka_consumer_group: str, kafka_server: str,
 ):
-    (_, kafka_port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
     producer = Producer(
         {
-            "bootstrap.servers": "localhost:{}".format(kafka_port),
+            "bootstrap.servers": kafka_server,
             "client.id": "test-producer",
             "acks": "all",
         }
@@ -103,7 +98,7 @@ def test_replay(
         "--stop-after-objects",
         "1",
         journal_config={
-            "brokers": ["127.0.0.1:%d" % kafka_port],
+            "brokers": [kafka_server],
             "group_id": kafka_consumer_group,
             "prefix": kafka_prefix,
         },
@@ -138,10 +133,10 @@ def _patch_objstorages(names):
 NUM_CONTENTS = 10
 
 
-def _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages):
+def _fill_objstorage_and_kafka(kafka_server, kafka_prefix, objstorages):
     producer = Producer(
         {
-            "bootstrap.servers": "127.0.0.1:{}".format(kafka_port),
+            "bootstrap.servers": kafka_server,
             "client.id": "test-producer",
             "acks": "all",
         }
@@ -169,19 +164,18 @@ def test_replay_content(
     storage,
     kafka_prefix: str,
     kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
+    kafka_server: str,
 ):
-    (_, kafka_port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
-    contents = _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages)
+    contents = _fill_objstorage_and_kafka(kafka_server, kafka_prefix, objstorages)
 
     result = invoke(
         "content-replay",
         "--stop-after-objects",
         str(NUM_CONTENTS),
         journal_config={
-            "brokers": ["127.0.0.1:%d" % kafka_port],
+            "brokers": [kafka_server],
             "group_id": kafka_consumer_group,
             "prefix": kafka_prefix,
         },
@@ -202,13 +196,12 @@ def test_replay_content_structured_log(
     storage,
     kafka_prefix: str,
     kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
+    kafka_server: str,
     caplog,
 ):
-    (_, kafka_port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
-    contents = _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages)
+    contents = _fill_objstorage_and_kafka(kafka_server, kafka_prefix, objstorages)
 
     caplog.set_level(logging.DEBUG, "swh.journal.replay")
 
@@ -219,7 +212,7 @@ def test_replay_content_structured_log(
         "--stop-after-objects",
         str(NUM_CONTENTS),
         journal_config={
-            "brokers": ["127.0.0.1:%d" % kafka_port],
+            "brokers": [kafka_server],
             "group_id": kafka_consumer_group,
             "prefix": kafka_prefix,
         },
@@ -245,13 +238,12 @@ def test_replay_content_static_group_id(
     storage,
     kafka_prefix: str,
     kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
+    kafka_server: str,
     caplog,
 ):
-    (_, kafka_port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
-    contents = _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages)
+    contents = _fill_objstorage_and_kafka(kafka_server, kafka_prefix, objstorages)
 
     # Setup log capture to fish the consumer settings out of the log messages
     caplog.set_level(logging.DEBUG, "swh.journal.client")
@@ -262,7 +254,7 @@ def test_replay_content_static_group_id(
         str(NUM_CONTENTS),
         env={"KAFKA_GROUP_INSTANCE_ID": "static-group-instance-id"},
         journal_config={
-            "brokers": ["127.0.0.1:%d" % kafka_port],
+            "brokers": [kafka_server],
             "group_id": kafka_consumer_group,
             "prefix": kafka_prefix,
         },
@@ -296,12 +288,11 @@ def test_replay_content_exclude(
     storage,
     kafka_prefix: str,
     kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
+    kafka_server: str,
 ):
-    (_, kafka_port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
-    contents = _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages)
+    contents = _fill_objstorage_and_kafka(kafka_server, kafka_prefix, objstorages)
 
     excluded_contents = list(contents)[0::2]  # picking half of them
     with tempfile.NamedTemporaryFile(mode="w+b") as fd:
@@ -316,7 +307,7 @@ def test_replay_content_exclude(
             "--exclude-sha1-file",
             fd.name,
             journal_config={
-                "brokers": ["127.0.0.1:%d" % kafka_port],
+                "brokers": [kafka_server],
                 "group_id": kafka_consumer_group,
                 "prefix": kafka_prefix,
             },
@@ -349,16 +340,15 @@ def test_replay_content_check_dst(
     storage,
     kafka_prefix: str,
     kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
+    kafka_server: str,
     check_dst: bool,
     expected_copied: int,
     expected_in_dst: int,
     caplog,
 ):
-    (_, kafka_port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
-    contents = _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages)
+    contents = _fill_objstorage_and_kafka(kafka_server, kafka_prefix, objstorages)
 
     for i, (sha1, content) in enumerate(contents.items()):
         if i >= NUM_CONTENTS_DST:
@@ -374,7 +364,7 @@ def test_replay_content_check_dst(
         str(NUM_CONTENTS),
         "--check-dst" if check_dst else "--no-check-dst",
         journal_config={
-            "brokers": ["127.0.0.1:%d" % kafka_port],
+            "brokers": [kafka_server],
             "group_id": kafka_consumer_group,
             "prefix": kafka_prefix,
         },
@@ -433,13 +423,12 @@ def test_replay_content_check_dst_retry(
     storage,
     kafka_prefix: str,
     kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
+    kafka_server: str,
     monkeypatch_retry_sleep,
 ):
-    (_, kafka_port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
-    contents = _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages)
+    contents = _fill_objstorage_and_kafka(kafka_server, kafka_prefix, objstorages)
 
     failures = {}
     for i, (sha1, content) in enumerate(contents.items()):
@@ -458,7 +447,7 @@ def test_replay_content_check_dst_retry(
         str(NUM_CONTENTS),
         "--check-dst",
         journal_config={
-            "brokers": ["127.0.0.1:%d" % kafka_port],
+            "brokers": [kafka_server],
             "group_id": kafka_consumer_group,
             "prefix": kafka_prefix,
         },
@@ -478,14 +467,13 @@ def test_replay_content_failed_copy_retry(
     storage,
     kafka_prefix: str,
     kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
+    kafka_server: str,
     caplog,
     monkeypatch_retry_sleep,
 ):
-    (_, kafka_port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
-    contents = _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages)
+    contents = _fill_objstorage_and_kafka(kafka_server, kafka_prefix, objstorages)
 
     add_failures = {}
     get_failures = {}
@@ -532,7 +520,7 @@ def test_replay_content_failed_copy_retry(
         "--stop-after-objects",
         str(NUM_CONTENTS),
         journal_config={
-            "brokers": ["127.0.0.1:%d" % kafka_port],
+            "brokers": [kafka_server],
             "group_id": kafka_consumer_group,
             "prefix": kafka_prefix,
         },
@@ -571,13 +559,12 @@ def test_replay_content_objnotfound(
     storage,
     kafka_prefix: str,
     kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
+    kafka_server: str,
     caplog,
 ):
-    (_, kafka_port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
-    contents = _fill_objstorage_and_kafka(kafka_port, kafka_prefix, objstorages)
+    contents = _fill_objstorage_and_kafka(kafka_server, kafka_prefix, objstorages)
 
     num_contents_deleted = 5
     contents_deleted = set()
@@ -596,7 +583,7 @@ def test_replay_content_objnotfound(
         "--stop-after-objects",
         str(NUM_CONTENTS),
         journal_config={
-            "brokers": ["127.0.0.1:%d" % kafka_port],
+            "brokers": [kafka_server],
             "group_id": kafka_consumer_group,
             "prefix": kafka_prefix,
         },

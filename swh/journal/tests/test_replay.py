@@ -7,8 +7,7 @@ import datetime
 import functools
 import logging
 import random
-from subprocess import Popen
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import dateutil
 import pytest
@@ -36,10 +35,7 @@ def make_topic(kafka_prefix: str, object_type: str) -> str:
 
 
 def test_storage_play(
-    kafka_prefix: str,
-    kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
-    caplog,
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server: str, caplog,
 ):
     """Optimal replayer scenario.
 
@@ -48,14 +44,13 @@ def test_storage_play(
     - replayer consumes objects from the topic and replay them
 
     """
-    (_, port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
     storage = get_storage(**storage_config)
 
     producer = Producer(
         {
-            "bootstrap.servers": "localhost:{}".format(port),
+            "bootstrap.servers": kafka_server,
             "client.id": "test producer",
             "acks": "all",
         }
@@ -86,7 +81,7 @@ def test_storage_play(
     caplog.set_level(logging.ERROR, "swh.journal.replay")
     # Fill the storage from Kafka
     replayer = JournalClient(
-        brokers="localhost:%d" % kafka_server[1],
+        brokers=kafka_server,
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
         stop_after_objects=nb_sent,
@@ -138,10 +133,7 @@ def test_storage_play(
 
 
 def test_storage_play_with_collision(
-    kafka_prefix: str,
-    kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
-    caplog,
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server: str, caplog,
 ):
     """Another replayer scenario with collisions.
 
@@ -151,14 +143,13 @@ def test_storage_play_with_collision(
     - This drops the colliding contents from the replay when detected
 
     """
-    (_, port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
     storage = get_storage(**storage_config)
 
     producer = Producer(
         {
-            "bootstrap.servers": "localhost:{}".format(port),
+            "bootstrap.servers": kafka_server,
             "client.id": "test producer",
             "enable.idempotence": "true",
         }
@@ -199,7 +190,7 @@ def test_storage_play_with_collision(
     caplog.set_level(logging.ERROR, "swh.journal.replay")
     # Fill the storage from Kafka
     replayer = JournalClient(
-        brokers="localhost:%d" % kafka_server[1],
+        brokers=kafka_server,
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
         stop_after_objects=nb_sent,
