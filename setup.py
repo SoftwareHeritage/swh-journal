@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (C) 2015-2018  The Software Heritage developers
+# Copyright (C) 2015-2020  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -40,6 +40,7 @@ setup(
     description="Software Heritage Journal utilities",
     long_description=long_description,
     long_description_content_type="text/markdown",
+    python_requires=">=3.7",
     author="Software Heritage developers",
     author_email="swh-devel@inria.fr",
     url="https://forge.softwareheritage.org/diffusion/DJNL/",
@@ -50,6 +51,8 @@ setup(
         swh-journal=swh.journal.cli:main
         [swh.cli.subcommands]
         journal=swh.journal.cli:cli
+        [pytest11]
+        pytest_swh_journal = swh.journal.pytest_plugin
     """,
     install_requires=parse_requirements() + parse_requirements("swh"),
     setup_requires=["vcversioner"],
