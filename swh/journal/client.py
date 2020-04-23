@@ -39,6 +39,16 @@ _SPAMMY_ERRORS = [
 ]
 
 
+def get_journal_client(cls: str, **kwargs: Any):
+    """Factory function to instantiate a journal client object.
+
+    Currently, only the "kafka" journal client is supported.
+    """
+    if cls == "kafka":
+        return JournalClient(**kwargs)
+    raise ValueError("Unknown journal client class `%s`" % cls)
+
+
 def _error_cb(error):
     if error.fatal():
         raise KafkaException(error)

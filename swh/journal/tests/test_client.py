@@ -3,8 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from subprocess import Popen
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from unittest.mock import MagicMock
 
 from confluent_kafka import Producer
@@ -17,15 +16,12 @@ from swh.journal.client import JournalClient
 from swh.journal.serializers import key_to_kafka, value_to_kafka
 
 
-def test_client(
-    kafka_prefix: str, kafka_consumer_group: str, kafka_server: Tuple[Popen, int]
-):
-    (_, port) = kafka_server
+def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str):
     kafka_prefix += ".swh.journal.objects"
 
     producer = Producer(
         {
-            "bootstrap.servers": "localhost:{}".format(port),
+            "bootstrap.servers": kafka_server,
             "client.id": "test producer",
             "acks": "all",
         }
@@ -42,7 +38,7 @@ def test_client(
     producer.flush()
 
     client = JournalClient(
-        brokers="localhost:%d" % kafka_server[1],
+        brokers=kafka_server,
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
         stop_after_objects=1,
@@ -53,15 +49,12 @@ def test_client(
     worker_fn.assert_called_once_with({"revision": [rev.to_dict()]})
 
 
-def test_client_eof(
-    kafka_prefix: str, kafka_consumer_group: str, kafka_server: Tuple[Popen, int]
-):
-    (_, port) = kafka_server
+def test_client_eof(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str):
     kafka_prefix += ".swh.journal.objects"
 
     producer = Producer(
         {
-            "bootstrap.servers": "localhost:{}".format(port),
+            "bootstrap.servers": kafka_server,
             "client.id": "test producer",
             "acks": "all",
         }
@@ -78,7 +71,7 @@ def test_client_eof(
     producer.flush()
 
     client = JournalClient(
-        brokers="localhost:%d" % kafka_server[1],
+        brokers=kafka_server,
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
         stop_after_objects=None,
@@ -93,12 +86,8 @@ def test_client_eof(
 
 @pytest.mark.parametrize("batch_size", [1, 5, 100])
 def test_client_batch_size(
-    kafka_prefix: str,
-    kafka_consumer_group: str,
-    kafka_server: Tuple[Popen, int],
-    batch_size: int,
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server: str, batch_size: int,
 ):
-    (_, port) = kafka_server
     kafka_prefix += ".swh.journal.objects"
 
     num_objects = 2 * batch_size + 1
@@ -106,7 +95,7 @@ def test_client_batch_size(
 
     producer = Producer(
         {
-            "bootstrap.servers": "localhost:{}".format(port),
+            "bootstrap.servers": kafka_server,
             "client.id": "test producer",
             "acks": "all",
         }
@@ -125,7 +114,7 @@ def test_client_batch_size(
     producer.flush()
 
     client = JournalClient(
-        brokers=["localhost:%d" % kafka_server[1]],
+        brokers=[kafka_server],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
         stop_after_objects=num_objects,
@@ -141,4 +130,8 @@ def test_client_batch_size(
 
     client.process(worker_fn)
 
-    assert collected_output == [content.to_dict() for content in contents]
+    expected_output = [content.to_dict() for content in contents]
+    assert len(collected_output) == len(expected_output)
+
+    for output in collected_output:
+        assert output in expected_output
