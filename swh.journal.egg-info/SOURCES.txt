@@ -22,10 +22,12 @@ swh/journal/client.py
 swh/journal/direct_writer.py
 swh/journal/fixer.py
 swh/journal/py.typed
+swh/journal/pytest_plugin.py
 swh/journal/replay.py
 swh/journal/serializers.py
 swh/journal/tests/__init__.py
 swh/journal/tests/conftest.py
+swh/journal/tests/journal_data.py
 swh/journal/tests/log4j.properties
 swh/journal/tests/test_backfill.py
 swh/journal/tests/test_cli.py
