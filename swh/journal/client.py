@@ -39,14 +39,14 @@ _SPAMMY_ERRORS = [
 ]
 
 
-def get_journal_client(cfg, **kwargs):
-    conf = cfg.get("journal", {})
-    conf.update({k: v for (k, v) in kwargs.items() if v not in (None, ())})
-    if not conf.get("brokers"):
-        raise ValueError("You must specify at least one kafka broker.")
-    if not isinstance(conf["brokers"], (list, tuple)):
-        conf["brokers"] = [conf["brokers"]]
-    return JournalClient(**conf)
+def get_journal_client(cls: str, **kwargs: Any):
+    """Factory function to instantiate a journal client object.
+
+    Currently, only the "kafka" journal client is supported.
+    """
+    if cls == "kafka":
+        return JournalClient(**kwargs)
+    raise ValueError("Unknown journal client class `%s`" % cls)
 
 
 def _error_cb(error):

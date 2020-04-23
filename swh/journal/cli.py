@@ -7,6 +7,7 @@ import functools
 import logging
 import mmap
 import os
+import warnings
 
 import click
 
@@ -60,8 +61,20 @@ def cli(ctx, config_file):
 
 
 def get_journal_client(ctx, **kwargs):
+    conf = ctx.obj["config"].copy()
+    if "journal" in conf:
+        warnings.warn(
+            "Journal client configuration should now be under the "
+            "`journal_client` field and have a `cls` argument.",
+            DeprecationWarning,
+        )
+        conf["journal_client"] = {"cls": "kafka", **conf.pop("journal")}
+
+    client_conf = conf.get("journal_client").copy()
+    client_conf.update(kwargs)
+
     try:
-        return get_client(ctx.obj["config"], **kwargs)
+        return get_client(**client_conf)
     except ValueError as exc:
         ctx.fail(exc)
 

@@ -10,7 +10,7 @@ import logging
 import re
 import tempfile
 from typing import Any, Dict
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from click.testing import CliRunner
 from confluent_kafka import Producer
@@ -21,7 +21,7 @@ from swh.model.hashutil import hash_to_hex
 from swh.objstorage.backends.in_memory import InMemoryObjStorage
 from swh.storage import get_storage
 
-from swh.journal.cli import cli
+from swh.journal.cli import cli, get_journal_client
 from swh.journal.replay import CONTENT_REPLAY_RETRIES
 from swh.journal.serializers import key_to_kafka, value_to_kafka
 
@@ -57,7 +57,8 @@ def monkeypatch_retry_sleep(monkeypatch):
 def invoke(*args, env=None, journal_config=None):
     config = copy.deepcopy(CLI_CONFIG)
     if journal_config:
-        config["journal"] = journal_config
+        config["journal_client"] = journal_config.copy()
+        config["journal_client"]["cls"] = "kafka"
 
     runner = CliRunner()
     with tempfile.NamedTemporaryFile("a", suffix=".yml") as config_fd:
@@ -65,6 +66,42 @@ def invoke(*args, env=None, journal_config=None):
         config_fd.seek(0)
         args = ["-C" + config_fd.name] + list(args)
         return runner.invoke(cli, args, obj={"log_level": logging.DEBUG}, env=env,)
+
+
+def test_get_journal_client_config_bwcompat(kafka_server):
+    cfg = {
+        "journal": {
+            "brokers": [kafka_server],
+            "group_id": "toto",
+            "prefix": "xiferp",
+            "object_types": ["content"],
+            "batch_size": 50,
+        }
+    }
+    ctx = MagicMock(obj={"config": cfg})
+    with pytest.deprecated_call():
+        client = get_journal_client(ctx, stop_after_objects=10, prefix="prefix")
+    assert client.subscription == ["prefix.content"]
+    assert client.stop_after_objects == 10
+    assert client.batch_size == 50
+
+
+def test_get_journal_client_config(kafka_server):
+    cfg = {
+        "journal_client": {
+            "cls": "kafka",
+            "brokers": [kafka_server],
+            "group_id": "toto",
+            "prefix": "xiferp",
+            "object_types": ["content"],
+            "batch_size": 50,
+        }
+    }
+    ctx = MagicMock(obj={"config": cfg})
+    client = get_journal_client(ctx, stop_after_objects=10, prefix="prefix")
+    assert client.subscription == ["prefix.content"]
+    assert client.stop_after_objects == 10
+    assert client.batch_size == 50
 
 
 def test_replay(
