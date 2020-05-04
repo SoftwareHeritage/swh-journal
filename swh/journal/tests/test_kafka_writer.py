@@ -6,9 +6,7 @@
 import pytest
 from confluent_kafka import Consumer, Producer
 
-from swh.storage import get_storage
-
-from swh.model.model import Directory, Origin, OriginVisit
+from swh.model.model import Directory
 
 from swh.journal.tests.journal_data import TEST_OBJECTS
 from swh.journal.pytest_plugin import consume_messages, assert_all_objects_consumed
@@ -27,55 +25,6 @@ def test_kafka_writer(kafka_prefix: str, kafka_server: str, consumer: Consumer):
     for object_type, objects in TEST_OBJECTS.items():
         writer.write_additions(object_type, objects)
         expected_messages += len(objects)
-
-    consumed_messages = consume_messages(consumer, kafka_prefix, expected_messages)
-    assert_all_objects_consumed(consumed_messages)
-
-
-def test_storage_direct_writer(kafka_prefix: str, kafka_server, consumer: Consumer):
-    kafka_prefix += ".swh.journal.objects"
-
-    writer_config = {
-        "cls": "kafka",
-        "brokers": [kafka_server],
-        "client_id": "kafka_writer",
-        "prefix": kafka_prefix,
-    }
-    storage_config = {
-        "cls": "pipeline",
-        "steps": [{"cls": "memory", "journal_writer": writer_config},],
-    }
-
-    storage = get_storage(**storage_config)
-
-    expected_messages = 0
-
-    for object_type, objects in TEST_OBJECTS.items():
-        method = getattr(storage, object_type + "_add")
-        if object_type in (
-            "content",
-            "directory",
-            "revision",
-            "release",
-            "snapshot",
-            "origin",
-        ):
-            method(objects)
-            expected_messages += len(objects)
-        elif object_type in ("origin_visit",):
-            for obj in objects:
-                assert isinstance(obj, OriginVisit)
-                storage.origin_add_one(Origin(url=obj.origin))
-                visit = method(obj.origin, date=obj.date, type=obj.type)
-                expected_messages += 1
-
-                obj_d = obj.to_dict()
-                for k in ("visit", "origin", "date", "type"):
-                    del obj_d[k]
-                storage.origin_visit_update(obj.origin, visit.visit, **obj_d)
-                expected_messages += 1
-        else:
-            assert False, object_type
 
     consumed_messages = consume_messages(consumer, kafka_prefix, expected_messages)
     assert_all_objects_consumed(consumed_messages)
