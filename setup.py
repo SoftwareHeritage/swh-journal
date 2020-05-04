@@ -47,10 +47,6 @@ setup(
     packages=find_packages(),
     scripts=[],
     entry_points="""
-        [console_scripts]
-        swh-journal=swh.journal.cli:main
-        [swh.cli.subcommands]
-        journal=swh.journal.cli:cli
         [pytest11]
         pytest_swh_journal = swh.journal.pytest_plugin
     """,
@@ -70,5 +66,6 @@ setup(
         "Bug Reports": "https://forge.softwareheritage.org/maniphest",
         "Funding": "https://www.softwareheritage.org/donate",
         "Source": "https://forge.softwareheritage.org/source/swh-journal",
+        "Documentation": "https://docs.softwareheritage.org/devel/swh-journal/",
     },
 )
