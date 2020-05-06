@@ -68,8 +68,6 @@ def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str)
 
 
 def test_client_eof(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str):
-    kafka_prefix += ".swh.journal.objects"
-
     producer = Producer(
         {
             "bootstrap.servers": kafka_server,
@@ -102,8 +100,6 @@ def test_client_eof(kafka_prefix: str, kafka_consumer_group: str, kafka_server: 
 def test_client_batch_size(
     kafka_prefix: str, kafka_consumer_group: str, kafka_server: str, batch_size: int,
 ):
-    kafka_prefix += ".swh.journal.objects"
-
     num_objects = 2 * batch_size + 1
     assert num_objects < 256, "Too many objects, generation will fail"
 

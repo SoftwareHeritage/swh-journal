@@ -163,8 +163,8 @@ def test_config(kafka_server_base: str, kafka_prefix: str, object_types: Iterato
     """
     return {
         **TEST_CONFIG,
-        "prefix": kafka_prefix + ".swh.journal.objects",
         "brokers": [kafka_server_base],
+        "prefix": kafka_prefix,
     }
 
 

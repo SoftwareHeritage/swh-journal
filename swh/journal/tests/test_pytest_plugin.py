@@ -47,5 +47,5 @@ def test_test_config(test_config: dict, kafka_prefix: str, kafka_server_base: st
             "skipped_content",
         },
         "brokers": [kafka_server_base],
-        "prefix": kafka_prefix + ".swh.journal.objects",
+        "prefix": kafka_prefix,
     }
