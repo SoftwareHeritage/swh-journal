@@ -150,7 +150,6 @@ def kafka_server_base() -> Iterator[str]:
 
 TEST_CONFIG = {
     "consumer_id": "swh.journal.consumer",
-    "object_types": TEST_OBJECT_DICTS.keys(),
     "stop_after_objects": 1,  # will read 1 object and stop
     "storage": {"cls": "memory", "args": {}},
 }
@@ -163,6 +162,7 @@ def test_config(kafka_server_base: str, kafka_prefix: str, object_types: Iterato
     """
     return {
         **TEST_CONFIG,
+        "object_types": object_types,
         "brokers": [kafka_server_base],
         "prefix": kafka_prefix,
     }
