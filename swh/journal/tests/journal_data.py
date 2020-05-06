@@ -125,10 +125,13 @@ ORIGIN_VISITS = [
 
 TEST_OBJECT_DICTS: Dict[str, List[Dict[str, Any]]] = {
     "content": CONTENTS,
-    "revision": REVISIONS,
-    "release": RELEASES,
+    "directory": [],
     "origin": ORIGINS,
     "origin_visit": ORIGIN_VISITS,
+    "release": RELEASES,
+    "revision": REVISIONS,
+    "snapshot": [],
+    "skipped_content": [],
 }
 
 MODEL_OBJECTS = {v: k for (k, v) in OBJECT_TYPES.items()}

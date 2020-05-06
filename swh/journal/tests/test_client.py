@@ -138,10 +138,10 @@ def test_client_batch_size(
 
 
 @pytest.fixture()
-def kafka_producer(kafka_prefix: str, kafka_server: str):
+def kafka_producer(kafka_prefix: str, kafka_server_base: str):
     producer = Producer(
         {
-            "bootstrap.servers": kafka_server,
+            "bootstrap.servers": kafka_server_base,
             "client.id": "test producer",
             "acks": "all",
         }
@@ -163,10 +163,10 @@ def kafka_producer(kafka_prefix: str, kafka_server: str):
 
 
 def test_client_subscribe_all(
-    kafka_producer: Producer, kafka_prefix: str, kafka_server: str
+    kafka_producer: Producer, kafka_prefix: str, kafka_server_base: str
 ):
     client = JournalClient(
-        brokers=[kafka_server],
+        brokers=[kafka_server_base],
         group_id="whatever",
         prefix=kafka_prefix,
         stop_after_objects=2,
@@ -184,10 +184,10 @@ def test_client_subscribe_all(
 
 
 def test_client_subscribe_one_topic(
-    kafka_producer: Producer, kafka_prefix: str, kafka_server: str
+    kafka_producer: Producer, kafka_prefix: str, kafka_server_base: str
 ):
     client = JournalClient(
-        brokers=[kafka_server],
+        brokers=[kafka_server_base],
         group_id="whatever",
         prefix=kafka_prefix,
         stop_after_objects=1,
@@ -201,11 +201,11 @@ def test_client_subscribe_one_topic(
 
 
 def test_client_subscribe_absent_topic(
-    kafka_producer: Producer, kafka_prefix: str, kafka_server: str
+    kafka_producer: Producer, kafka_prefix: str, kafka_server_base: str
 ):
     with pytest.raises(ValueError):
         JournalClient(
-            brokers=[kafka_server],
+            brokers=[kafka_server_base],
             group_id="whatever",
             prefix=kafka_prefix,
             stop_after_objects=1,
@@ -214,18 +214,18 @@ def test_client_subscribe_absent_topic(
 
 
 def test_client_subscribe_absent_prefix(
-    kafka_producer: Producer, kafka_prefix: str, kafka_server: str
+    kafka_producer: Producer, kafka_prefix: str, kafka_server_base: str
 ):
     with pytest.raises(ValueError):
         JournalClient(
-            brokers=[kafka_server],
+            brokers=[kafka_server_base],
             group_id="whatever",
             prefix="wrong.prefix",
             stop_after_objects=1,
         )
     with pytest.raises(ValueError):
         JournalClient(
-            brokers=[kafka_server],
+            brokers=[kafka_server_base],
             group_id="whatever",
             prefix="wrong.prefix",
             stop_after_objects=1,

@@ -270,7 +270,9 @@ class JournalClient:
                 else:
                     _error_cb(error)
                 continue
-
+            if message.value() is None:
+                # ignore message with no payload, these can be generated in tests
+                continue
             nb_processed += 1
             object_type = message.topic().split(".")[-1]
             objects[object_type].append(self.deserialize_message(message))
