@@ -27,7 +27,10 @@ def consume_messages(consumer, kafka_prefix, expected_messages):
 
     while fetched_messages < expected_messages:
         if retries_left == 0:
-            raise ValueError("Timed out fetching messages from kafka")
+            raise ValueError(
+                "Timed out fetching messages from kafka. "
+                f"Only {fetched_messages}/{expected_messages} fetched"
+            )
 
         msg = consumer.poll(timeout=0.01)
 
