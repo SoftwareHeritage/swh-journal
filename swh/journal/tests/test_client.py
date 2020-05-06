@@ -9,16 +9,38 @@ from unittest.mock import MagicMock
 from confluent_kafka import Producer
 import pytest
 
-from swh.model.hypothesis_strategies import revisions
 from swh.model.model import Content
 
 from swh.journal.client import JournalClient
 from swh.journal.serializers import key_to_kafka, value_to_kafka
 
+REV = {
+    "message": b"something cool",
+    "author": {"fullname": b"Peter", "name": None, "email": b"peter@ouiche.lo"},
+    "committer": {"fullname": b"Stephen", "name": b"From Outer Space", "email": None},
+    "date": {
+        "timestamp": {"seconds": 123456789, "microseconds": 123},
+        "offset": 120,
+        "negative_utc": False,
+    },
+    "committer_date": {
+        "timestamp": {"seconds": 123123456, "microseconds": 0},
+        "offset": 0,
+        "negative_utc": False,
+    },
+    "type": "git",
+    "directory": (
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x01\x02\x03\x04\x05"
+    ),
+    "synthetic": False,
+    "metadata": None,
+    "parents": [],
+    "id": b"\x8b\xeb\xd1\x9d\x07\xe2\x1e0\xe2 \x91X\x8d\xbd\x1c\xa8\x86\xdeB\x0c",
+}
+
 
 def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str):
-    kafka_prefix += ".swh.journal.objects"
-
     producer = Producer(
         {
             "bootstrap.servers": kafka_server,
@@ -27,13 +49,9 @@ def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str)
         }
     )
 
-    rev = revisions().example()
-
     # Fill Kafka
     producer.produce(
-        topic=kafka_prefix + ".revision",
-        key=key_to_kafka(rev.id),
-        value=value_to_kafka(rev.to_dict()),
+        topic=kafka_prefix + ".revision", key=REV["id"], value=value_to_kafka(REV),
     )
     producer.flush()
 
@@ -46,7 +64,7 @@ def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str)
     worker_fn = MagicMock()
     client.process(worker_fn)
 
-    worker_fn.assert_called_once_with({"revision": [rev.to_dict()]})
+    worker_fn.assert_called_once_with({"revision": [REV]})
 
 
 def test_client_eof(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str):
@@ -60,13 +78,9 @@ def test_client_eof(kafka_prefix: str, kafka_consumer_group: str, kafka_server: 
         }
     )
 
-    rev = revisions().example()
-
     # Fill Kafka
     producer.produce(
-        topic=kafka_prefix + ".revision",
-        key=key_to_kafka(rev.id),
-        value=value_to_kafka(rev.to_dict()),
+        topic=kafka_prefix + ".revision", key=REV["id"], value=value_to_kafka(REV),
     )
     producer.flush()
 
@@ -81,7 +95,7 @@ def test_client_eof(kafka_prefix: str, kafka_consumer_group: str, kafka_server: 
     worker_fn = MagicMock()
     client.process(worker_fn)
 
-    worker_fn.assert_called_once_with({"revision": [rev.to_dict()]})
+    worker_fn.assert_called_once_with({"revision": [REV]})
 
 
 @pytest.mark.parametrize("batch_size", [1, 5, 100])
