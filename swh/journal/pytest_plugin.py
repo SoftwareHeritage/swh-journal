@@ -62,6 +62,9 @@ def assert_all_objects_consumed(consumed_messages):
     for object_type, known_values in TEST_OBJECT_DICTS.items():
         known_keys = [object_key(object_type, obj) for obj in TEST_OBJECTS[object_type]]
 
+        if not consumed_messages[object_type]:
+            return
+
         (received_keys, received_values) = zip(*consumed_messages[object_type])
 
         if object_type == "origin_visit":
