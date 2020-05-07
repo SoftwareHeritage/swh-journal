@@ -1,4 +1,4 @@
-from swh.journal.client import JournalClient, ACCEPTED_OBJECT_TYPES
+from swh.journal.client import JournalClient
 from swh.journal.writer.kafka import KafkaJournalWriter
 from swh.journal.serializers import kafka_to_value, key_to_kafka, value_to_kafka
 
@@ -69,7 +69,7 @@ class MockedKafkaConsumer:
 
 
 class MockedJournalClient(JournalClient):
-    def __init__(self, queue, object_types=ACCEPTED_OBJECT_TYPES):
+    def __init__(self, queue, object_types=None):
         self._object_types = object_types
         self.consumer = MockedKafkaConsumer(queue)
         self.process_timeout = None
