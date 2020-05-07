@@ -14,8 +14,6 @@ from swh.journal.writer.kafka import KafkaJournalWriter, KafkaDeliveryError
 
 
 def test_kafka_writer(kafka_prefix: str, kafka_server: str, consumer: Consumer):
-    kafka_prefix += ".swh.journal.objects"
-
     writer = KafkaJournalWriter(
         brokers=[kafka_server], client_id="kafka_writer", prefix=kafka_prefix,
     )
@@ -78,7 +76,6 @@ def test_write_delivery_timeout(
         def produce(self, **kwargs):
             produced.append(kwargs)
 
-    kafka_prefix += ".swh.journal.objects"
     writer = KafkaJournalWriter(
         brokers=[kafka_server],
         client_id="kafka_writer",

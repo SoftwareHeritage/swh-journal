@@ -27,6 +27,7 @@ swh/journal/tests/journal_data.py
 swh/journal/tests/log4j.properties
 swh/journal/tests/test_client.py
 swh/journal/tests/test_kafka_writer.py
+swh/journal/tests/test_pytest_plugin.py
 swh/journal/tests/test_serializers.py
 swh/journal/tests/utils.py
 swh/journal/writer/__init__.py

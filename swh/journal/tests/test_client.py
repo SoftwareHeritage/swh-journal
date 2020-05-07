@@ -9,16 +9,38 @@ from unittest.mock import MagicMock
 from confluent_kafka import Producer
 import pytest
 
-from swh.model.hypothesis_strategies import revisions
 from swh.model.model import Content
 
 from swh.journal.client import JournalClient
 from swh.journal.serializers import key_to_kafka, value_to_kafka
 
+REV = {
+    "message": b"something cool",
+    "author": {"fullname": b"Peter", "name": None, "email": b"peter@ouiche.lo"},
+    "committer": {"fullname": b"Stephen", "name": b"From Outer Space", "email": None},
+    "date": {
+        "timestamp": {"seconds": 123456789, "microseconds": 123},
+        "offset": 120,
+        "negative_utc": False,
+    },
+    "committer_date": {
+        "timestamp": {"seconds": 123123456, "microseconds": 0},
+        "offset": 0,
+        "negative_utc": False,
+    },
+    "type": "git",
+    "directory": (
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x01\x02\x03\x04\x05"
+    ),
+    "synthetic": False,
+    "metadata": None,
+    "parents": [],
+    "id": b"\x8b\xeb\xd1\x9d\x07\xe2\x1e0\xe2 \x91X\x8d\xbd\x1c\xa8\x86\xdeB\x0c",
+}
+
 
 def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str):
-    kafka_prefix += ".swh.journal.objects"
-
     producer = Producer(
         {
             "bootstrap.servers": kafka_server,
@@ -27,18 +49,14 @@ def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str)
         }
     )
 
-    rev = revisions().example()
-
     # Fill Kafka
     producer.produce(
-        topic=kafka_prefix + ".revision",
-        key=key_to_kafka(rev.id),
-        value=value_to_kafka(rev.to_dict()),
+        topic=kafka_prefix + ".revision", key=REV["id"], value=value_to_kafka(REV),
     )
     producer.flush()
 
     client = JournalClient(
-        brokers=kafka_server,
+        brokers=[kafka_server],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
         stop_after_objects=1,
@@ -46,12 +64,10 @@ def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str)
     worker_fn = MagicMock()
     client.process(worker_fn)
 
-    worker_fn.assert_called_once_with({"revision": [rev.to_dict()]})
+    worker_fn.assert_called_once_with({"revision": [REV]})
 
 
 def test_client_eof(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str):
-    kafka_prefix += ".swh.journal.objects"
-
     producer = Producer(
         {
             "bootstrap.servers": kafka_server,
@@ -60,18 +76,14 @@ def test_client_eof(kafka_prefix: str, kafka_consumer_group: str, kafka_server: 
         }
     )
 
-    rev = revisions().example()
-
     # Fill Kafka
     producer.produce(
-        topic=kafka_prefix + ".revision",
-        key=key_to_kafka(rev.id),
-        value=value_to_kafka(rev.to_dict()),
+        topic=kafka_prefix + ".revision", key=REV["id"], value=value_to_kafka(REV),
     )
     producer.flush()
 
     client = JournalClient(
-        brokers=kafka_server,
+        brokers=[kafka_server],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
         stop_after_objects=None,
@@ -81,15 +93,13 @@ def test_client_eof(kafka_prefix: str, kafka_consumer_group: str, kafka_server: 
     worker_fn = MagicMock()
     client.process(worker_fn)
 
-    worker_fn.assert_called_once_with({"revision": [rev.to_dict()]})
+    worker_fn.assert_called_once_with({"revision": [REV]})
 
 
 @pytest.mark.parametrize("batch_size", [1, 5, 100])
 def test_client_batch_size(
     kafka_prefix: str, kafka_consumer_group: str, kafka_server: str, batch_size: int,
 ):
-    kafka_prefix += ".swh.journal.objects"
-
     num_objects = 2 * batch_size + 1
     assert num_objects < 256, "Too many objects, generation will fail"
 
@@ -135,3 +145,99 @@ def test_client_batch_size(
 
     for output in collected_output:
         assert output in expected_output
+
+
+@pytest.fixture()
+def kafka_producer(kafka_prefix: str, kafka_server_base: str):
+    producer = Producer(
+        {
+            "bootstrap.servers": kafka_server_base,
+            "client.id": "test producer",
+            "acks": "all",
+        }
+    )
+
+    # Fill Kafka
+    producer.produce(
+        topic=kafka_prefix + ".something",
+        key=key_to_kafka(b"key1"),
+        value=value_to_kafka("value1"),
+    )
+    producer.produce(
+        topic=kafka_prefix + ".else",
+        key=key_to_kafka(b"key1"),
+        value=value_to_kafka("value2"),
+    )
+    producer.flush()
+    return producer
+
+
+def test_client_subscribe_all(
+    kafka_producer: Producer, kafka_prefix: str, kafka_server_base: str
+):
+    client = JournalClient(
+        brokers=[kafka_server_base],
+        group_id="whatever",
+        prefix=kafka_prefix,
+        stop_after_objects=2,
+    )
+    assert set(client.subscription) == {
+        f"{kafka_prefix}.something",
+        f"{kafka_prefix}.else",
+    }
+
+    worker_fn = MagicMock()
+    client.process(worker_fn)
+    worker_fn.assert_called_once_with(
+        {"something": ["value1"], "else": ["value2"],}
+    )
+
+
+def test_client_subscribe_one_topic(
+    kafka_producer: Producer, kafka_prefix: str, kafka_server_base: str
+):
+    client = JournalClient(
+        brokers=[kafka_server_base],
+        group_id="whatever",
+        prefix=kafka_prefix,
+        stop_after_objects=1,
+        object_types=["else"],
+    )
+    assert client.subscription == [f"{kafka_prefix}.else"]
+
+    worker_fn = MagicMock()
+    client.process(worker_fn)
+    worker_fn.assert_called_once_with({"else": ["value2"]})
+
+
+def test_client_subscribe_absent_topic(
+    kafka_producer: Producer, kafka_prefix: str, kafka_server_base: str
+):
+    with pytest.raises(ValueError):
+        JournalClient(
+            brokers=[kafka_server_base],
+            group_id="whatever",
+            prefix=kafka_prefix,
+            stop_after_objects=1,
+            object_types=["really"],
+        )
+
+
+def test_client_subscribe_absent_prefix(
+    kafka_producer: Producer, kafka_prefix: str, kafka_server_base: str
+):
+    with pytest.raises(ValueError):
+        JournalClient(
+            brokers=[kafka_server_base],
+            group_id="whatever",
+            prefix="wrong.prefix",
+            stop_after_objects=1,
+        )
+    with pytest.raises(ValueError):
+        JournalClient(
+            brokers=[kafka_server_base],
+            group_id="whatever",
+            prefix="wrong.prefix",
+            stop_after_objects=1,
+            object_types=["else"],
+        )

@@ -11,7 +11,8 @@ from collections import defaultdict
 
 import pytest
 
-from confluent_kafka import Consumer, Producer, KafkaException
+from confluent_kafka import Consumer, KafkaException, Producer
+from confluent_kafka.admin import AdminClient
 
 from swh.journal.serializers import object_key, kafka_to_key, kafka_to_value
 from swh.journal.tests.journal_data import TEST_OBJECTS, TEST_OBJECT_DICTS
@@ -27,7 +28,10 @@ def consume_messages(consumer, kafka_prefix, expected_messages):
 
     while fetched_messages < expected_messages:
         if retries_left == 0:
-            raise ValueError("Timed out fetching messages from kafka")
+            raise ValueError(
+                "Timed out fetching messages from kafka. "
+                f"Only {fetched_messages}/{expected_messages} fetched"
+            )
 
         msg = consumer.poll(timeout=0.01)
 
@@ -59,6 +63,9 @@ def assert_all_objects_consumed(consumed_messages):
     for object_type, known_values in TEST_OBJECT_DICTS.items():
         known_keys = [object_key(object_type, obj) for obj in TEST_OBJECTS[object_type]]
 
+        if not consumed_messages[object_type]:
+            return
+
         (received_keys, received_values) = zip(*consumed_messages[object_type])
 
         if object_type == "origin_visit":
@@ -87,41 +94,77 @@ def kafka_consumer_group(kafka_prefix: str):
     return "test-consumer-%s" % kafka_prefix
 
 
-@pytest.fixture(scope="session")
-def kafka_server() -> Iterator[str]:
-    p = Producer({"test.mock.num.brokers": "1"})
+@pytest.fixture(scope="function")
+def object_types():
+    """Set of object types to precreate topics for."""
+    return set(TEST_OBJECT_DICTS.keys())
 
-    metadata = p.list_topics()
+
+@pytest.fixture(scope="function")
+def kafka_server(
+    kafka_server_base: str, kafka_prefix: str, object_types: Iterator[str]
+) -> str:
+    """A kafka server with existing topics
+
+    topics are built from the ``kafka_prefix`` and the ``object_types`` list"""
+    topics = [f"{kafka_prefix}.{obj}" for obj in object_types]
+
+    # unfortunately, the Mock broker does not support the CreatTopic admin API, so we
+    # have to create topics using a Producer.
+    producer = Producer(
+        {
+            "bootstrap.servers": kafka_server_base,
+            "client.id": "bootstrap producer",
+            "acks": "all",
+        }
+    )
+    for topic in topics:
+        producer.produce(topic=topic, value=None)
+    for i in range(10):
+        if producer.flush(0.1) == 0:
+            break
+
+    return kafka_server_base
+
+
+@pytest.fixture(scope="session")
+def kafka_server_base() -> Iterator[str]:
+    """Create a mock kafka cluster suitable for tests.
+
+    Yield a connection string.
+
+    Note: this is a generator to keep the mock broker alive during the whole test
+    session.
+
+    see https://github.com/edenhill/librdkafka/blob/master/src/rdkafka_mock.h
+    """
+    admin = AdminClient({"test.mock.num.brokers": "1"})
+
+    metadata = admin.list_topics()
     brokers = [str(broker) for broker in metadata.brokers.values()]
     assert len(brokers) == 1, "More than one broker found in the kafka cluster?!"
 
     broker_connstr, broker_id = brokers[0].split("/")
-    ip, port_str = broker_connstr.split(":")
-    assert ip == "127.0.0.1"
-    assert int(port_str)
-
     yield broker_connstr
-
-    p.flush()
 
 
 TEST_CONFIG = {
     "consumer_id": "swh.journal.consumer",
-    "object_types": TEST_OBJECT_DICTS.keys(),
     "stop_after_objects": 1,  # will read 1 object and stop
     "storage": {"cls": "memory", "args": {}},
 }
 
 
 @pytest.fixture
-def test_config(kafka_server: str, kafka_prefix: str):
+def test_config(kafka_server_base: str, kafka_prefix: str, object_types: Iterator[str]):
     """Test configuration needed for producer/consumer
 
     """
     return {
         **TEST_CONFIG,
-        "brokers": [kafka_server],
-        "prefix": kafka_prefix + ".swh.journal.objects",
+        "object_types": object_types,
+        "brokers": [kafka_server_base],
+        "prefix": kafka_prefix,
     }
 
 
