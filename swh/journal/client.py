@@ -21,17 +21,6 @@ rdkafka_logger = logging.getLogger(__name__ + ".rdkafka")
 # Only accepted offset reset policy accepted
 ACCEPTED_OFFSET_RESET = ["earliest", "latest"]
 
-# Only accepted object types
-ACCEPTED_OBJECT_TYPES = [
-    "content",
-    "directory",
-    "revision",
-    "release",
-    "snapshot",
-    "origin",
-    "origin_visit",
-]
-
 # Errors that Kafka raises too often and are not useful; therefore they
 # we lower their log level to DEBUG instead of INFO.
 _SPAMMY_ERRORS = [
@@ -73,7 +62,8 @@ class JournalClient:
     `'swh.journal.objects'`.
 
     Clients subscribe to events specific to each object type as listed in the
-    `object_types` argument (if unset, defaults to all accepted object types).
+    `object_types` argument (if unset, defaults to all existing kafka topic under
+    the prefix).
 
     Clients can be sharded by setting the `group_id` to a common
     value across instances. The journal will share the message
@@ -111,20 +101,11 @@ class JournalClient:
     ):
         if prefix is None:
             prefix = DEFAULT_PREFIX
-        if object_types is None:
-            object_types = ACCEPTED_OBJECT_TYPES
         if auto_offset_reset not in ACCEPTED_OFFSET_RESET:
             raise ValueError(
                 "Option 'auto_offset_reset' only accept %s, not %s"
                 % (ACCEPTED_OFFSET_RESET, auto_offset_reset)
             )
-
-        for object_type in object_types:
-            if object_type not in ACCEPTED_OBJECT_TYPES:
-                raise ValueError(
-                    "Option 'object_types' only accepts %s, not %s."
-                    % (ACCEPTED_OBJECT_TYPES, object_type)
-                )
 
         if batch_size <= 0:
             raise ValueError("Option 'batch_size' needs to be positive")
@@ -184,9 +165,34 @@ class JournalClient:
 
         self.consumer = Consumer(consumer_settings)
 
-        self.subscription = [
-            "%s.%s" % (prefix, object_type) for object_type in object_types
-        ]
+        existing_topics = self.consumer.list_topics(timeout=10).topics.keys()
+        if not any(topic.startswith(f"{prefix}.") for topic in existing_topics):
+            raise ValueError(
+                f"The prefix {prefix} does not match any existing topic "
+                "on the kafka broker"
+            )
+
+        if object_types:
+            unknown_topics = []
+            for object_type in object_types:
+                topic = f"{prefix}.{object_type}"
+                if topic not in existing_topics:
+                    unknown_topics.append(topic)
+            if unknown_topics:
+                raise ValueError(
+                    f"Topic(s) {','.join(unknown_topics)} "
+                    "are unknown on the kafka broker"
+                )
+            self.subscription = [
+                f"{prefix}.{object_type}" for object_type in object_types
+            ]
+        else:
+            # subscribe to every topic under the prefix
+            self.subscription = [
+                topic for topic in existing_topics if topic.startswith(prefix)
+            ]
+
+        logger.debug(f"Upstream topics: {existing_topics}")
         self.subscribe()
 
         self.stop_after_objects = stop_after_objects
@@ -194,12 +200,12 @@ class JournalClient:
         self.eof_reached: Set[Tuple[str, str]] = set()
         self.batch_size = batch_size
 
-        self._object_types = object_types
-
     def subscribe(self):
-        logger.debug("Upstream topics: %s", self.consumer.list_topics(timeout=10))
-        logger.debug("Subscribing to: %s", self.subscription)
+        """Subscribe to topics listed in self.subscription
 
+        This can be overridden if you need, for instance, to manually assign partitions.
+        """
+        logger.debug(f"Subscribing to: {self.subscription}")
         self.consumer.subscribe(topics=self.subscription)
 
     def process(self, worker_fn):
@@ -264,13 +270,11 @@ class JournalClient:
                 else:
                     _error_cb(error)
                 continue
-
+            if message.value() is None:
+                # ignore message with no payload, these can be generated in tests
+                continue
             nb_processed += 1
-
             object_type = message.topic().split(".")[-1]
-            # Got a message from a topic we did not subscribe to.
-            assert object_type in self._object_types, object_type
-
             objects[object_type].append(self.deserialize_message(message))
 
         if objects:
