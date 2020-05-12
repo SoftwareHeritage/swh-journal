@@ -9,18 +9,6 @@ from typing import Dict, Iterable, List, NamedTuple, Optional, Type
 
 from confluent_kafka import Producer, KafkaException
 
-from swh.model.model import (
-    BaseModel,
-    Content,
-    Directory,
-    Origin,
-    OriginVisit,
-    Release,
-    Revision,
-    SkippedContent,
-    Snapshot,
-)
-
 from swh.journal.serializers import (
     KeyType,
     ModelObject,
@@ -31,17 +19,6 @@ from swh.journal.serializers import (
 )
 
 logger = logging.getLogger(__name__)
-
-OBJECT_TYPES: Dict[Type[BaseModel], str] = {
-    Content: "content",
-    Directory: "directory",
-    Origin: "origin",
-    OriginVisit: "origin_visit",
-    Release: "release",
-    Revision: "revision",
-    SkippedContent: "skipped_content",
-    Snapshot: "snapshot",
-}
 
 
 class DeliveryTag(NamedTuple):

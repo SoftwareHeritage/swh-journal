@@ -5,11 +5,34 @@
 
 import datetime
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Type
 
 from swh.model.hashutil import MultiHash, hash_to_bytes
 from swh.journal.serializers import ModelObject
-from swh.journal.writer.kafka import OBJECT_TYPES
+
+from swh.model.model import (
+    BaseModel,
+    Content,
+    Directory,
+    Origin,
+    OriginVisit,
+    Release,
+    Revision,
+    SkippedContent,
+    Snapshot,
+)
+
+
+OBJECT_TYPES: Dict[Type[BaseModel], str] = {
+    Content: "content",
+    Directory: "directory",
+    Origin: "origin",
+    OriginVisit: "origin_visit",
+    Release: "release",
+    Revision: "revision",
+    SkippedContent: "skipped_content",
+    Snapshot: "snapshot",
+}
 
 
 CONTENTS = [
