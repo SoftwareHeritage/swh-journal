@@ -34,6 +34,7 @@ OBJECT_TYPES: Dict[Type[BaseModel], str] = {
     Snapshot: "snapshot",
 }
 
+UTC = datetime.timezone.utc
 
 CONTENTS = [
     {**MultiHash.from_data(b"foo").digest(), "length": 3, "status": "visible",},
@@ -169,7 +170,7 @@ for object_type, objects in TEST_OBJECT_DICTS.items():
         if object_type == "origin_visit":
             obj_d = {**obj_d, "visit": num}
         elif object_type == "content":
-            obj_d = {**obj_d, "data": b"", "ctime": datetime.datetime.now()}
+            obj_d = {**obj_d, "data": b"", "ctime": datetime.datetime.now(tz=UTC)}
 
         converted_objects.append(model.from_dict(obj_d))
 
