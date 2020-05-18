@@ -92,6 +92,7 @@ class JournalClient:
         group_id: str,
         prefix: Optional[str] = None,
         object_types: Optional[List[str]] = None,
+        privileged: bool = False,
         stop_after_objects: Optional[int] = None,
         batch_size: int = 200,
         process_timeout: Optional[float] = None,
@@ -164,33 +165,42 @@ class JournalClient:
         logger.debug("Consumer settings: %s", consumer_settings)
 
         self.consumer = Consumer(consumer_settings)
-
-        existing_topics = self.consumer.list_topics(timeout=10).topics.keys()
-        if not any(topic.startswith(f"{prefix}.") for topic in existing_topics):
+        if privileged:
+            privileged_prefix = f"{prefix}_privileged"
+        else:  # do not attempt to subscribe to privileged topics
+            privileged_prefix = f"{prefix}"
+        existing_topics = [
+            topic
+            for topic in self.consumer.list_topics(timeout=10).topics.keys()
+            if (
+                topic.startswith(f"{prefix}.")
+                or topic.startswith(f"{privileged_prefix}.")
+            )
+        ]
+        if not existing_topics:
             raise ValueError(
                 f"The prefix {prefix} does not match any existing topic "
                 "on the kafka broker"
             )
 
-        if object_types:
-            unknown_topics = []
-            for object_type in object_types:
-                topic = f"{prefix}.{object_type}"
-                if topic not in existing_topics:
-                    unknown_topics.append(topic)
-            if unknown_topics:
-                raise ValueError(
-                    f"Topic(s) {','.join(unknown_topics)} "
-                    "are unknown on the kafka broker"
-                )
-            self.subscription = [
-                f"{prefix}.{object_type}" for object_type in object_types
-            ]
-        else:
-            # subscribe to every topic under the prefix
-            self.subscription = [
-                topic for topic in existing_topics if topic.startswith(prefix)
-            ]
+        if not object_types:
+            object_types = list({topic.split(".")[-1] for topic in existing_topics})
+
+        self.subscription = []
+        unknown_types = []
+        for object_type in object_types:
+            topics = (f"{privileged_prefix}.{object_type}", f"{prefix}.{object_type}")
+            for topic in topics:
+                if topic in existing_topics:
+                    self.subscription.append(topic)
+                    break
+            else:
+                unknown_types.append(object_type)
+        if unknown_types:
+            raise ValueError(
+                f"Topic(s) for object types {','.join(unknown_types)} "
+                "are unknown on the kafka broker"
+            )
 
         logger.debug(f"Upstream topics: {existing_topics}")
         self.subscribe()

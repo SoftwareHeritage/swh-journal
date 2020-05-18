@@ -60,18 +60,34 @@ class KafkaDeliveryError(Exception):
 
 
 class KafkaJournalWriter:
-    """This class is instantiated and used by swh-storage to write incoming
-    new objects to Kafka before adding them to the storage backend
-    (eg. postgresql) itself.
+    """This class is used to write serialized versions of swh.model.model objects to a
+    series of Kafka topics.
+
+    Topics used to send objects representations are built from a ``prefix`` plus the
+    type of the object:
+
+      ``{prefix}.{object_type}``
+
+    Objects can be sent as is, or can be anonymized. The anonymization feature, when
+    activated, will write anonymized versions of model objects in the main topic, and
+    stock (non-anonymized) objects will be sent to a dedicated (privileged) set of
+    topics:
+
+      ``{prefix}_privileged.{object_type}``
+
+    The anonymization of a swh.model object is the result of calling its
+    ``BaseModel.anonymize()`` method. An object is considered anonymizable if this
+    method returns a (non-None) value.
 
     Args:
-      brokers: list of broker addresses and ports
-      prefix: the prefix used to build the topic names for objects
-      client_id: the id of the writer sent to kafka
-      producer_config: extra configuration keys passed to the `Producer`
+      brokers: list of broker addresses and ports.
+      prefix: the prefix used to build the topic names for objects.
+      client_id: the id of the writer sent to kafka.
+      producer_config: extra configuration keys passed to the `Producer`.
       flush_timeout: timeout, in seconds, after which the `flush` operation
         will fail if some message deliveries are still pending.
-      producer_class: override for the kafka producer class
+      producer_class: override for the kafka producer class.
+      anonymize: if True, activate the anonymization feature.
 
     """
 
@@ -83,8 +99,11 @@ class KafkaJournalWriter:
         producer_config: Optional[Dict] = None,
         flush_timeout: float = 120,
         producer_class: Type[Producer] = Producer,
+        anonymize: bool = False,
     ):
         self._prefix = prefix
+        self._prefix_privileged = f"{self._prefix}_privileged"
+        self.anonymize = anonymize
 
         if not producer_config:
             producer_config = {}
@@ -190,8 +209,20 @@ class KafkaJournalWriter:
 
     def _write_addition(self, object_type: str, object_: ModelObject) -> None:
         """Write a single object to the journal"""
-        topic = f"{self._prefix}.{object_type}"
         key = object_key(object_type, object_)
+
+        if self.anonymize:
+            anon_object_ = object_.anonymize()
+            if anon_object_:  # can be either None, or an anonymized object
+                # if the object is anonymizable, send the non-anonymized version in the
+                # privileged channel
+                topic = f"{self._prefix_privileged}.{object_type}"
+                dict_ = self._sanitize_object(object_type, object_)
+                logger.debug("topic: %s, key: %s, value: %s", topic, key, dict_)
+                self.send(topic, key=key, value=dict_)
+                object_ = anon_object_
+
+        topic = f"{self._prefix}.{object_type}"
         dict_ = self._sanitize_object(object_type, object_)
         logger.debug("topic: %s, key: %s, value: %s", topic, key, dict_)
         self.send(topic, key=key, value=dict_)
