@@ -121,7 +121,7 @@ def test_write_delivery_failure(
         brokers=[kafka_server], client_id="kafka_writer", prefix=kafka_prefix,
     )
 
-    empty_dir = Directory(entries=[])
+    empty_dir = Directory(entries=())
     with pytest.raises(KafkaDeliveryError) as exc:
         writer.write_addition("directory", empty_dir)
 
@@ -153,7 +153,7 @@ def test_write_delivery_timeout(
         producer_class=MockProducer,
     )
 
-    empty_dir = Directory(entries=[])
+    empty_dir = Directory(entries=())
     with pytest.raises(KafkaDeliveryError) as exc:
         writer.write_addition("directory", empty_dir)
 

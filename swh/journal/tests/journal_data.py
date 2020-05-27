@@ -89,7 +89,7 @@ REVISIONS = [
         "directory": b"\x01" * 20,
         "synthetic": False,
         "metadata": None,
-        "parents": [],
+        "parents": (),
     },
     {
         "id": hash_to_bytes("368a48fe15b7db2383775f97c6b247011b3f14f4"),
@@ -102,7 +102,7 @@ REVISIONS = [
         "directory": b"\x02" * 20,
         "synthetic": False,
         "metadata": None,
-        "parents": [],
+        "parents": (),
     },
 ]
 
