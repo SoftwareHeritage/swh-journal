@@ -6,7 +6,7 @@
 import random
 import string
 
-from typing import Dict, Iterator
+from typing import Collection, Dict, Iterator, Optional
 from collections import defaultdict
 
 import pytest
@@ -14,6 +14,7 @@ import pytest
 from confluent_kafka import Consumer, KafkaException, Producer
 from confluent_kafka.admin import AdminClient
 
+from swh.model.hashutil import hash_to_hex
 from swh.journal.serializers import object_key, kafka_to_key, kafka_to_value
 from swh.journal.tests.journal_data import TEST_OBJECTS, TEST_OBJECT_DICTS
 
@@ -60,8 +61,15 @@ def consume_messages(consumer, kafka_prefix, expected_messages):
     return consumed_messages
 
 
-def assert_all_objects_consumed(consumed_messages):
-    """Check whether all objects from TEST_OBJECT_DICTS have been consumed"""
+def assert_all_objects_consumed(
+    consumed_messages: Dict, exclude: Optional[Collection] = None
+):
+    """Check whether all objects from TEST_OBJECT_DICTS have been consumed
+
+    `exclude` can be a list of object types for which we do not want to compare the
+    values (eg. for anonymized object).
+
+    """
     for object_type, known_values in TEST_OBJECT_DICTS.items():
         known_keys = [object_key(object_type, obj) for obj in TEST_OBJECTS[object_type]]
 
@@ -70,18 +78,24 @@ def assert_all_objects_consumed(consumed_messages):
 
         (received_keys, received_values) = zip(*consumed_messages[object_type])
 
-        if object_type == "origin_visit":
-            for value in received_values:
-                del value["visit"]
-        elif object_type == "content":
+        if object_type in ("content", "skipped_content"):
             for value in received_values:
                 del value["ctime"]
 
         for key in known_keys:
-            assert key in received_keys
+            assert key in received_keys, (
+                f"expected {object_type} key {hash_to_hex(key)} "
+                "absent from consumed messages"
+            )
+
+        if exclude and object_type in exclude:
+            continue
 
         for value in known_values:
-            assert value in received_values
+            assert value in received_values, (
+                f"expected {object_type} value {value!r} is "
+                "absent from consumed messages"
+            )
 
 
 @pytest.fixture(scope="function")

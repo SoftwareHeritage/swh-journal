@@ -77,7 +77,7 @@ def test_kafka_writer_anonymized(
             expected_messages += len(objects)
 
     consumed_messages = consume_messages(consumer, kafka_prefix, expected_messages)
-    assert_all_objects_consumed(consumed_messages)
+    assert_all_objects_consumed(consumed_messages, exclude=["revision", "release"])
 
     for key, obj_dict in consumed_messages["revision"]:
         obj = Revision.from_dict(obj_dict)
