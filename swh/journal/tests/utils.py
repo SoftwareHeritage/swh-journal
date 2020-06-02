@@ -23,9 +23,10 @@ class FakeKafkaMessage:
 
 
 class MockedKafkaWriter(KafkaJournalWriter):
-    def __init__(self, queue):
+    def __init__(self, queue, anonymize: bool = False):
         self._prefix = "prefix"
         self.queue = queue
+        self.anonymize = anonymize
 
     def send(self, topic, key, value):
         msg = FakeKafkaMessage(topic=topic, key=key, value=value)
