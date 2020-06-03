@@ -3,19 +3,29 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from typing import Iterable
+
 import pytest
 from confluent_kafka import Consumer, Producer
 
-from swh.model.model import Directory
+from swh.model.model import Directory, Revision, Release
 
 from swh.journal.tests.journal_data import TEST_OBJECTS
 from swh.journal.pytest_plugin import consume_messages, assert_all_objects_consumed
 from swh.journal.writer.kafka import KafkaJournalWriter, KafkaDeliveryError
 
 
-def test_kafka_writer(kafka_prefix: str, kafka_server: str, consumer: Consumer):
+def test_kafka_writer(
+    kafka_prefix: str,
+    kafka_server: str,
+    consumer: Consumer,
+    privileged_object_types: Iterable[str],
+):
     writer = KafkaJournalWriter(
-        brokers=[kafka_server], client_id="kafka_writer", prefix=kafka_prefix,
+        brokers=[kafka_server],
+        client_id="kafka_writer",
+        prefix=kafka_prefix,
+        anonymize=False,
     )
 
     expected_messages = 0
@@ -26,6 +36,65 @@ def test_kafka_writer(kafka_prefix: str, kafka_server: str, consumer: Consumer):
 
     consumed_messages = consume_messages(consumer, kafka_prefix, expected_messages)
     assert_all_objects_consumed(consumed_messages)
+
+    for key, obj_dict in consumed_messages["revision"]:
+        obj = Revision.from_dict(obj_dict)
+        for person in (obj.author, obj.committer):
+            assert not (
+                len(person.fullname) == 32
+                and person.name is None
+                and person.email is None
+            )
+    for key, obj_dict in consumed_messages["release"]:
+        obj = Release.from_dict(obj_dict)
+        for person in (obj.author,):
+            assert not (
+                len(person.fullname) == 32
+                and person.name is None
+                and person.email is None
+            )
+
+
+def test_kafka_writer_anonymized(
+    kafka_prefix: str,
+    kafka_server: str,
+    consumer: Consumer,
+    privileged_object_types: Iterable[str],
+):
+    writer = KafkaJournalWriter(
+        brokers=[kafka_server],
+        client_id="kafka_writer",
+        prefix=kafka_prefix,
+        anonymize=True,
+    )
+
+    expected_messages = 0
+
+    for object_type, objects in TEST_OBJECTS.items():
+        writer.write_additions(object_type, objects)
+        expected_messages += len(objects)
+        if object_type in privileged_object_types:
+            expected_messages += len(objects)
+
+    consumed_messages = consume_messages(consumer, kafka_prefix, expected_messages)
+    assert_all_objects_consumed(consumed_messages, exclude=["revision", "release"])
+
+    for key, obj_dict in consumed_messages["revision"]:
+        obj = Revision.from_dict(obj_dict)
+        for person in (obj.author, obj.committer):
+            assert (
+                len(person.fullname) == 32
+                and person.name is None
+                and person.email is None
+            )
+    for key, obj_dict in consumed_messages["release"]:
+        obj = Release.from_dict(obj_dict)
+        for person in (obj.author,):
+            assert (
+                len(person.fullname) == 32
+                and person.name is None
+                and person.email is None
+            )
 
 
 def test_write_delivery_failure(
@@ -52,7 +121,7 @@ def test_write_delivery_failure(
         brokers=[kafka_server], client_id="kafka_writer", prefix=kafka_prefix,
     )
 
-    empty_dir = Directory(entries=[])
+    empty_dir = Directory(entries=())
     with pytest.raises(KafkaDeliveryError) as exc:
         writer.write_addition("directory", empty_dir)
 
@@ -84,7 +153,7 @@ def test_write_delivery_timeout(
         producer_class=MockProducer,
     )
 
-    empty_dir = Directory(entries=[])
+    empty_dir = Directory(entries=())
     with pytest.raises(KafkaDeliveryError) as exc:
         writer.write_addition("directory", empty_dir)
 

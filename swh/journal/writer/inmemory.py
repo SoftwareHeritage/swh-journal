@@ -20,13 +20,21 @@ class InMemoryJournalWriter:
         # Share the list of objects across processes, for RemoteAPI tests.
         self.manager = Manager()
         self.objects = self.manager.list()
+        self.privileged_objects = self.manager.list()
 
-    def write_addition(self, object_type: str, object_: ModelObject) -> None:
+    def write_addition(
+        self, object_type: str, object_: ModelObject, privileged: bool = False
+    ) -> None:
         assert isinstance(object_, BaseModel)
-        self.objects.append((object_type, object_))
+        if privileged:
+            self.privileged_objects.append((object_type, object_))
+        else:
+            self.objects.append((object_type, object_))
 
     write_update = write_addition
 
-    def write_additions(self, object_type: str, objects: List[ModelObject]) -> None:
+    def write_additions(
+        self, object_type: str, objects: List[ModelObject], privileged: bool = False
+    ) -> None:
         for object_ in objects:
-            self.write_addition(object_type, object_)
+            self.write_addition(object_type, object_, privileged)
