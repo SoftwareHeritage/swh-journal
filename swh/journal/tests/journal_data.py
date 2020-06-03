@@ -5,15 +5,53 @@
 
 import datetime
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Type
 
 from swh.model.hashutil import MultiHash, hash_to_bytes
 from swh.journal.serializers import ModelObject
-from swh.journal.writer.kafka import OBJECT_TYPES
 
+from swh.model.model import (
+    BaseModel,
+    Content,
+    Directory,
+    Origin,
+    OriginVisit,
+    Release,
+    Revision,
+    SkippedContent,
+    Snapshot,
+)
+
+
+OBJECT_TYPES: Dict[Type[BaseModel], str] = {
+    Content: "content",
+    Directory: "directory",
+    Origin: "origin",
+    OriginVisit: "origin_visit",
+    Release: "release",
+    Revision: "revision",
+    SkippedContent: "skipped_content",
+    Snapshot: "snapshot",
+}
+
+UTC = datetime.timezone.utc
 
 CONTENTS = [
-    {**MultiHash.from_data(b"foo").digest(), "length": 3, "status": "visible",},
+    {
+        **MultiHash.from_data(f"foo{i}".encode()).digest(),
+        "length": 4,
+        "status": "visible",
+    }
+    for i in range(10)
+]
+SKIPPED_CONTENTS = [
+    {
+        **MultiHash.from_data(f"bar{i}".encode()).digest(),
+        "length": 4,
+        "status": "absent",
+        "reason": f"because chr({i}) != '*'",
+    }
+    for i in range(2)
 ]
 
 duplicate_content1 = {
@@ -65,7 +103,7 @@ REVISIONS = [
         "directory": b"\x01" * 20,
         "synthetic": False,
         "metadata": None,
-        "parents": [],
+        "parents": (),
     },
     {
         "id": hash_to_bytes("368a48fe15b7db2383775f97c6b247011b3f14f4"),
@@ -78,7 +116,7 @@ REVISIONS = [
         "directory": b"\x02" * 20,
         "synthetic": False,
         "metadata": None,
-        "parents": [],
+        "parents": (),
     },
 ]
 
@@ -108,30 +146,117 @@ ORIGIN_VISITS = [
     {
         "origin": ORIGINS[0]["url"],
         "date": "2013-05-07 04:20:39.369271+00:00",
-        "snapshot": None,  # TODO
-        "status": "ongoing",  # TODO
+        "snapshot": None,
+        "status": "ongoing",
         "metadata": {"foo": "bar"},
         "type": "git",
+        "visit": 1,
+    },
+    {
+        "origin": ORIGINS[1]["url"],
+        "date": "2014-11-27 17:20:39+00:00",
+        "snapshot": None,
+        "status": "ongoing",
+        "metadata": {"baz": "qux"},
+        "type": "hg",
+        "visit": 1,
     },
     {
         "origin": ORIGINS[0]["url"],
         "date": "2018-11-27 17:20:39+00:00",
-        "snapshot": None,  # TODO
-        "status": "ongoing",  # TODO
+        "snapshot": None,
+        "status": "ongoing",
         "metadata": {"baz": "qux"},
         "type": "git",
+        "visit": 2,
+    },
+    {
+        "origin": ORIGINS[0]["url"],
+        "date": "2018-11-27 17:20:39+00:00",
+        "snapshot": hash_to_bytes("742cdc6be7bf6e895b055227c2300070f056e07b"),
+        "status": "full",
+        "metadata": {"baz": "qux"},
+        "type": "git",
+        "visit": 3,
+    },
+    {
+        "origin": ORIGINS[1]["url"],
+        "date": "2015-11-27 17:20:39+00:00",
+        "snapshot": hash_to_bytes("ecee48397a92b0d034e9752a17459f3691a73ef9"),
+        "status": "partial",
+        "metadata": {"something": "wrong occurred"},
+        "type": "hg",
+        "visit": 2,
     },
 ]
 
+
+DIRECTORIES = [
+    {"id": hash_to_bytes("4b825dc642cb6eb9a060e54bf8d69288fbee4904"), "entries": ()},
+    {
+        "id": hash_to_bytes("cc13247a0d6584f297ca37b5868d2cbd242aea03"),
+        "entries": (
+            {
+                "name": b"file1.ext",
+                "perms": 0o644,
+                "type": "file",
+                "target": CONTENTS[0]["sha1_git"],
+            },
+            {
+                "name": b"dir1",
+                "perms": 0o755,
+                "type": "dir",
+                "target": hash_to_bytes("4b825dc642cb6eb9a060e54bf8d69288fbee4904"),
+            },
+            {
+                "name": b"subprepo1",
+                "perms": 0o160000,
+                "type": "rev",
+                "target": REVISIONS[1]["id"],
+            },
+        ),
+    },
+]
+
+
+SNAPSHOTS = [
+    {
+        "id": hash_to_bytes("742cdc6be7bf6e895b055227c2300070f056e07b"),
+        "branches": {
+            b"master": {"target_type": "revision", "target": REVISIONS[0]["id"]}
+        },
+    },
+    {
+        "id": hash_to_bytes("ecee48397a92b0d034e9752a17459f3691a73ef9"),
+        "branches": {
+            b"target/revision": {
+                "target_type": "revision",
+                "target": REVISIONS[0]["id"],
+            },
+            b"target/alias": {"target_type": "alias", "target": b"target/revision"},
+            b"target/directory": {
+                "target_type": "directory",
+                "target": DIRECTORIES[0]["id"],
+            },
+            b"target/release": {"target_type": "release", "target": RELEASES[0]["id"]},
+            b"target/snapshot": {
+                "target_type": "snapshot",
+                "target": hash_to_bytes("742cdc6be7bf6e895b055227c2300070f056e07b"),
+            },
+        },
+    },
+]
+
+
 TEST_OBJECT_DICTS: Dict[str, List[Dict[str, Any]]] = {
     "content": CONTENTS,
-    "directory": [],
+    "directory": DIRECTORIES,
     "origin": ORIGINS,
     "origin_visit": ORIGIN_VISITS,
     "release": RELEASES,
     "revision": REVISIONS,
-    "snapshot": [],
-    "skipped_content": [],
+    "snapshot": SNAPSHOTS,
+    "skipped_content": SKIPPED_CONTENTS,
 }
 
 MODEL_OBJECTS = {v: k for (k, v) in OBJECT_TYPES.items()}
@@ -143,10 +268,8 @@ for object_type, objects in TEST_OBJECT_DICTS.items():
     model = MODEL_OBJECTS[object_type]
 
     for (num, obj_d) in enumerate(objects):
-        if object_type == "origin_visit":
-            obj_d = {**obj_d, "visit": num}
-        elif object_type == "content":
-            obj_d = {**obj_d, "data": b"", "ctime": datetime.datetime.now()}
+        if object_type == "content":
+            obj_d = {**obj_d, "data": b"", "ctime": datetime.datetime.now(tz=UTC)}
 
         converted_objects.append(model.from_dict(obj_d))
 

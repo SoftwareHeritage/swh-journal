@@ -6,7 +6,7 @@
 import random
 import string
 
-from typing import Dict, Iterator
+from typing import Collection, Dict, Iterator, Optional
 from collections import defaultdict
 
 import pytest
@@ -14,6 +14,7 @@ import pytest
 from confluent_kafka import Consumer, KafkaException, Producer
 from confluent_kafka.admin import AdminClient
 
+from swh.model.hashutil import hash_to_hex
 from swh.journal.serializers import object_key, kafka_to_key, kafka_to_value
 from swh.journal.tests.journal_data import TEST_OBJECTS, TEST_OBJECT_DICTS
 
@@ -48,7 +49,9 @@ def consume_messages(consumer, kafka_prefix, expected_messages):
 
         fetched_messages += 1
         topic = msg.topic()
-        assert topic.startswith(kafka_prefix + "."), "Unexpected topic"
+        assert topic.startswith(f"{kafka_prefix}.") or topic.startswith(
+            f"{kafka_prefix}_privileged."
+        ), "Unexpected topic"
         object_type = topic[len(kafka_prefix + ".") :]
 
         consumed_messages[object_type].append(
@@ -58,8 +61,15 @@ def consume_messages(consumer, kafka_prefix, expected_messages):
     return consumed_messages
 
 
-def assert_all_objects_consumed(consumed_messages):
-    """Check whether all objects from TEST_OBJECT_DICTS have been consumed"""
+def assert_all_objects_consumed(
+    consumed_messages: Dict, exclude: Optional[Collection] = None
+):
+    """Check whether all objects from TEST_OBJECT_DICTS have been consumed
+
+    `exclude` can be a list of object types for which we do not want to compare the
+    values (eg. for anonymized object).
+
+    """
     for object_type, known_values in TEST_OBJECT_DICTS.items():
         known_keys = [object_key(object_type, obj) for obj in TEST_OBJECTS[object_type]]
 
@@ -68,18 +78,24 @@ def assert_all_objects_consumed(consumed_messages):
 
         (received_keys, received_values) = zip(*consumed_messages[object_type])
 
-        if object_type == "origin_visit":
-            for value in received_values:
-                del value["visit"]
-        elif object_type == "content":
+        if object_type in ("content", "skipped_content"):
             for value in received_values:
                 del value["ctime"]
 
         for key in known_keys:
-            assert key in received_keys
+            assert key in received_keys, (
+                f"expected {object_type} key {hash_to_hex(key)} "
+                "absent from consumed messages"
+            )
+
+        if exclude and object_type in exclude:
+            continue
 
         for value in known_values:
-            assert value in received_values
+            assert value in received_values, (
+                f"expected {object_type} value {value!r} is "
+                "absent from consumed messages"
+            )
 
 
 @pytest.fixture(scope="function")
@@ -101,13 +117,30 @@ def object_types():
 
 
 @pytest.fixture(scope="function")
+def privileged_object_types():
+    """Set of object types to precreate privileged topics for."""
+    return {"revision", "release"}
+
+
+@pytest.fixture(scope="function")
 def kafka_server(
-    kafka_server_base: str, kafka_prefix: str, object_types: Iterator[str]
+    kafka_server_base: str,
+    kafka_prefix: str,
+    object_types: Iterator[str],
+    privileged_object_types: Iterator[str],
 ) -> str:
     """A kafka server with existing topics
 
-    topics are built from the ``kafka_prefix`` and the ``object_types`` list"""
-    topics = [f"{kafka_prefix}.{obj}" for obj in object_types]
+    Unprivileged topics are built as ``{kafka_prefix}.{object_type}`` with object_type
+    from the ``object_types`` list.
+
+    Privileged topics are built as ``{kafka_prefix}_privileged.{object_type}`` with
+    object_type from the ``privileged_object_types`` list.
+
+    """
+    topics = [f"{kafka_prefix}.{obj}" for obj in object_types] + [
+        f"{kafka_prefix}_privileged.{obj}" for obj in privileged_object_types
+    ]
 
     # unfortunately, the Mock broker does not support the CreatTopic admin API, so we
     # have to create topics using a Producer.
@@ -156,13 +189,19 @@ TEST_CONFIG = {
 
 
 @pytest.fixture
-def test_config(kafka_server_base: str, kafka_prefix: str, object_types: Iterator[str]):
+def test_config(
+    kafka_server_base: str,
+    kafka_prefix: str,
+    object_types: Iterator[str],
+    privileged_object_types: Iterator[str],
+):
     """Test configuration needed for producer/consumer
 
     """
     return {
         **TEST_CONFIG,
         "object_types": object_types,
+        "privileged_object_types": privileged_object_types,
         "brokers": [kafka_server_base],
         "prefix": kafka_prefix,
     }
@@ -170,7 +209,7 @@ def test_config(kafka_server_base: str, kafka_prefix: str, object_types: Iterato
 
 @pytest.fixture
 def consumer(
-    kafka_server: str, test_config: Dict, kafka_consumer_group: str,
+    kafka_server: str, test_config: Dict, kafka_consumer_group: str
 ) -> Consumer:
     """Get a connected Kafka consumer.
 
@@ -183,12 +222,13 @@ def consumer(
             "group.id": kafka_consumer_group,
         }
     )
-
+    prefix = test_config["prefix"]
     kafka_topics = [
-        "%s.%s" % (test_config["prefix"], object_type)
-        for object_type in test_config["object_types"]
+        f"{prefix}.{object_type}" for object_type in test_config["object_types"]
+    ] + [
+        f"{prefix}_privileged.{object_type}"
+        for object_type in test_config["privileged_object_types"]
     ]
-
     consumer.subscribe(kafka_topics)
 
     yield consumer
