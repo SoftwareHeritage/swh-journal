@@ -109,4 +109,13 @@ def value_to_kafka(value: Any) -> bytes:
 
 def kafka_to_value(kafka_value: bytes) -> Any:
     """Deserialize some data stored in kafka"""
-    return msgpack_loads(kafka_value)
+    value = msgpack_loads(kafka_value)
+    if isinstance(value, list):
+        return tuple(value)
+    if isinstance(value, dict):
+        return ensure_tuples(value)
+    return value
+
+
+def ensure_tuples(value: Dict) -> Dict:
+    return {k: tuple(v) if isinstance(v, list) else v for k, v in value.items()}

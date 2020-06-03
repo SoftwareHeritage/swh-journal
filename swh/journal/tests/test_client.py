@@ -35,7 +35,7 @@ REV = {
     ),
     "synthetic": False,
     "metadata": None,
-    "parents": [],
+    "parents": (),
     "id": b"\x8b\xeb\xd1\x9d\x07\xe2\x1e0\xe2 \x91X\x8d\xbd\x1c\xa8\x86\xdeB\x0c",
 }
 
@@ -241,3 +241,90 @@ def test_client_subscribe_absent_prefix(
             stop_after_objects=1,
             object_types=["else"],
         )
+
+
+def test_client_subscriptions_with_anonymized_topics(
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server_base: str
+):
+    producer = Producer(
+        {
+            "bootstrap.servers": kafka_server_base,
+            "client.id": "test producer",
+            "acks": "all",
+        }
+    )
+
+    # Fill Kafka with revision object on both the regular prefix (normally for
+    # anonymized objects in this case) and privileged one
+    producer.produce(
+        topic=kafka_prefix + ".revision", key=REV["id"], value=value_to_kafka(REV),
+    )
+    producer.produce(
+        topic=kafka_prefix + "_privileged.revision",
+        key=REV["id"],
+        value=value_to_kafka(REV),
+    )
+    producer.flush()
+
+    # without privileged "channels" activated on the client side
+    client = JournalClient(
+        brokers=[kafka_server_base],
+        group_id=kafka_consumer_group,
+        prefix=kafka_prefix,
+        stop_after_objects=1,
+        privileged=False,
+    )
+    # we only subscribed to "standard" topics
+    assert client.subscription == [kafka_prefix + ".revision"]
+
+    # with privileged "channels" activated on the client side
+    client = JournalClient(
+        brokers=[kafka_server_base],
+        group_id=kafka_consumer_group,
+        prefix=kafka_prefix,
+        stop_after_objects=1,
+        privileged=True,
+    )
+    # we only subscribed to "privileged" topics
+    assert client.subscription == [kafka_prefix + "_privileged.revision"]
+
+
+def test_client_subscriptions_without_anonymized_topics(
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server_base: str
+):
+    producer = Producer(
+        {
+            "bootstrap.servers": kafka_server_base,
+            "client.id": "test producer",
+            "acks": "all",
+        }
+    )
+
+    # Fill Kafka with revision objects only on the standard prefix
+    producer.produce(
+        topic=kafka_prefix + ".revision", key=REV["id"], value=value_to_kafka(REV),
+    )
+    producer.flush()
+
+    # without privileged channel activated on the client side
+    client = JournalClient(
+        brokers=[kafka_server_base],
+        group_id=kafka_consumer_group,
+        prefix=kafka_prefix,
+        stop_after_objects=1,
+        privileged=False,
+    )
+    # we only subscribed to the standard prefix
+    assert client.subscription == [kafka_prefix + ".revision"]
+
+    # with privileged channel activated on the client side
+    client = JournalClient(
+        brokers=[kafka_server_base],
+        group_id=kafka_consumer_group,
+        prefix=kafka_prefix,
+        stop_after_objects=1,
+        privileged=True,
+    )
+    # we also only subscribed to the standard prefix, since there is no priviled prefix
+    # on the kafka broker
+    assert client.subscription == [kafka_prefix + ".revision"]
