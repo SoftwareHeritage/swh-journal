@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import copy
 import datetime
 
 from typing import Any, Dict, List, Type
@@ -16,6 +17,7 @@ from swh.model.model import (
     Directory,
     Origin,
     OriginVisit,
+    OriginVisitStatus,
     Release,
     Revision,
     SkippedContent,
@@ -28,6 +30,7 @@ OBJECT_TYPES: Dict[Type[BaseModel], str] = {
     Directory: "directory",
     Origin: "origin",
     OriginVisit: "origin_visit",
+    OriginVisitStatus: "origin_visit_status",
     Release: "release",
     Revision: "revision",
     SkippedContent: "skipped_content",
@@ -191,6 +194,13 @@ ORIGIN_VISITS = [
 ]
 
 
+ORIGIN_VISIT_STATUSES = []
+for visit in ORIGIN_VISITS:
+    visit_status = copy.deepcopy(visit)
+    visit_status.pop("type")
+    ORIGIN_VISIT_STATUSES.append(visit_status)
+
+
 DIRECTORIES = [
     {"id": hash_to_bytes("4b825dc642cb6eb9a060e54bf8d69288fbee4904"), "entries": ()},
     {
@@ -253,6 +263,7 @@ TEST_OBJECT_DICTS: Dict[str, List[Dict[str, Any]]] = {
     "directory": DIRECTORIES,
     "origin": ORIGINS,
     "origin_visit": ORIGIN_VISITS,
+    "origin_visit_status": ORIGIN_VISIT_STATUSES,
     "release": RELEASES,
     "revision": REVISIONS,
     "snapshot": SNAPSHOTS,
