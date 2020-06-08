@@ -145,7 +145,7 @@ ORIGINS = [
 ORIGIN_VISITS = [
     {
         "origin": ORIGINS[0]["url"],
-        "date": "2013-05-07 04:20:39.369271+00:00",
+        "date": datetime.datetime(2013, 5, 7, 4, 20, 39, 369271, tzinfo=UTC),
         "snapshot": None,
         "status": "ongoing",
         "metadata": {"foo": "bar"},
@@ -154,7 +154,7 @@ ORIGIN_VISITS = [
     },
     {
         "origin": ORIGINS[1]["url"],
-        "date": "2014-11-27 17:20:39+00:00",
+        "date": datetime.datetime(2014, 11, 27, 17, 20, 39, tzinfo=UTC),
         "snapshot": None,
         "status": "ongoing",
         "metadata": {"baz": "qux"},
@@ -163,7 +163,7 @@ ORIGIN_VISITS = [
     },
     {
         "origin": ORIGINS[0]["url"],
-        "date": "2018-11-27 17:20:39+00:00",
+        "date": datetime.datetime(2018, 11, 27, 17, 20, 39, tzinfo=UTC),
         "snapshot": None,
         "status": "ongoing",
         "metadata": {"baz": "qux"},
@@ -172,7 +172,7 @@ ORIGIN_VISITS = [
     },
     {
         "origin": ORIGINS[0]["url"],
-        "date": "2018-11-27 17:20:39+00:00",
+        "date": datetime.datetime(2018, 11, 27, 17, 20, 39, tzinfo=UTC),
         "snapshot": hash_to_bytes("742cdc6be7bf6e895b055227c2300070f056e07b"),
         "status": "full",
         "metadata": {"baz": "qux"},
@@ -181,7 +181,7 @@ ORIGIN_VISITS = [
     },
     {
         "origin": ORIGINS[1]["url"],
-        "date": "2015-11-27 17:20:39+00:00",
+        "date": datetime.datetime(2015, 11, 27, 17, 20, 39, tzinfo=UTC),
         "snapshot": hash_to_bytes("ecee48397a92b0d034e9752a17459f3691a73ef9"),
         "status": "partial",
         "metadata": {"something": "wrong occurred"},
