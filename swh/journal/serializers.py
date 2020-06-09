@@ -62,6 +62,12 @@ def object_key(object_type: str, object_) -> KeyType:
             "origin": object_.origin,
             "date": str(object_.date),
         }
+    elif object_type == "origin_visit_status":
+        return {
+            "origin": object_.origin,
+            "visit": str(object_.visit),
+            "date": str(object_.date),
+        }
     else:
         raise ValueError("Unknown object type: %s." % object_type)
 
