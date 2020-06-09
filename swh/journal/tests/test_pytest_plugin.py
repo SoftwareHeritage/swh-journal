@@ -56,6 +56,7 @@ def test_test_config(test_config: dict, kafka_prefix: str, kafka_server_base: st
             "directory",
             "origin",
             "origin_visit",
+            "origin_visit_status",
             "release",
             "revision",
             "snapshot",
