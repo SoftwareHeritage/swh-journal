@@ -14,8 +14,7 @@ import pytest
 from confluent_kafka import Consumer, KafkaException, Producer
 from confluent_kafka.admin import AdminClient
 
-from swh.model.hashutil import hash_to_hex
-from swh.journal.serializers import object_key, kafka_to_key, kafka_to_value
+from swh.journal.serializers import object_key, kafka_to_key, kafka_to_value, pprint_key
 from swh.journal.tests.journal_data import TEST_OBJECTS, TEST_OBJECT_DICTS
 
 
@@ -84,7 +83,7 @@ def assert_all_objects_consumed(
 
         for key in known_keys:
             assert key in received_keys, (
-                f"expected {object_type} key {hash_to_hex(key)} "
+                f"expected {object_type} key {pprint_key(key)} "
                 "absent from consumed messages"
             )
 
