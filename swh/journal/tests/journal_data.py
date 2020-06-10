@@ -46,7 +46,15 @@ CONTENTS = [
         "status": "visible",
     }
     for i in range(10)
+] + [
+    {
+        **MultiHash.from_data(f"forbidden foo{i}".encode()).digest(),
+        "length": 14,
+        "status": "hidden",
+    }
+    for i in range(10)
 ]
+
 SKIPPED_CONTENTS = [
     {
         **MultiHash.from_data(f"bar{i}".encode()).digest(),
