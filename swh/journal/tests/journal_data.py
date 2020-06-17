@@ -46,7 +46,15 @@ CONTENTS = [
         "status": "visible",
     }
     for i in range(10)
+] + [
+    {
+        **MultiHash.from_data(f"forbidden foo{i}".encode()).digest(),
+        "length": 14,
+        "status": "hidden",
+    }
+    for i in range(10)
 ]
+
 SKIPPED_CONTENTS = [
     {
         **MultiHash.from_data(f"bar{i}".encode()).digest(),
@@ -151,7 +159,7 @@ ORIGIN_VISITS = [
         "date": datetime.datetime(2013, 5, 7, 4, 20, 39, 369271, tzinfo=UTC),
         "snapshot": None,
         "status": "ongoing",
-        "metadata": {"foo": "bar"},
+        "metadata": None,
         "type": "git",
         "visit": 1,
     },
@@ -160,7 +168,7 @@ ORIGIN_VISITS = [
         "date": datetime.datetime(2014, 11, 27, 17, 20, 39, tzinfo=UTC),
         "snapshot": None,
         "status": "ongoing",
-        "metadata": {"baz": "qux"},
+        "metadata": None,
         "type": "hg",
         "visit": 1,
     },
@@ -169,7 +177,7 @@ ORIGIN_VISITS = [
         "date": datetime.datetime(2018, 11, 27, 17, 20, 39, tzinfo=UTC),
         "snapshot": None,
         "status": "ongoing",
-        "metadata": {"baz": "qux"},
+        "metadata": None,
         "type": "git",
         "visit": 2,
     },
@@ -178,7 +186,7 @@ ORIGIN_VISITS = [
         "date": datetime.datetime(2018, 11, 27, 17, 20, 39, tzinfo=UTC),
         "snapshot": hash_to_bytes("742cdc6be7bf6e895b055227c2300070f056e07b"),
         "status": "full",
-        "metadata": {"baz": "qux"},
+        "metadata": None,
         "type": "git",
         "visit": 3,
     },
@@ -187,7 +195,7 @@ ORIGIN_VISITS = [
         "date": datetime.datetime(2015, 11, 27, 17, 20, 39, tzinfo=UTC),
         "snapshot": hash_to_bytes("ecee48397a92b0d034e9752a17459f3691a73ef9"),
         "status": "partial",
-        "metadata": {"something": "wrong occurred"},
+        "metadata": None,
         "type": "hg",
         "visit": 2,
     },
