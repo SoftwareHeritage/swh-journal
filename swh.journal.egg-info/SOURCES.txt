@@ -29,7 +29,6 @@ swh/journal/tests/test_client.py
 swh/journal/tests/test_kafka_writer.py
 swh/journal/tests/test_pytest_plugin.py
 swh/journal/tests/test_serializers.py
-swh/journal/tests/utils.py
 swh/journal/writer/__init__.py
 swh/journal/writer/inmemory.py
 swh/journal/writer/kafka.py
