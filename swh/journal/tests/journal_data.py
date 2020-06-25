@@ -3,7 +3,6 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import copy
 import datetime
 
 from typing import Any, Dict, List, Type
@@ -157,56 +156,81 @@ ORIGIN_VISITS = [
     {
         "origin": ORIGINS[0]["url"],
         "date": datetime.datetime(2013, 5, 7, 4, 20, 39, 369271, tzinfo=UTC),
-        "snapshot": None,
-        "status": "ongoing",
-        "metadata": None,
-        "type": "git",
         "visit": 1,
+        "type": "git",
     },
     {
         "origin": ORIGINS[1]["url"],
         "date": datetime.datetime(2014, 11, 27, 17, 20, 39, tzinfo=UTC),
-        "snapshot": None,
-        "status": "ongoing",
-        "metadata": None,
-        "type": "hg",
         "visit": 1,
+        "type": "hg",
     },
     {
         "origin": ORIGINS[0]["url"],
         "date": datetime.datetime(2018, 11, 27, 17, 20, 39, tzinfo=UTC),
-        "snapshot": None,
-        "status": "ongoing",
-        "metadata": None,
-        "type": "git",
         "visit": 2,
+        "type": "git",
     },
     {
         "origin": ORIGINS[0]["url"],
         "date": datetime.datetime(2018, 11, 27, 17, 20, 39, tzinfo=UTC),
-        "snapshot": hash_to_bytes("742cdc6be7bf6e895b055227c2300070f056e07b"),
-        "status": "full",
-        "metadata": None,
-        "type": "git",
         "visit": 3,
+        "type": "git",
     },
     {
         "origin": ORIGINS[1]["url"],
         "date": datetime.datetime(2015, 11, 27, 17, 20, 39, tzinfo=UTC),
-        "snapshot": hash_to_bytes("ecee48397a92b0d034e9752a17459f3691a73ef9"),
-        "status": "partial",
-        "metadata": None,
-        "type": "hg",
         "visit": 2,
+        "type": "hg",
     },
 ]
 
-
-ORIGIN_VISIT_STATUSES = []
-for visit in ORIGIN_VISITS:
-    visit_status = copy.deepcopy(visit)
-    visit_status.pop("type")
-    ORIGIN_VISIT_STATUSES.append(visit_status)
+# The origin-visit-status dates needs to be shifted slightly in the future from their
+# visit dates counterpart. Otherwise, we are hitting storage-wise the "on conflict"
+# ignore policy (because origin-visit-add creates an origin-visit-status with the same
+# parameters from the origin-visit {origin, visit, date}...
+ORIGIN_VISIT_STATUSES = [
+    {
+        "origin": ORIGINS[0]["url"],
+        "date": datetime.datetime(2013, 5, 7, 4, 20, 39, 432222, tzinfo=UTC),
+        "visit": 1,
+        "status": "ongoing",
+        "snapshot": None,
+        "metadata": None,
+    },
+    {
+        "origin": ORIGINS[1]["url"],
+        "date": datetime.datetime(2014, 11, 27, 17, 21, 12, tzinfo=UTC),
+        "visit": 1,
+        "status": "ongoing",
+        "snapshot": None,
+        "metadata": None,
+    },
+    {
+        "origin": ORIGINS[0]["url"],
+        "date": datetime.datetime(2018, 11, 27, 17, 20, 59, tzinfo=UTC),
+        "visit": 2,
+        "status": "ongoing",
+        "snapshot": None,
+        "metadata": None,
+    },
+    {
+        "origin": ORIGINS[0]["url"],
+        "date": datetime.datetime(2018, 11, 27, 17, 20, 49, tzinfo=UTC),
+        "visit": 3,
+        "status": "full",
+        "snapshot": hash_to_bytes("742cdc6be7bf6e895b055227c2300070f056e07b"),
+        "metadata": None,
+    },
+    {
+        "origin": ORIGINS[1]["url"],
+        "date": datetime.datetime(2015, 11, 27, 17, 22, 18, tzinfo=UTC),
+        "visit": 2,
+        "status": "partial",
+        "snapshot": hash_to_bytes("ecee48397a92b0d034e9752a17459f3691a73ef9"),
+        "metadata": None,
+    },
+]
 
 
 DIRECTORIES = [
@@ -270,7 +294,11 @@ TEST_OBJECT_DICTS: Dict[str, List[Dict[str, Any]]] = {
     "content": CONTENTS,
     "directory": DIRECTORIES,
     "origin": ORIGINS,
-    "origin_visit": ORIGIN_VISITS,
+    "origin_visit": [
+        # temporary adaptation to remove when fields are dropped
+        {**o, "status": None, "snapshot": None, "metadata": None}
+        for o in ORIGIN_VISITS
+    ],
     "origin_visit_status": ORIGIN_VISIT_STATUSES,
     "release": RELEASES,
     "revision": REVISIONS,
