@@ -91,9 +91,6 @@ def assert_all_objects_consumed(
             continue
 
         for value in known_values:
-            if object_type == "origin_visit":
-                value["date"] = str(value["date"])
-
             assert value in received_values, (
                 f"expected {object_type} value {value!r} is "
                 "absent from consumed messages"

@@ -200,9 +200,6 @@ class KafkaJournalWriter:
         self, object_type: str, object_: ModelObject
     ) -> Dict[str, str]:
         dict_ = object_.to_dict()
-        if object_type == "origin_visit":
-            # :(
-            dict_["date"] = str(dict_["date"])
         if object_type == "content":
             dict_.pop("data", None)
         return dict_
