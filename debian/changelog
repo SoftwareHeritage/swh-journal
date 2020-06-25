@@ -1,3 +1,13 @@
+swh-journal (0.3.4-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.3.4     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2020-06-25 10:10:16
+    +0200)
+  * Upstream changes:     - v0.3.4     - Drop datetime conversion
+    indirection
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 25 Jun 2020 08:13:02 +0000
+
 swh-journal (0.3.3-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.3.3     - (tagged by Antoine R. Dumont
