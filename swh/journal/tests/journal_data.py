@@ -103,7 +103,7 @@ DATES = [
 
 REVISIONS = [
     {
-        "id": hash_to_bytes("7026b7c1a2af56521e951c01ed20f255fa054238"),
+        "id": hash_to_bytes("4ca486e65eb68e4986aeef8227d2db1d56ce51b3"),
         "message": b"hello",
         "date": DATES[0],
         "committer": COMMITTERS[0],
@@ -116,7 +116,7 @@ REVISIONS = [
         "parents": (),
     },
     {
-        "id": hash_to_bytes("368a48fe15b7db2383775f97c6b247011b3f14f4"),
+        "id": hash_to_bytes("677063f5c405d6fc1781fc56379c9a9adf43d3a0"),
         "message": b"hello again",
         "date": DATES[1],
         "committer": COMMITTERS[1],
@@ -132,7 +132,7 @@ REVISIONS = [
 
 RELEASES = [
     {
-        "id": hash_to_bytes("d81cc0710eb6cf9efd5b920a8453e1e07157b6cd"),
+        "id": hash_to_bytes("8059dc4e17fcd0e51ca3bcd6b80f4577d281fd08"),
         "name": b"v0.0.1",
         "date": {
             "timestamp": {"seconds": 1234567890, "microseconds": 0,},
@@ -219,7 +219,7 @@ ORIGIN_VISIT_STATUSES = [
         "date": datetime.datetime(2018, 11, 27, 17, 20, 49, tzinfo=UTC),
         "visit": 3,
         "status": "full",
-        "snapshot": hash_to_bytes("742cdc6be7bf6e895b055227c2300070f056e07b"),
+        "snapshot": hash_to_bytes("17d0066a4a80aba4a0e913532ee8ff2014f006a9"),
         "metadata": None,
     },
     {
@@ -227,7 +227,7 @@ ORIGIN_VISIT_STATUSES = [
         "date": datetime.datetime(2015, 11, 27, 17, 22, 18, tzinfo=UTC),
         "visit": 2,
         "status": "partial",
-        "snapshot": hash_to_bytes("ecee48397a92b0d034e9752a17459f3691a73ef9"),
+        "snapshot": hash_to_bytes("8ce268b87faf03850693673c3eb5c9bb66e1ca38"),
         "metadata": None,
     },
 ]
@@ -236,7 +236,7 @@ ORIGIN_VISIT_STATUSES = [
 DIRECTORIES = [
     {"id": hash_to_bytes("4b825dc642cb6eb9a060e54bf8d69288fbee4904"), "entries": ()},
     {
-        "id": hash_to_bytes("cc13247a0d6584f297ca37b5868d2cbd242aea03"),
+        "id": hash_to_bytes("21416d920e0ebf0df4a7888bed432873ed5cb3a7"),
         "entries": (
             {
                 "name": b"file1.ext",
@@ -263,13 +263,13 @@ DIRECTORIES = [
 
 SNAPSHOTS = [
     {
-        "id": hash_to_bytes("742cdc6be7bf6e895b055227c2300070f056e07b"),
+        "id": hash_to_bytes("17d0066a4a80aba4a0e913532ee8ff2014f006a9"),
         "branches": {
             b"master": {"target_type": "revision", "target": REVISIONS[0]["id"]}
         },
     },
     {
-        "id": hash_to_bytes("ecee48397a92b0d034e9752a17459f3691a73ef9"),
+        "id": hash_to_bytes("8ce268b87faf03850693673c3eb5c9bb66e1ca38"),
         "branches": {
             b"target/revision": {
                 "target_type": "revision",
@@ -283,7 +283,7 @@ SNAPSHOTS = [
             b"target/release": {"target_type": "release", "target": RELEASES[0]["id"]},
             b"target/snapshot": {
                 "target_type": "snapshot",
-                "target": hash_to_bytes("742cdc6be7bf6e895b055227c2300070f056e07b"),
+                "target": hash_to_bytes("17d0066a4a80aba4a0e913532ee8ff2014f006a9"),
             },
         },
     },
