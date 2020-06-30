@@ -294,11 +294,7 @@ TEST_OBJECT_DICTS: Dict[str, List[Dict[str, Any]]] = {
     "content": CONTENTS,
     "directory": DIRECTORIES,
     "origin": ORIGINS,
-    "origin_visit": [
-        # temporary adaptation to remove when fields are dropped
-        {**o, "status": None, "snapshot": None, "metadata": None}
-        for o in ORIGIN_VISITS
-    ],
+    "origin_visit": ORIGIN_VISITS,
     "origin_visit_status": ORIGIN_VISIT_STATUSES,
     "release": RELEASES,
     "revision": REVISIONS,
