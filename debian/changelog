@@ -1,3 +1,13 @@
+swh-journal (0.3.5-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.3.5     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2020-07-01 15:55:31
+    +0200)
+  * Upstream changes:     - v0.3.5     - journal_data: Drop obsolete
+    origin_visit fields     - Use proper hash ids in tests' journal_data
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Wed, 01 Jul 2020 14:00:27 +0000
+
 swh-journal (0.3.4-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.3.4     - (tagged by Antoine R. Dumont
