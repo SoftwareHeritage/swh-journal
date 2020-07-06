@@ -3,7 +3,7 @@ msgpack
 tenacity
 vcversioner
 swh.core[db,http]>=0.0.60
-swh.model>=0.3
+swh.model>=0.3.6
 
 [testing]
 pytest
