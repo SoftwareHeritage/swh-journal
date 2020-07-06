@@ -23,17 +23,23 @@ from swh.model.model import (
     Snapshot,
 )
 
+MODEL_CLASSES = (
+    Content,
+    Directory,
+    Origin,
+    OriginVisit,
+    OriginVisitStatus,
+    Release,
+    Revision,
+    SkippedContent,
+    Snapshot,
+)
 
 OBJECT_TYPES: Dict[Type[BaseModel], str] = {
-    Content: "content",
-    Directory: "directory",
-    Origin: "origin",
-    OriginVisit: "origin_visit",
-    OriginVisitStatus: "origin_visit_status",
-    Release: "release",
-    Revision: "revision",
-    SkippedContent: "skipped_content",
-    Snapshot: "snapshot",
+    cls: cls.object_type for cls in MODEL_CLASSES  # type: ignore
+}
+MODEL_OBJECTS: Dict[str, Type[BaseModel]] = {
+    cls.object_type: cls for cls in MODEL_CLASSES  # type: ignore
 }
 
 UTC = datetime.timezone.utc
@@ -42,6 +48,7 @@ CONTENTS = [
     {
         **MultiHash.from_data(f"foo{i}".encode()).digest(),
         "length": 4,
+        "data": f"foo{i}".encode(),
         "status": "visible",
     }
     for i in range(10)
@@ -49,6 +56,7 @@ CONTENTS = [
     {
         **MultiHash.from_data(f"forbidden foo{i}".encode()).digest(),
         "length": 14,
+        "data": f"forbidden foo{i}".encode(),
         "status": "hidden",
     }
     for i in range(10)
@@ -302,8 +310,6 @@ TEST_OBJECT_DICTS: Dict[str, List[Dict[str, Any]]] = {
     "skipped_content": SKIPPED_CONTENTS,
 }
 
-MODEL_OBJECTS = {v: k for (k, v) in OBJECT_TYPES.items()}
-
 TEST_OBJECTS: Dict[str, List[ModelObject]] = {}
 
 for object_type, objects in TEST_OBJECT_DICTS.items():
@@ -312,7 +318,7 @@ for object_type, objects in TEST_OBJECT_DICTS.items():
 
     for (num, obj_d) in enumerate(objects):
         if object_type == "content":
-            obj_d = {**obj_d, "data": b"", "ctime": datetime.datetime.now(tz=UTC)}
+            obj_d = {**obj_d, "ctime": datetime.datetime.now(tz=UTC)}
 
         converted_objects.append(model.from_dict(obj_d))
 
