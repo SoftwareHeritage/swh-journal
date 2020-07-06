@@ -9,13 +9,18 @@ import string
 from typing import Collection, Dict, Iterator, Optional
 from collections import defaultdict
 
+import attr
 import pytest
 
 from confluent_kafka import Consumer, KafkaException, Producer
 from confluent_kafka.admin import AdminClient
 
 from swh.journal.serializers import object_key, kafka_to_key, kafka_to_value, pprint_key
-from swh.journal.tests.journal_data import TEST_OBJECTS, TEST_OBJECT_DICTS
+from swh.journal.tests.journal_data import (
+    TEST_OBJECTS,
+    TEST_OBJECT_DICTS,
+    MODEL_OBJECTS,
+)
 
 
 def consume_messages(consumer, kafka_prefix, expected_messages):
@@ -63,14 +68,14 @@ def consume_messages(consumer, kafka_prefix, expected_messages):
 def assert_all_objects_consumed(
     consumed_messages: Dict, exclude: Optional[Collection] = None
 ):
-    """Check whether all objects from TEST_OBJECT_DICTS have been consumed
+    """Check whether all objects from TEST_OBJECTS have been consumed
 
     `exclude` can be a list of object types for which we do not want to compare the
     values (eg. for anonymized object).
 
     """
-    for object_type, known_values in TEST_OBJECT_DICTS.items():
-        known_keys = [object_key(object_type, obj) for obj in TEST_OBJECTS[object_type]]
+    for object_type, known_objects in TEST_OBJECTS.items():
+        known_keys = [object_key(object_type, obj) for obj in known_objects]
 
         if not consumed_messages[object_type]:
             return
@@ -80,6 +85,8 @@ def assert_all_objects_consumed(
         if object_type in ("content", "skipped_content"):
             for value in received_values:
                 del value["ctime"]
+        if object_type == "content":
+            known_objects = [attr.evolve(o, data=None) for o in known_objects]
 
         for key in known_keys:
             assert key in received_keys, (
@@ -90,8 +97,12 @@ def assert_all_objects_consumed(
         if exclude and object_type in exclude:
             continue
 
-        for value in known_values:
-            assert value in received_values, (
+        received_objects = [
+            MODEL_OBJECTS[object_type].from_dict(d) for d in received_values
+        ]
+
+        for value in known_objects:
+            assert value in received_objects, (
                 f"expected {object_type} value {value!r} is "
                 "absent from consumed messages"
             )
