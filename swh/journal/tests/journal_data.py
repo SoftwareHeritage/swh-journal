@@ -9,18 +9,24 @@ from typing import Dict, Sequence
 
 import attr
 
-from swh.model.hashutil import MultiHash, hash_to_bytes
+from swh.model.hashutil import MultiHash, hash_to_bytes, hash_to_hex
 from swh.journal.serializers import ModelObject
 
+from swh.model.identifiers import SWHID
 from swh.model.model import (
     Content,
     Directory,
     DirectoryEntry,
+    MetadataAuthority,
+    MetadataAuthorityType,
+    MetadataFetcher,
+    MetadataTargetType,
     ObjectType,
     Origin,
     OriginVisit,
     OriginVisitStatus,
     Person,
+    RawExtrinsicMetadata,
     Release,
     Revision,
     RevisionType,
@@ -288,12 +294,47 @@ SNAPSHOTS = [
 ]
 
 
+METADATA_AUTHORITIES = [
+    MetadataAuthority(
+        type=MetadataAuthorityType.FORGE, url="http://example.org/", metadata={},
+    ),
+]
+
+METADATA_FETCHERS = [
+    MetadataFetcher(name="test-fetcher", version="1.0.0", metadata={},)
+]
+
+RAW_EXTRINSIC_METADATA = [
+    RawExtrinsicMetadata(
+        type=MetadataTargetType.ORIGIN,
+        id="http://example.org/foo.git",
+        discovery_date=datetime.datetime(2020, 7, 30, 17, 8, 20, tzinfo=UTC),
+        authority=attr.evolve(METADATA_AUTHORITIES[0], metadata=None),
+        fetcher=attr.evolve(METADATA_FETCHERS[0], metadata=None),
+        format="json",
+        metadata=b'{"foo": "bar"}',
+    ),
+    RawExtrinsicMetadata(
+        type=MetadataTargetType.CONTENT,
+        id=SWHID(object_type="content", object_id=hash_to_hex(CONTENTS[0].sha1_git)),
+        discovery_date=datetime.datetime(2020, 7, 30, 17, 8, 20, tzinfo=UTC),
+        authority=attr.evolve(METADATA_AUTHORITIES[0], metadata=None),
+        fetcher=attr.evolve(METADATA_FETCHERS[0], metadata=None),
+        format="json",
+        metadata=b'{"foo": "bar"}',
+    ),
+]
+
+
 TEST_OBJECTS: Dict[str, Sequence[ModelObject]] = {
     "content": CONTENTS,
     "directory": DIRECTORIES,
+    "metadata_authority": METADATA_AUTHORITIES,
+    "metadata_fetcher": METADATA_FETCHERS,
     "origin": ORIGINS,
     "origin_visit": ORIGIN_VISITS,
     "origin_visit_status": ORIGIN_VISIT_STATUSES,
+    "raw_extrinsic_metadata": RAW_EXTRINSIC_METADATA,
     "release": RELEASES,
     "revision": REVISIONS,
     "snapshot": SNAPSHOTS,

@@ -12,9 +12,12 @@ from swh.model.hashutil import DEFAULT_ALGORITHMS
 from swh.model.model import (
     Content,
     Directory,
+    MetadataAuthority,
+    MetadataFetcher,
     Origin,
     OriginVisit,
     OriginVisitStatus,
+    RawExtrinsicMetadata,
     Release,
     Revision,
     SkippedContent,
@@ -24,9 +27,12 @@ from swh.model.model import (
 ModelObject = Union[
     Content,
     Directory,
+    MetadataAuthority,
+    MetadataFetcher,
     Origin,
     OriginVisit,
     OriginVisitStatus,
+    RawExtrinsicMetadata,
     Release,
     Revision,
     SkippedContent,
@@ -54,7 +60,14 @@ def object_key(
 
 @overload
 def object_key(
-    object_type: str, object_: Union[OriginVisit, OriginVisitStatus]
+    object_type: str,
+    object_: Union[
+        MetadataAuthority,
+        MetadataFetcher,
+        OriginVisit,
+        OriginVisitStatus,
+        RawExtrinsicMetadata,
+    ],
 ) -> Dict[str, str]:
     ...
 
@@ -78,6 +91,26 @@ def object_key(object_type: str, object_) -> KeyType:
             "origin": object_.origin,
             "visit": str(object_.visit),
             "date": str(object_.date),
+        }
+    elif object_type == "metadata_authority":
+        return {
+            "type": object_.type.value,
+            "url": object_.url,
+        }
+    elif object_type == "metadata_fetcher":
+        return {
+            "name": object_.name,
+            "version": object_.version,
+        }
+    elif object_type == "raw_extrinsic_metadata":
+        return {
+            "type": object_.type.value,
+            "id": str(object_.id),
+            "authority_type": object_.authority.type.value,
+            "authority_url": object_.authority.url,
+            "discovery_date": str(object_.discovery_date),
+            "fetcher_name": object_.fetcher.name,
+            "fetcher_version": object_.fetcher.version,
         }
     else:
         raise ValueError("Unknown object type: %s." % object_type)
