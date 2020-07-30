@@ -14,6 +14,7 @@ from swh.model.model import (
     Directory,
     Origin,
     OriginVisit,
+    OriginVisitStatus,
     Release,
     Revision,
     SkippedContent,
@@ -21,7 +22,15 @@ from swh.model.model import (
 )
 
 ModelObject = Union[
-    Content, Directory, Origin, OriginVisit, Release, Revision, SkippedContent, Snapshot
+    Content,
+    Directory,
+    Origin,
+    OriginVisit,
+    OriginVisitStatus,
+    Release,
+    Revision,
+    SkippedContent,
+    Snapshot,
 ]
 
 KeyType = Union[Dict[str, str], Dict[str, bytes], bytes]
@@ -44,7 +53,9 @@ def object_key(
 
 
 @overload
-def object_key(object_type: str, object_: OriginVisit) -> Dict[str, str]:
+def object_key(
+    object_type: str, object_: Union[OriginVisit, OriginVisitStatus]
+) -> Dict[str, str]:
     ...
 
 
