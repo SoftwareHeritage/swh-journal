@@ -54,9 +54,12 @@ def test_test_config(test_config: dict, kafka_prefix: str, kafka_server_base: st
         "object_types": {
             "content",
             "directory",
+            "metadata_authority",
+            "metadata_fetcher",
             "origin",
             "origin_visit",
             "origin_visit_status",
+            "raw_extrinsic_metadata",
             "release",
             "revision",
             "snapshot",

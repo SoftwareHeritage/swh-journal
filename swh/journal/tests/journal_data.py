@@ -5,192 +5,187 @@
 
 import datetime
 
-from typing import Any, Dict, List, Type
+from typing import Dict, Sequence
 
-from swh.model.hashutil import MultiHash, hash_to_bytes
+import attr
+
+from swh.model.hashutil import MultiHash, hash_to_bytes, hash_to_hex
 from swh.journal.serializers import ModelObject
 
+from swh.model.identifiers import SWHID
 from swh.model.model import (
-    BaseModel,
     Content,
     Directory,
+    DirectoryEntry,
+    MetadataAuthority,
+    MetadataAuthorityType,
+    MetadataFetcher,
+    MetadataTargetType,
+    ObjectType,
     Origin,
     OriginVisit,
     OriginVisitStatus,
+    Person,
+    RawExtrinsicMetadata,
     Release,
     Revision,
+    RevisionType,
     SkippedContent,
     Snapshot,
+    SnapshotBranch,
+    TargetType,
+    Timestamp,
+    TimestampWithTimezone,
 )
-
-MODEL_CLASSES = (
-    Content,
-    Directory,
-    Origin,
-    OriginVisit,
-    OriginVisitStatus,
-    Release,
-    Revision,
-    SkippedContent,
-    Snapshot,
-)
-
-OBJECT_TYPES: Dict[Type[BaseModel], str] = {
-    cls: cls.object_type for cls in MODEL_CLASSES  # type: ignore
-}
-MODEL_OBJECTS: Dict[str, Type[BaseModel]] = {
-    cls.object_type: cls for cls in MODEL_CLASSES  # type: ignore
-}
 
 UTC = datetime.timezone.utc
 
 CONTENTS = [
-    {
+    Content(
+        length=4,
+        data=f"foo{i}".encode(),
+        status="visible",
         **MultiHash.from_data(f"foo{i}".encode()).digest(),
-        "length": 4,
-        "data": f"foo{i}".encode(),
-        "status": "visible",
-    }
+    )
     for i in range(10)
 ] + [
-    {
+    Content(
+        length=14,
+        data=f"forbidden foo{i}".encode(),
+        status="hidden",
         **MultiHash.from_data(f"forbidden foo{i}".encode()).digest(),
-        "length": 14,
-        "data": f"forbidden foo{i}".encode(),
-        "status": "hidden",
-    }
+    )
     for i in range(10)
 ]
 
 SKIPPED_CONTENTS = [
-    {
+    SkippedContent(
+        length=4,
+        status="absent",
+        reason=f"because chr({i}) != '*'",
         **MultiHash.from_data(f"bar{i}".encode()).digest(),
-        "length": 4,
-        "status": "absent",
-        "reason": f"because chr({i}) != '*'",
-    }
+    )
     for i in range(2)
 ]
 
-duplicate_content1 = {
-    "length": 4,
-    "sha1": hash_to_bytes("44973274ccef6ab4dfaaf86599792fa9c3fe4689"),
-    "sha1_git": b"another-foo",
-    "blake2s256": b"another-bar",
-    "sha256": b"another-baz",
-    "status": "visible",
-}
+duplicate_content1 = Content(
+    length=4,
+    sha1=hash_to_bytes("44973274ccef6ab4dfaaf86599792fa9c3fe4689"),
+    sha1_git=b"another-foo",
+    blake2s256=b"another-bar",
+    sha256=b"another-baz",
+    status="visible",
+)
 
 # Craft a sha1 collision
-duplicate_content2 = duplicate_content1.copy()
-sha1_array = bytearray(duplicate_content1["sha1_git"])
+sha1_array = bytearray(duplicate_content1.sha1_git)
 sha1_array[0] += 1
-duplicate_content2["sha1_git"] = bytes(sha1_array)
+duplicate_content2 = attr.evolve(duplicate_content1, sha1_git=bytes(sha1_array))
 
 
 DUPLICATE_CONTENTS = [duplicate_content1, duplicate_content2]
 
 
 COMMITTERS = [
-    {"fullname": b"foo", "name": b"foo", "email": b"",},
-    {"fullname": b"bar", "name": b"bar", "email": b"",},
+    Person(fullname=b"foo", name=b"foo", email=b""),
+    Person(fullname=b"bar", name=b"bar", email=b""),
 ]
 
 DATES = [
-    {
-        "timestamp": {"seconds": 1234567891, "microseconds": 0,},
-        "offset": 120,
-        "negative_utc": False,
-    },
-    {
-        "timestamp": {"seconds": 1234567892, "microseconds": 0,},
-        "offset": 120,
-        "negative_utc": False,
-    },
+    TimestampWithTimezone(
+        timestamp=Timestamp(seconds=1234567891, microseconds=0,),
+        offset=120,
+        negative_utc=False,
+    ),
+    TimestampWithTimezone(
+        timestamp=Timestamp(seconds=1234567892, microseconds=0,),
+        offset=120,
+        negative_utc=False,
+    ),
 ]
 
 REVISIONS = [
-    {
-        "id": hash_to_bytes("4ca486e65eb68e4986aeef8227d2db1d56ce51b3"),
-        "message": b"hello",
-        "date": DATES[0],
-        "committer": COMMITTERS[0],
-        "author": COMMITTERS[0],
-        "committer_date": DATES[0],
-        "type": "git",
-        "directory": b"\x01" * 20,
-        "synthetic": False,
-        "metadata": None,
-        "parents": (),
-    },
-    {
-        "id": hash_to_bytes("677063f5c405d6fc1781fc56379c9a9adf43d3a0"),
-        "message": b"hello again",
-        "date": DATES[1],
-        "committer": COMMITTERS[1],
-        "author": COMMITTERS[1],
-        "committer_date": DATES[1],
-        "type": "hg",
-        "directory": b"\x02" * 20,
-        "synthetic": False,
-        "metadata": None,
-        "parents": (),
-    },
+    Revision(
+        id=hash_to_bytes("4ca486e65eb68e4986aeef8227d2db1d56ce51b3"),
+        message=b"hello",
+        date=DATES[0],
+        committer=COMMITTERS[0],
+        author=COMMITTERS[0],
+        committer_date=DATES[0],
+        type=RevisionType.GIT,
+        directory=b"\x01" * 20,
+        synthetic=False,
+        metadata=None,
+        parents=(),
+    ),
+    Revision(
+        id=hash_to_bytes("677063f5c405d6fc1781fc56379c9a9adf43d3a0"),
+        message=b"hello again",
+        date=DATES[1],
+        committer=COMMITTERS[1],
+        author=COMMITTERS[1],
+        committer_date=DATES[1],
+        type=RevisionType.MERCURIAL,
+        directory=b"\x02" * 20,
+        synthetic=False,
+        metadata=None,
+        parents=(),
+    ),
 ]
 
 RELEASES = [
-    {
-        "id": hash_to_bytes("8059dc4e17fcd0e51ca3bcd6b80f4577d281fd08"),
-        "name": b"v0.0.1",
-        "date": {
-            "timestamp": {"seconds": 1234567890, "microseconds": 0,},
-            "offset": 120,
-            "negative_utc": False,
-        },
-        "author": COMMITTERS[0],
-        "target_type": "revision",
-        "target": b"\x04" * 20,
-        "message": b"foo",
-        "synthetic": False,
-    },
+    Release(
+        id=hash_to_bytes("8059dc4e17fcd0e51ca3bcd6b80f4577d281fd08"),
+        name=b"v0.0.1",
+        date=TimestampWithTimezone(
+            timestamp=Timestamp(seconds=1234567890, microseconds=0,),
+            offset=120,
+            negative_utc=False,
+        ),
+        author=COMMITTERS[0],
+        target_type=ObjectType.REVISION,
+        target=b"\x04" * 20,
+        message=b"foo",
+        synthetic=False,
+    ),
 ]
 
 ORIGINS = [
-    {"url": "https://somewhere.org/den/fox",},
-    {"url": "https://overtherainbow.org/fox/den",},
+    Origin(url="https://somewhere.org/den/fox",),
+    Origin(url="https://overtherainbow.org/fox/den",),
 ]
 
 ORIGIN_VISITS = [
-    {
-        "origin": ORIGINS[0]["url"],
-        "date": datetime.datetime(2013, 5, 7, 4, 20, 39, 369271, tzinfo=UTC),
-        "visit": 1,
-        "type": "git",
-    },
-    {
-        "origin": ORIGINS[1]["url"],
-        "date": datetime.datetime(2014, 11, 27, 17, 20, 39, tzinfo=UTC),
-        "visit": 1,
-        "type": "hg",
-    },
-    {
-        "origin": ORIGINS[0]["url"],
-        "date": datetime.datetime(2018, 11, 27, 17, 20, 39, tzinfo=UTC),
-        "visit": 2,
-        "type": "git",
-    },
-    {
-        "origin": ORIGINS[0]["url"],
-        "date": datetime.datetime(2018, 11, 27, 17, 20, 39, tzinfo=UTC),
-        "visit": 3,
-        "type": "git",
-    },
-    {
-        "origin": ORIGINS[1]["url"],
-        "date": datetime.datetime(2015, 11, 27, 17, 20, 39, tzinfo=UTC),
-        "visit": 2,
-        "type": "hg",
-    },
+    OriginVisit(
+        origin=ORIGINS[0].url,
+        date=datetime.datetime(2013, 5, 7, 4, 20, 39, 369271, tzinfo=UTC),
+        visit=1,
+        type="git",
+    ),
+    OriginVisit(
+        origin=ORIGINS[1].url,
+        date=datetime.datetime(2014, 11, 27, 17, 20, 39, tzinfo=UTC),
+        visit=1,
+        type="hg",
+    ),
+    OriginVisit(
+        origin=ORIGINS[0].url,
+        date=datetime.datetime(2018, 11, 27, 17, 20, 39, tzinfo=UTC),
+        visit=2,
+        type="git",
+    ),
+    OriginVisit(
+        origin=ORIGINS[0].url,
+        date=datetime.datetime(2018, 11, 27, 17, 20, 39, tzinfo=UTC),
+        visit=3,
+        type="git",
+    ),
+    OriginVisit(
+        origin=ORIGINS[1].url,
+        date=datetime.datetime(2015, 11, 27, 17, 20, 39, tzinfo=UTC),
+        visit=2,
+        type="hg",
+    ),
 ]
 
 # The origin-visit-status dates needs to be shifted slightly in the future from their
@@ -198,128 +193,150 @@ ORIGIN_VISITS = [
 # ignore policy (because origin-visit-add creates an origin-visit-status with the same
 # parameters from the origin-visit {origin, visit, date}...
 ORIGIN_VISIT_STATUSES = [
-    {
-        "origin": ORIGINS[0]["url"],
-        "date": datetime.datetime(2013, 5, 7, 4, 20, 39, 432222, tzinfo=UTC),
-        "visit": 1,
-        "status": "ongoing",
-        "snapshot": None,
-        "metadata": None,
-    },
-    {
-        "origin": ORIGINS[1]["url"],
-        "date": datetime.datetime(2014, 11, 27, 17, 21, 12, tzinfo=UTC),
-        "visit": 1,
-        "status": "ongoing",
-        "snapshot": None,
-        "metadata": None,
-    },
-    {
-        "origin": ORIGINS[0]["url"],
-        "date": datetime.datetime(2018, 11, 27, 17, 20, 59, tzinfo=UTC),
-        "visit": 2,
-        "status": "ongoing",
-        "snapshot": None,
-        "metadata": None,
-    },
-    {
-        "origin": ORIGINS[0]["url"],
-        "date": datetime.datetime(2018, 11, 27, 17, 20, 49, tzinfo=UTC),
-        "visit": 3,
-        "status": "full",
-        "snapshot": hash_to_bytes("17d0066a4a80aba4a0e913532ee8ff2014f006a9"),
-        "metadata": None,
-    },
-    {
-        "origin": ORIGINS[1]["url"],
-        "date": datetime.datetime(2015, 11, 27, 17, 22, 18, tzinfo=UTC),
-        "visit": 2,
-        "status": "partial",
-        "snapshot": hash_to_bytes("8ce268b87faf03850693673c3eb5c9bb66e1ca38"),
-        "metadata": None,
-    },
+    OriginVisitStatus(
+        origin=ORIGINS[0].url,
+        date=datetime.datetime(2013, 5, 7, 4, 20, 39, 432222, tzinfo=UTC),
+        visit=1,
+        status="ongoing",
+        snapshot=None,
+        metadata=None,
+    ),
+    OriginVisitStatus(
+        origin=ORIGINS[1].url,
+        date=datetime.datetime(2014, 11, 27, 17, 21, 12, tzinfo=UTC),
+        visit=1,
+        status="ongoing",
+        snapshot=None,
+        metadata=None,
+    ),
+    OriginVisitStatus(
+        origin=ORIGINS[0].url,
+        date=datetime.datetime(2018, 11, 27, 17, 20, 59, tzinfo=UTC),
+        visit=2,
+        status="ongoing",
+        snapshot=None,
+        metadata=None,
+    ),
+    OriginVisitStatus(
+        origin=ORIGINS[0].url,
+        date=datetime.datetime(2018, 11, 27, 17, 20, 49, tzinfo=UTC),
+        visit=3,
+        status="full",
+        snapshot=hash_to_bytes("17d0066a4a80aba4a0e913532ee8ff2014f006a9"),
+        metadata=None,
+    ),
+    OriginVisitStatus(
+        origin=ORIGINS[1].url,
+        date=datetime.datetime(2015, 11, 27, 17, 22, 18, tzinfo=UTC),
+        visit=2,
+        status="partial",
+        snapshot=hash_to_bytes("8ce268b87faf03850693673c3eb5c9bb66e1ca38"),
+        metadata=None,
+    ),
 ]
 
 
 DIRECTORIES = [
-    {"id": hash_to_bytes("4b825dc642cb6eb9a060e54bf8d69288fbee4904"), "entries": ()},
-    {
-        "id": hash_to_bytes("21416d920e0ebf0df4a7888bed432873ed5cb3a7"),
-        "entries": (
-            {
-                "name": b"file1.ext",
-                "perms": 0o644,
-                "type": "file",
-                "target": CONTENTS[0]["sha1_git"],
-            },
-            {
-                "name": b"dir1",
-                "perms": 0o755,
-                "type": "dir",
-                "target": hash_to_bytes("4b825dc642cb6eb9a060e54bf8d69288fbee4904"),
-            },
-            {
-                "name": b"subprepo1",
-                "perms": 0o160000,
-                "type": "rev",
-                "target": REVISIONS[1]["id"],
-            },
+    Directory(id=hash_to_bytes("4b825dc642cb6eb9a060e54bf8d69288fbee4904"), entries=()),
+    Directory(
+        id=hash_to_bytes("21416d920e0ebf0df4a7888bed432873ed5cb3a7"),
+        entries=(
+            DirectoryEntry(
+                name=b"file1.ext",
+                perms=0o644,
+                type="file",
+                target=CONTENTS[0].sha1_git,
+            ),
+            DirectoryEntry(
+                name=b"dir1",
+                perms=0o755,
+                type="dir",
+                target=hash_to_bytes("4b825dc642cb6eb9a060e54bf8d69288fbee4904"),
+            ),
+            DirectoryEntry(
+                name=b"subprepo1", perms=0o160000, type="rev", target=REVISIONS[1].id,
+            ),
         ),
-    },
+    ),
 ]
 
 
 SNAPSHOTS = [
-    {
-        "id": hash_to_bytes("17d0066a4a80aba4a0e913532ee8ff2014f006a9"),
-        "branches": {
-            b"master": {"target_type": "revision", "target": REVISIONS[0]["id"]}
+    Snapshot(
+        id=hash_to_bytes("17d0066a4a80aba4a0e913532ee8ff2014f006a9"),
+        branches={
+            b"master": SnapshotBranch(
+                target_type=TargetType.REVISION, target=REVISIONS[0].id
+            )
         },
-    },
-    {
-        "id": hash_to_bytes("8ce268b87faf03850693673c3eb5c9bb66e1ca38"),
-        "branches": {
-            b"target/revision": {
-                "target_type": "revision",
-                "target": REVISIONS[0]["id"],
-            },
-            b"target/alias": {"target_type": "alias", "target": b"target/revision"},
-            b"target/directory": {
-                "target_type": "directory",
-                "target": DIRECTORIES[0]["id"],
-            },
-            b"target/release": {"target_type": "release", "target": RELEASES[0]["id"]},
-            b"target/snapshot": {
-                "target_type": "snapshot",
-                "target": hash_to_bytes("17d0066a4a80aba4a0e913532ee8ff2014f006a9"),
-            },
+    ),
+    Snapshot(
+        id=hash_to_bytes("8ce268b87faf03850693673c3eb5c9bb66e1ca38"),
+        branches={
+            b"target/revision": SnapshotBranch(
+                target_type=TargetType.REVISION, target=REVISIONS[0].id,
+            ),
+            b"target/alias": SnapshotBranch(
+                target_type=TargetType.ALIAS, target=b"target/revision"
+            ),
+            b"target/directory": SnapshotBranch(
+                target_type=TargetType.DIRECTORY, target=DIRECTORIES[0].id,
+            ),
+            b"target/release": SnapshotBranch(
+                target_type=TargetType.RELEASE, target=RELEASES[0].id
+            ),
+            b"target/snapshot": SnapshotBranch(
+                target_type=TargetType.SNAPSHOT,
+                target=hash_to_bytes("17d0066a4a80aba4a0e913532ee8ff2014f006a9"),
+            ),
         },
-    },
+    ),
 ]
 
 
-TEST_OBJECT_DICTS: Dict[str, List[Dict[str, Any]]] = {
+METADATA_AUTHORITIES = [
+    MetadataAuthority(
+        type=MetadataAuthorityType.FORGE, url="http://example.org/", metadata={},
+    ),
+]
+
+METADATA_FETCHERS = [
+    MetadataFetcher(name="test-fetcher", version="1.0.0", metadata={},)
+]
+
+RAW_EXTRINSIC_METADATA = [
+    RawExtrinsicMetadata(
+        type=MetadataTargetType.ORIGIN,
+        id="http://example.org/foo.git",
+        discovery_date=datetime.datetime(2020, 7, 30, 17, 8, 20, tzinfo=UTC),
+        authority=attr.evolve(METADATA_AUTHORITIES[0], metadata=None),
+        fetcher=attr.evolve(METADATA_FETCHERS[0], metadata=None),
+        format="json",
+        metadata=b'{"foo": "bar"}',
+    ),
+    RawExtrinsicMetadata(
+        type=MetadataTargetType.CONTENT,
+        id=SWHID(object_type="content", object_id=hash_to_hex(CONTENTS[0].sha1_git)),
+        discovery_date=datetime.datetime(2020, 7, 30, 17, 8, 20, tzinfo=UTC),
+        authority=attr.evolve(METADATA_AUTHORITIES[0], metadata=None),
+        fetcher=attr.evolve(METADATA_FETCHERS[0], metadata=None),
+        format="json",
+        metadata=b'{"foo": "bar"}',
+    ),
+]
+
+
+TEST_OBJECTS: Dict[str, Sequence[ModelObject]] = {
     "content": CONTENTS,
     "directory": DIRECTORIES,
+    "metadata_authority": METADATA_AUTHORITIES,
+    "metadata_fetcher": METADATA_FETCHERS,
     "origin": ORIGINS,
     "origin_visit": ORIGIN_VISITS,
     "origin_visit_status": ORIGIN_VISIT_STATUSES,
+    "raw_extrinsic_metadata": RAW_EXTRINSIC_METADATA,
     "release": RELEASES,
     "revision": REVISIONS,
     "snapshot": SNAPSHOTS,
     "skipped_content": SKIPPED_CONTENTS,
 }
-
-TEST_OBJECTS: Dict[str, List[ModelObject]] = {}
-
-for object_type, objects in TEST_OBJECT_DICTS.items():
-    converted_objects: List[ModelObject] = []
-    model = MODEL_OBJECTS[object_type]
-
-    for (num, obj_d) in enumerate(objects):
-        if object_type == "content":
-            obj_d = {**obj_d, "ctime": datetime.datetime.now(tz=UTC)}
-
-        converted_objects.append(model.from_dict(obj_d))
-
-    TEST_OBJECTS[object_type] = converted_objects
