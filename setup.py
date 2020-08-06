@@ -51,9 +51,9 @@ setup(
         pytest_swh_journal = swh.journal.pytest_plugin
     """,
     install_requires=parse_requirements() + parse_requirements("swh"),
-    setup_requires=["vcversioner"],
+    setup_requires=["setuptools-scm"],
+    use_scm_version=True,
     extras_require={"testing": parse_requirements("test")},
-    vcversioner={},
     include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
