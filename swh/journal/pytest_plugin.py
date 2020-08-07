@@ -80,7 +80,7 @@ def assert_all_objects_consumed(
 
         if object_type in ("content", "skipped_content"):
             for value in received_values:
-                del value["ctime"]
+                value.pop("ctime", None)
         if object_type == "content":
             known_objects = [attr.evolve(o, data=None) for o in known_objects]
 
@@ -96,7 +96,7 @@ def assert_all_objects_consumed(
         for value in known_objects:
             expected_value = value.to_dict()
             if value.object_type in ("content", "skipped_content"):
-                del expected_value["ctime"]
+                expected_value.pop("ctime", None)
             assert expected_value in received_values, (
                 f"expected {object_type} value {value!r} is "
                 "absent from consumed messages"
