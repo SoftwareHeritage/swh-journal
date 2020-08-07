@@ -4,4 +4,3 @@
 confluent-kafka
 msgpack
 tenacity
-vcversioner
