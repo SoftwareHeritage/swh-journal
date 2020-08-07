@@ -1,3 +1,9 @@
+swh-journal (0.4.2-1~swh2) unstable-swh; urgency=medium
+
+  * Fix debian dependencies
+
+ -- Antoine R. Dumont (@ardumont)) <ardumont@softwareheritage.org>  Fri, 07 Aug 2020 09:38:25 +0000
+
 swh-journal (0.4.2-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.4.2     - (tagged by Antoine R. Dumont
