@@ -130,6 +130,7 @@ REVISIONS = [
         synthetic=False,
         metadata=None,
         parents=(),
+        extra_headers=((b"foo", b"bar"),),
     ),
 ]
 
