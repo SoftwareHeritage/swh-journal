@@ -4,14 +4,12 @@
 # See top-level LICENSE file for more information
 
 import datetime
-
 from typing import Dict, Sequence
 
 import attr
 
-from swh.model.hashutil import MultiHash, hash_to_bytes, hash_to_hex
 from swh.journal.serializers import ModelObject
-
+from swh.model.hashutil import MultiHash, hash_to_bytes, hash_to_hex
 from swh.model.identifiers import SWHID
 from swh.model.model import (
     Content,

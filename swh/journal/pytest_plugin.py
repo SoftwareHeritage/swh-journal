@@ -3,19 +3,17 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+from collections import defaultdict
 import random
 import string
-
 from typing import Collection, Dict, Iterator, Optional
-from collections import defaultdict
 
 import attr
-import pytest
-
 from confluent_kafka import Consumer, KafkaException, Producer
 from confluent_kafka.admin import AdminClient
+import pytest
 
-from swh.journal.serializers import object_key, kafka_to_key, kafka_to_value, pprint_key
+from swh.journal.serializers import kafka_to_key, kafka_to_value, object_key, pprint_key
 from swh.journal.tests.journal_data import TEST_OBJECTS
 
 

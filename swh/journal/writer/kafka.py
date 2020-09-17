@@ -7,14 +7,14 @@ import logging
 import time
 from typing import Dict, Iterable, List, NamedTuple, Optional, Type
 
-from confluent_kafka import Producer, KafkaException
+from confluent_kafka import KafkaException, Producer
 
 from swh.journal.serializers import (
     KeyType,
     ModelObject,
+    key_to_kafka,
     object_key,
     pprint_key,
-    key_to_kafka,
     value_to_kafka,
 )
 
