@@ -3,9 +3,8 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import itertools
-
 from collections import OrderedDict
+import itertools
 from typing import Iterable
 
 from swh.journal import serializers

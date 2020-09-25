@@ -7,10 +7,9 @@ import logging
 
 from hypothesis.strategies import one_of
 
-from swh.model import hypothesis_strategies as strategies
-
 # for bw compat
 from swh.journal.tests.journal_data import *  # noqa
+from swh.model import hypothesis_strategies as strategies
 
 logger = logging.getLogger(__name__)
 
