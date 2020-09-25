@@ -5,14 +5,13 @@
 
 from typing import Iterable
 
-import pytest
 from confluent_kafka import Consumer, Producer
+import pytest
 
-from swh.model.model import Directory, Revision, Release
-
+from swh.journal.pytest_plugin import assert_all_objects_consumed, consume_messages
 from swh.journal.tests.journal_data import TEST_OBJECTS
-from swh.journal.pytest_plugin import consume_messages, assert_all_objects_consumed
-from swh.journal.writer.kafka import KafkaJournalWriter, KafkaDeliveryError
+from swh.journal.writer.kafka import KafkaDeliveryError, KafkaJournalWriter
+from swh.model.model import Directory, Release, Revision
 
 
 def test_kafka_writer(

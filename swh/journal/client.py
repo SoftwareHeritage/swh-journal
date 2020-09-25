@@ -9,10 +9,11 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-from confluent_kafka import Consumer, KafkaException, KafkaError
+from confluent_kafka import Consumer, KafkaError, KafkaException
+
+from swh.journal import DEFAULT_PREFIX
 
 from .serializers import kafka_to_value
-from swh.journal import DEFAULT_PREFIX
 
 logger = logging.getLogger(__name__)
 rdkafka_logger = logging.getLogger(__name__ + ".rdkafka")
