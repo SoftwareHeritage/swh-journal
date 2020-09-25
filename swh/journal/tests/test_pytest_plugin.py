@@ -4,6 +4,7 @@
 # See top-level LICENSE file for more information
 
 from typing import Iterator
+
 from confluent_kafka.admin import AdminClient
 
 

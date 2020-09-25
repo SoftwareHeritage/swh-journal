@@ -9,10 +9,9 @@ from unittest.mock import MagicMock
 from confluent_kafka import Producer
 import pytest
 
-from swh.model.model import Content
-
 from swh.journal.client import JournalClient
 from swh.journal.serializers import key_to_kafka, value_to_kafka
+from swh.model.model import Content
 
 REV = {
     "message": b"something cool",
