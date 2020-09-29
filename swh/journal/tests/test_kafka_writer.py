@@ -12,7 +12,7 @@ from swh.journal.pytest_plugin import assert_all_objects_consumed, consume_messa
 from swh.journal.tests.journal_data import TEST_OBJECTS
 from swh.journal.writer import model_object_dict_sanitizer
 from swh.journal.writer.kafka import KafkaDeliveryError, KafkaJournalWriter
-from swh.model.model import Directory, Release, Revision
+from swh.model.model import BaseModel, Directory, Release, Revision
 
 
 def test_kafka_writer(
@@ -21,7 +21,7 @@ def test_kafka_writer(
     consumer: Consumer,
     privileged_object_types: Iterable[str],
 ):
-    writer = KafkaJournalWriter(
+    writer = KafkaJournalWriter[BaseModel](
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,
@@ -62,7 +62,7 @@ def test_kafka_writer_anonymized(
     consumer: Consumer,
     privileged_object_types: Iterable[str],
 ):
-    writer = KafkaJournalWriter(
+    writer = KafkaJournalWriter[BaseModel](
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,
@@ -150,7 +150,7 @@ def test_write_delivery_timeout(
         def produce(self, **kwargs):
             produced.append(kwargs)
 
-    writer = KafkaJournalWriter(
+    writer = KafkaJournalWriter[BaseModel](
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,

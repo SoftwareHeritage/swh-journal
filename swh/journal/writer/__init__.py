@@ -3,8 +3,25 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional, TypeVar
 import warnings
+
+from typing_extensions import Protocol
+
+from swh.model.model import KeyType
+
+TSelf = TypeVar("TSelf")
+
+
+class ValueProtocol(Protocol):
+    def anonymize(self: TSelf) -> Optional[TSelf]:
+        ...
+
+    def unique_key(self) -> KeyType:
+        ...
+
+    def to_dict(self) -> Dict[str, Any]:
+        ...
 
 
 def model_object_dict_sanitizer(

@@ -5,17 +5,19 @@
 
 import logging
 from multiprocessing import Manager
-from typing import Any, List, Tuple
+from typing import Any, Generic, List, Tuple, TypeVar
 
-from swh.journal.serializers import ModelObject
-from swh.model.model import BaseModel
+from . import ValueProtocol
 
 logger = logging.getLogger(__name__)
 
 
-class InMemoryJournalWriter:
-    objects: List[Tuple[str, ModelObject]]
-    privileged_objects: List[Tuple[str, ModelObject]]
+TValue = TypeVar("TValue", bound=ValueProtocol)
+
+
+class InMemoryJournalWriter(Generic[TValue]):
+    objects: List[Tuple[str, TValue]]
+    privileged_objects: List[Tuple[str, TValue]]
 
     def __init__(self, value_sanitizer: Any):
         # Share the list of objects across processes, for RemoteAPI tests.
@@ -24,9 +26,8 @@ class InMemoryJournalWriter:
         self.privileged_objects = self.manager.list()
 
     def write_addition(
-        self, object_type: str, object_: ModelObject, privileged: bool = False
+        self, object_type: str, object_: TValue, privileged: bool = False
     ) -> None:
-        assert isinstance(object_, BaseModel)
         if privileged:
             self.privileged_objects.append((object_type, object_))
         else:
@@ -35,7 +36,7 @@ class InMemoryJournalWriter:
     write_update = write_addition
 
     def write_additions(
-        self, object_type: str, objects: List[ModelObject], privileged: bool = False
+        self, object_type: str, objects: List[TValue], privileged: bool = False
     ) -> None:
         for object_ in objects:
             self.write_addition(object_type, object_, privileged)

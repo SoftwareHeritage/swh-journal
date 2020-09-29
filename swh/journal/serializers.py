@@ -8,36 +8,7 @@ from typing import Any, Union
 import msgpack
 
 from swh.core.api.serializers import msgpack_dumps, msgpack_loads
-from swh.model.model import (
-    Content,
-    Directory,
-    KeyType,
-    MetadataAuthority,
-    MetadataFetcher,
-    Origin,
-    OriginVisit,
-    OriginVisitStatus,
-    RawExtrinsicMetadata,
-    Release,
-    Revision,
-    SkippedContent,
-    Snapshot,
-)
-
-ModelObject = Union[
-    Content,
-    Directory,
-    MetadataAuthority,
-    MetadataFetcher,
-    Origin,
-    OriginVisit,
-    OriginVisitStatus,
-    RawExtrinsicMetadata,
-    Release,
-    Revision,
-    SkippedContent,
-    Snapshot,
-]
+from swh.model.model import KeyType
 
 
 def stringify_key_item(k: str, v: Union[str, bytes]) -> str:
