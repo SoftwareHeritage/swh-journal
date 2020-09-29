@@ -13,7 +13,7 @@ from confluent_kafka import Consumer, KafkaException, Producer
 from confluent_kafka.admin import AdminClient
 import pytest
 
-from swh.journal.serializers import kafka_to_key, kafka_to_value, object_key, pprint_key
+from swh.journal.serializers import kafka_to_key, kafka_to_value, pprint_key
 from swh.journal.tests.journal_data import TEST_OBJECTS
 
 
@@ -69,7 +69,7 @@ def assert_all_objects_consumed(
 
     """
     for object_type, known_objects in TEST_OBJECTS.items():
-        known_keys = [object_key(object_type, obj) for obj in known_objects]
+        known_keys = [obj.unique_key() for obj in known_objects]
 
         if not consumed_messages[object_type]:
             return

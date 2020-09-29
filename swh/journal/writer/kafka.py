@@ -13,7 +13,6 @@ from swh.journal.serializers import (
     KeyType,
     ModelObject,
     key_to_kafka,
-    object_key,
     pprint_key,
     value_to_kafka,
 )
@@ -206,7 +205,7 @@ class KafkaJournalWriter:
 
     def _write_addition(self, object_type: str, object_: ModelObject) -> None:
         """Write a single object to the journal"""
-        key = object_key(object_type, object_)
+        key = object_.unique_key()
 
         if self.anonymize:
             anon_object_ = object_.anonymize()

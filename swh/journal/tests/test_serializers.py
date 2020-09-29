@@ -30,18 +30,11 @@ def test_key_to_kafka_repeatable():
         assert key == serializers.key_to_kafka(d)
 
 
-def test_get_key():
-    """Test whether get_key works on all our objects"""
-    for object_type, objects in TEST_OBJECTS.items():
-        for obj in objects:
-            assert serializers.object_key(object_type, obj) is not None
-
-
 def test_pprint_key():
     """Test whether get_key works on all our objects"""
     for object_type, objects in TEST_OBJECTS.items():
         for obj in objects:
-            key = serializers.object_key(object_type, obj)
+            key = obj.unique_key()
             pprinted_key = serializers.pprint_key(key)
             assert isinstance(pprinted_key, str)
 
@@ -66,7 +59,7 @@ def test_kafka_to_key():
     ]
     for object_type, objects in TEST_OBJECTS.items():
         for obj in objects:
-            key = serializers.object_key(object_type, obj)
+            key = obj.unique_key()
             keys.append(key)
 
     for key in keys:
