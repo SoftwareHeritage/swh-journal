@@ -5,7 +5,7 @@
 
 import logging
 import time
-from typing import Dict, Iterable, List, NamedTuple, Optional, Type
+from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Type
 
 from confluent_kafka import KafkaException, Producer
 
@@ -95,6 +95,7 @@ class KafkaJournalWriter:
         brokers: Iterable[str],
         prefix: str,
         client_id: str,
+        value_sanitizer: Callable[[str, Dict[str, Any]], Dict[str, Any]],
         producer_config: Optional[Dict] = None,
         flush_timeout: float = 120,
         producer_class: Type[Producer] = Producer,
@@ -133,6 +134,8 @@ class KafkaJournalWriter:
 
         # List of (object_type, key, error_msg, error_name) for failed deliveries
         self.delivery_failures: List[DeliveryFailureInfo] = []
+
+        self.value_sanitizer = value_sanitizer
 
     def _error_cb(self, error):
         if error.fatal():
@@ -195,14 +198,6 @@ class KafkaJournalWriter:
         elif self.delivery_failures:
             raise self.delivery_error("Failed deliveries after flush()")
 
-    def _sanitize_object(
-        self, object_type: str, object_: ModelObject
-    ) -> Dict[str, str]:
-        dict_ = object_.to_dict()
-        if object_type == "content":
-            dict_.pop("data", None)
-        return dict_
-
     def _write_addition(self, object_type: str, object_: ModelObject) -> None:
         """Write a single object to the journal"""
         key = object_.unique_key()
@@ -213,13 +208,13 @@ class KafkaJournalWriter:
                 # if the object is anonymizable, send the non-anonymized version in the
                 # privileged channel
                 topic = f"{self._prefix_privileged}.{object_type}"
-                dict_ = self._sanitize_object(object_type, object_)
+                dict_ = self.value_sanitizer(object_type, object_.to_dict())
                 logger.debug("topic: %s, key: %s, value: %s", topic, key, dict_)
                 self.send(topic, key=key, value=dict_)
                 object_ = anon_object_
 
         topic = f"{self._prefix}.{object_type}"
-        dict_ = self._sanitize_object(object_type, object_)
+        dict_ = self.value_sanitizer(object_type, object_.to_dict())
         logger.debug("topic: %s, key: %s, value: %s", topic, key, dict_)
         self.send(topic, key=key, value=dict_)
 

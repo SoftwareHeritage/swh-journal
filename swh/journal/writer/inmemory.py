@@ -5,7 +5,7 @@
 
 import logging
 from multiprocessing import Manager
-from typing import List
+from typing import Any, List, Tuple
 
 from swh.journal.serializers import ModelObject
 from swh.model.model import BaseModel
@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 class InMemoryJournalWriter:
-    def __init__(self):
+    objects: List[Tuple[str, ModelObject]]
+    privileged_objects: List[Tuple[str, ModelObject]]
+
+    def __init__(self, value_sanitizer: Any):
         # Share the list of objects across processes, for RemoteAPI tests.
         self.manager = Manager()
         self.objects = self.manager.list()

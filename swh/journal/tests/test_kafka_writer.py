@@ -10,6 +10,7 @@ import pytest
 
 from swh.journal.pytest_plugin import assert_all_objects_consumed, consume_messages
 from swh.journal.tests.journal_data import TEST_OBJECTS
+from swh.journal.writer import model_object_dict_sanitizer
 from swh.journal.writer.kafka import KafkaDeliveryError, KafkaJournalWriter
 from swh.model.model import Directory, Release, Revision
 
@@ -24,6 +25,7 @@ def test_kafka_writer(
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,
+        value_sanitizer=model_object_dict_sanitizer,
         anonymize=False,
     )
 
@@ -64,6 +66,7 @@ def test_kafka_writer_anonymized(
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,
+        value_sanitizer=model_object_dict_sanitizer,
         anonymize=True,
     )
 
@@ -117,7 +120,10 @@ def test_write_delivery_failure(
 
     kafka_prefix += ".swh.journal.objects"
     writer = KafkaJournalWriterFailDelivery(
-        brokers=[kafka_server], client_id="kafka_writer", prefix=kafka_prefix,
+        brokers=[kafka_server],
+        client_id="kafka_writer",
+        prefix=kafka_prefix,
+        value_sanitizer=model_object_dict_sanitizer,
     )
 
     empty_dir = Directory(entries=())
@@ -148,6 +154,7 @@ def test_write_delivery_timeout(
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,
+        value_sanitizer=model_object_dict_sanitizer,
         flush_timeout=1,
         producer_class=MockProducer,
     )
