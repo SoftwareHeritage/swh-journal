@@ -306,7 +306,7 @@ METADATA_FETCHERS = [
 RAW_EXTRINSIC_METADATA = [
     RawExtrinsicMetadata(
         type=MetadataTargetType.ORIGIN,
-        id="http://example.org/foo.git",
+        target="http://example.org/foo.git",
         discovery_date=datetime.datetime(2020, 7, 30, 17, 8, 20, tzinfo=UTC),
         authority=attr.evolve(METADATA_AUTHORITIES[0], metadata=None),
         fetcher=attr.evolve(METADATA_FETCHERS[0], metadata=None),
@@ -315,7 +315,9 @@ RAW_EXTRINSIC_METADATA = [
     ),
     RawExtrinsicMetadata(
         type=MetadataTargetType.CONTENT,
-        id=SWHID(object_type="content", object_id=hash_to_hex(CONTENTS[0].sha1_git)),
+        target=SWHID(
+            object_type="content", object_id=hash_to_hex(CONTENTS[0].sha1_git)
+        ),
         discovery_date=datetime.datetime(2020, 7, 30, 17, 8, 20, tzinfo=UTC),
         authority=attr.evolve(METADATA_AUTHORITIES[0], metadata=None),
         fetcher=attr.evolve(METADATA_FETCHERS[0], metadata=None),
