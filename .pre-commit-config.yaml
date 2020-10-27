@@ -6,19 +6,10 @@ repos:
   - id: check-json
   - id: check-yaml
 
-# we need the master of pyflakes to have support for @overload on methods,
-# so we use a local config for now
-# - repo: https://gitlab.com/pycqa/flake8
-#   hooks:
-#   - id: flake8
-- repo: local
+- repo: https://gitlab.com/pycqa/flake8
+  rev: 3.8.4
   hooks:
   - id: flake8
-    name: flake8
-    entry: flake8
-    pass_filenames: true
-    language: system
-    types: [python]
 
 - repo: https://github.com/codespell-project/codespell
   rev: v1.16.0
