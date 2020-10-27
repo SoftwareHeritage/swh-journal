@@ -7,9 +7,8 @@ import logging
 from multiprocessing import Manager
 from typing import List
 
+from swh.journal.serializers import ModelObject
 from swh.model.model import BaseModel
-
-from .kafka import ModelObject
 
 logger = logging.getLogger(__name__)
 

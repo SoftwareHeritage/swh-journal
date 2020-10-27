@@ -30,7 +30,6 @@ swh.journal.egg-info/entry_points.txt
 swh.journal.egg-info/requires.txt
 swh.journal.egg-info/top_level.txt
 swh/journal/__init__.py
-swh/journal/cli.py
 swh/journal/client.py
 swh/journal/py.typed
 swh/journal/pytest_plugin.py
