@@ -3,15 +3,15 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from typing import Any, Dict, Union, overload
+from typing import Any, Union
 
 import msgpack
 
 from swh.core.api.serializers import msgpack_dumps, msgpack_loads
-from swh.model.hashutil import DEFAULT_ALGORITHMS
 from swh.model.model import (
     Content,
     Directory,
+    KeyType,
     MetadataAuthority,
     MetadataFetcher,
     Origin,
@@ -38,82 +38,6 @@ ModelObject = Union[
     SkippedContent,
     Snapshot,
 ]
-
-KeyType = Union[Dict[str, str], Dict[str, bytes], bytes]
-
-
-# these @overload'ed versions of the object_key method aim at helping mypy figuring
-# the correct type-ing.
-@overload
-def object_key(
-    object_type: str, object_: Union[Content, Directory, Revision, Release, Snapshot]
-) -> bytes:
-    ...
-
-
-@overload
-def object_key(
-    object_type: str, object_: Union[Origin, SkippedContent]
-) -> Dict[str, bytes]:
-    ...
-
-
-@overload
-def object_key(
-    object_type: str,
-    object_: Union[
-        MetadataAuthority,
-        MetadataFetcher,
-        OriginVisit,
-        OriginVisitStatus,
-        RawExtrinsicMetadata,
-    ],
-) -> Dict[str, str]:
-    ...
-
-
-def object_key(object_type: str, object_) -> KeyType:
-    if object_type in ("revision", "release", "directory", "snapshot"):
-        return object_.id
-    elif object_type == "content":
-        return object_.sha1  # TODO: use a dict of hashes
-    elif object_type == "skipped_content":
-        return {hash: getattr(object_, hash) for hash in DEFAULT_ALGORITHMS}
-    elif object_type == "origin":
-        return {"url": object_.url}
-    elif object_type == "origin_visit":
-        return {
-            "origin": object_.origin,
-            "date": str(object_.date),
-        }
-    elif object_type == "origin_visit_status":
-        return {
-            "origin": object_.origin,
-            "visit": str(object_.visit),
-            "date": str(object_.date),
-        }
-    elif object_type == "metadata_authority":
-        return {
-            "type": object_.type.value,
-            "url": object_.url,
-        }
-    elif object_type == "metadata_fetcher":
-        return {
-            "name": object_.name,
-            "version": object_.version,
-        }
-    elif object_type == "raw_extrinsic_metadata":
-        return {
-            "type": object_.type.value,
-            "id": str(object_.id),
-            "authority_type": object_.authority.type.value,
-            "authority_url": object_.authority.url,
-            "discovery_date": str(object_.discovery_date),
-            "fetcher_name": object_.fetcher.name,
-            "fetcher_version": object_.fetcher.version,
-        }
-    else:
-        raise ValueError("Unknown object type: %s." % object_type)
 
 
 def stringify_key_item(k: str, v: Union[str, bytes]) -> str:
