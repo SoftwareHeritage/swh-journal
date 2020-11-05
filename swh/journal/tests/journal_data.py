@@ -8,10 +8,10 @@ from typing import Dict, Sequence
 
 import attr
 
-from swh.journal.serializers import ModelObject
 from swh.model.hashutil import MultiHash, hash_to_bytes, hash_to_hex
 from swh.model.identifiers import SWHID
 from swh.model.model import (
+    BaseModel,
     Content,
     Directory,
     DirectoryEntry,
@@ -327,7 +327,7 @@ RAW_EXTRINSIC_METADATA = [
 ]
 
 
-TEST_OBJECTS: Dict[str, Sequence[ModelObject]] = {
+TEST_OBJECTS: Dict[str, Sequence[BaseModel]] = {
     "content": CONTENTS,
     "directory": DIRECTORIES,
     "metadata_authority": METADATA_AUTHORITIES,
