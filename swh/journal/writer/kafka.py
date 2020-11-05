@@ -5,17 +5,24 @@
 
 import logging
 import time
-from typing import Dict, Iterable, List, NamedTuple, Optional, Type
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    List,
+    NamedTuple,
+    Optional,
+    Type,
+    TypeVar,
+)
 
 from confluent_kafka import KafkaException, Producer
 
-from swh.journal.serializers import (
-    KeyType,
-    ModelObject,
-    key_to_kafka,
-    pprint_key,
-    value_to_kafka,
-)
+from swh.journal.serializers import KeyType, key_to_kafka, pprint_key, value_to_kafka
+
+from . import ValueProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +65,14 @@ class KafkaDeliveryError(Exception):
         return f"KafkaDeliveryError({self.message}, [{self.pretty_failures()}])"
 
 
-class KafkaJournalWriter:
-    """This class is used to write serialized versions of swh.model.model objects to a
-    series of Kafka topics.
+TValue = TypeVar("TValue", bound=ValueProtocol)
+
+
+class KafkaJournalWriter(Generic[TValue]):
+    """This class is used to write serialized versions of value objects to a
+    series of Kafka topics. The type parameter `TValue`, which must implement the
+    `ValueProtocol`, is the type of values this writer will write.
+    Typically, `TValue` will be `swh.model.model.BaseModel`.
 
     Topics used to send objects representations are built from a ``prefix`` plus the
     type of the object:
@@ -68,20 +80,24 @@ class KafkaJournalWriter:
       ``{prefix}.{object_type}``
 
     Objects can be sent as is, or can be anonymized. The anonymization feature, when
-    activated, will write anonymized versions of model objects in the main topic, and
+    activated, will write anonymized versions of value objects in the main topic, and
     stock (non-anonymized) objects will be sent to a dedicated (privileged) set of
     topics:
 
       ``{prefix}_privileged.{object_type}``
 
-    The anonymization of a swh.model object is the result of calling its
-    ``BaseModel.anonymize()`` method. An object is considered anonymizable if this
+    The anonymization of a value object is the result of calling its
+    ``anonymize()`` method. An object is considered anonymizable if this
     method returns a (non-None) value.
 
     Args:
       brokers: list of broker addresses and ports.
       prefix: the prefix used to build the topic names for objects.
       client_id: the id of the writer sent to kafka.
+      value_sanitizer: a function that takes the object type and the dict
+        representation of an object as argument, and returns an other dict
+        that should be actually stored in the journal (eg. removing keys
+        that do no belong there)
       producer_config: extra configuration keys passed to the `Producer`.
       flush_timeout: timeout, in seconds, after which the `flush` operation
         will fail if some message deliveries are still pending.
@@ -95,6 +111,7 @@ class KafkaJournalWriter:
         brokers: Iterable[str],
         prefix: str,
         client_id: str,
+        value_sanitizer: Callable[[str, Dict[str, Any]], Dict[str, Any]],
         producer_config: Optional[Dict] = None,
         flush_timeout: float = 120,
         producer_class: Type[Producer] = Producer,
@@ -133,6 +150,8 @@ class KafkaJournalWriter:
 
         # List of (object_type, key, error_msg, error_name) for failed deliveries
         self.delivery_failures: List[DeliveryFailureInfo] = []
+
+        self.value_sanitizer = value_sanitizer
 
     def _error_cb(self, error):
         if error.fatal():
@@ -195,15 +214,7 @@ class KafkaJournalWriter:
         elif self.delivery_failures:
             raise self.delivery_error("Failed deliveries after flush()")
 
-    def _sanitize_object(
-        self, object_type: str, object_: ModelObject
-    ) -> Dict[str, str]:
-        dict_ = object_.to_dict()
-        if object_type == "content":
-            dict_.pop("data", None)
-        return dict_
-
-    def _write_addition(self, object_type: str, object_: ModelObject) -> None:
+    def _write_addition(self, object_type: str, object_: TValue) -> None:
         """Write a single object to the journal"""
         key = object_.unique_key()
 
@@ -213,24 +224,24 @@ class KafkaJournalWriter:
                 # if the object is anonymizable, send the non-anonymized version in the
                 # privileged channel
                 topic = f"{self._prefix_privileged}.{object_type}"
-                dict_ = self._sanitize_object(object_type, object_)
+                dict_ = self.value_sanitizer(object_type, object_.to_dict())
                 logger.debug("topic: %s, key: %s, value: %s", topic, key, dict_)
                 self.send(topic, key=key, value=dict_)
                 object_ = anon_object_
 
         topic = f"{self._prefix}.{object_type}"
-        dict_ = self._sanitize_object(object_type, object_)
+        dict_ = self.value_sanitizer(object_type, object_.to_dict())
         logger.debug("topic: %s, key: %s, value: %s", topic, key, dict_)
         self.send(topic, key=key, value=dict_)
 
-    def write_addition(self, object_type: str, object_: ModelObject) -> None:
+    def write_addition(self, object_type: str, object_: TValue) -> None:
         """Write a single object to the journal"""
         self._write_addition(object_type, object_)
         self.flush()
 
     write_update = write_addition
 
-    def write_additions(self, object_type: str, objects: Iterable[ModelObject]) -> None:
+    def write_additions(self, object_type: str, objects: Iterable[TValue]) -> None:
         """Write a set of objects to the journal"""
         for object_ in objects:
             self._write_addition(object_type, object_)
