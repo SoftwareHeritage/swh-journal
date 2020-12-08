@@ -28,6 +28,7 @@ class InMemoryJournalWriter(Generic[TValue]):
     def write_addition(
         self, object_type: str, object_: TValue, privileged: bool = False
     ) -> None:
+        object_.unique_key()  # Check this does not error, to mimic the kafka writer
         if privileged:
             self.privileged_objects.append((object_type, object_))
         else:
