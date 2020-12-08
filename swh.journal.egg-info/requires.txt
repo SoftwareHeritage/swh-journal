@@ -1,7 +1,6 @@
 confluent-kafka
 msgpack
 tenacity
-swh.core[db,http]>=0.0.60
 swh.model>=0.7.2
 
 [testing]
