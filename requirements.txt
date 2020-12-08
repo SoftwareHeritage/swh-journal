@@ -2,5 +2,5 @@
 # should match https://pypi.python.org/pypi names. For the full spec or
 # dependency lines, see https://pip.readthedocs.org/en/1.1/requirements.html
 confluent-kafka
-msgpack
+msgpack >= 1.0.0
 tenacity
