@@ -103,7 +103,7 @@ def value_to_kafka(value: Any) -> bytes:
 
 def kafka_to_value(kafka_value: bytes) -> Any:
     """Deserialize some data stored in kafka"""
-    value = msgpack.unpackb(
+    return msgpack.unpackb(
         kafka_value,
         raw=False,
         object_hook=decode_types_bw,
@@ -111,13 +111,3 @@ def kafka_to_value(kafka_value: bytes) -> Any:
         strict_map_key=False,
         timestamp=3,  # convert Timestamp in datetime objects (tz UTC)
     )
-    return ensure_tuples(value)
-
-
-def ensure_tuples(value: Any) -> Any:
-    if isinstance(value, (tuple, list)):
-        return tuple(map(ensure_tuples, value))
-    elif isinstance(value, dict):
-        return dict(ensure_tuples(list(value.items())))
-    else:
-        return value

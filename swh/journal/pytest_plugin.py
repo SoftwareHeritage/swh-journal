@@ -6,7 +6,7 @@
 from collections import defaultdict
 import random
 import string
-from typing import Collection, Dict, Iterator, Optional
+from typing import Any, Collection, Dict, Iterator, Optional
 
 import attr
 from confluent_kafka import Consumer, KafkaException, Producer
@@ -15,6 +15,25 @@ import pytest
 
 from swh.journal.serializers import kafka_to_key, kafka_to_value, pprint_key
 from swh.journal.tests.journal_data import TEST_OBJECTS
+
+
+def ensure_lists(value: Any) -> Any:
+    """
+    >>> ensure_lists(["foo", 42])
+    ['foo', 42]
+    >>> ensure_lists(("foo", 42))
+    ['foo', 42]
+    >>> ensure_lists({"a": ["foo", 42]})
+    {'a': ['foo', 42]}
+    >>> ensure_lists({"a": ("foo", 42)})
+    {'a': ['foo', 42]}
+    """
+    if isinstance(value, (tuple, list)):
+        return list(map(ensure_lists, value))
+    elif isinstance(value, dict):
+        return dict(ensure_lists(list(value.items())))
+    else:
+        return value
 
 
 def consume_messages(consumer, kafka_prefix, expected_messages):
@@ -95,7 +114,7 @@ def assert_all_objects_consumed(
             expected_value = value.to_dict()
             if value.object_type in ("content", "skipped_content"):
                 expected_value.pop("ctime", None)
-            assert expected_value in received_values, (
+            assert ensure_lists(expected_value) in received_values, (
                 f"expected {object_type} value {value!r} is "
                 "absent from consumed messages"
             )
