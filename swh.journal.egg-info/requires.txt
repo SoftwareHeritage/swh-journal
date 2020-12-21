@@ -1,5 +1,5 @@
 confluent-kafka
-msgpack
+msgpack!=1.0.1,>=1.0.0
 tenacity
 swh.model>=0.7.2
 
