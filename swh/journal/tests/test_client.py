@@ -34,7 +34,7 @@ REV = {
     ),
     "synthetic": False,
     "metadata": None,
-    "parents": (),
+    "parents": [],
     "id": b"\x8b\xeb\xd1\x9d\x07\xe2\x1e0\xe2 \x91X\x8d\xbd\x1c\xa8\x86\xdeB\x0c",
 }
 

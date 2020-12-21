@@ -1,8 +1,12 @@
-swh-journal (0.6.0-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-journal (0.6.1-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 0.6.1     - (tagged by Valentin Lorentz
+    <vlorentz@softwareheritage.org> on 2020-12-21 11:29:15 +0100)
+  * Upstream changes:     - v0.6.1     - * serializers: Deserialize as
+    lists instead of tuples     - * Fix dependency on msgpack (>= 1.0.0)
+    - * Blacklist msgpack 1.0.1.
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Tue, 08 Dec 2020 14:32:15 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Mon, 21 Dec 2020 10:31:53 +0000
 
 swh-journal (0.6.0-1~swh1) unstable-swh; urgency=medium
 
