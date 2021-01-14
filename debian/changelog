@@ -1,3 +1,12 @@
+swh-journal (0.6.2-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.6.2     - (tagged by Vincent SELLIER
+    <vincent.sellier@softwareheritage.org> on 2021-01-14 14:28:31 +0100)
+  * Upstream changes:     - v0.6.2     - * 2021-01-13 Add new field
+    OriginVisitStatus.type field on test data
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Thu, 14 Jan 2021 13:31:15 +0000
+
 swh-journal (0.6.1-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 0.6.1     - (tagged by Valentin Lorentz
