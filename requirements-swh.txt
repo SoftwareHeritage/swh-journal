@@ -1,1 +1,1 @@
-swh.model >= 0.10.0
+swh.model >= 0.12.0
