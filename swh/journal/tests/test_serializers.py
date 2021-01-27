@@ -11,8 +11,7 @@ from typing import Iterable
 import pytest
 
 from swh.journal import serializers
-
-from .conftest import TEST_OBJECTS
+from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
 def test_key_to_kafka_repeatable():

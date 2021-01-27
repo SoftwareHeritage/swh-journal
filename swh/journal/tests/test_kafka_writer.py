@@ -1,4 +1,4 @@
-# Copyright (C) 2018-2020 The Software Heritage developers
+# Copyright (C) 2018-2021 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -9,10 +9,10 @@ from confluent_kafka import Consumer, Producer
 import pytest
 
 from swh.journal.pytest_plugin import assert_all_objects_consumed, consume_messages
-from swh.journal.tests.journal_data import TEST_OBJECTS
 from swh.journal.writer import model_object_dict_sanitizer
 from swh.journal.writer.kafka import KafkaDeliveryError, KafkaJournalWriter
 from swh.model.model import BaseModel, Directory, Release, Revision
+from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
 def test_kafka_writer(

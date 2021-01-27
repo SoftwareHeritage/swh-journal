@@ -35,11 +35,9 @@ swh/journal/py.typed
 swh/journal/pytest_plugin.py
 swh/journal/serializers.py
 swh/journal/tests/__init__.py
-swh/journal/tests/conftest.py
 swh/journal/tests/journal_data.py
 swh/journal/tests/log4j.properties
 swh/journal/tests/test_client.py
-swh/journal/tests/test_journal_data.py
 swh/journal/tests/test_kafka_writer.py
 swh/journal/tests/test_pytest_plugin.py
 swh/journal/tests/test_serializers.py

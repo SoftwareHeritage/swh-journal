@@ -1,4 +1,4 @@
-# Copyright (C) 2019-2020 The Software Heritage developers
+# Copyright (C) 2019-2021 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -14,7 +14,7 @@ from confluent_kafka.admin import AdminClient
 import pytest
 
 from swh.journal.serializers import kafka_to_key, kafka_to_value, pprint_key
-from swh.journal.tests.journal_data import TEST_OBJECTS
+from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
 def ensure_lists(value: Any) -> Any:
