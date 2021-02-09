@@ -255,4 +255,7 @@ def consumer(
 
     yield consumer
 
+    # Explicitly perform the commit operation on the consumer before closing it
+    # to avoid possible hang since confluent-kafka v1.6.0
+    consumer.commit()
     consumer.close()
