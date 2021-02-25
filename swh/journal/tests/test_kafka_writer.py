@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import logging
 from typing import Iterable
 
 from confluent_kafka import Consumer, Producer
@@ -170,3 +171,64 @@ def test_write_delivery_timeout(
     delivery_failure = exc.value.delivery_failures[0]
     assert delivery_failure.key == empty_dir.id
     assert delivery_failure.code == "SWH_FLUSH_TIMEOUT"
+
+
+class MockBufferErrorProducer(Producer):
+    """A Kafka producer that returns a BufferError on the `n_buffererrors`
+    first calls to produce."""
+
+    def __init__(self, *args, **kwargs):
+        self.n_buffererrors = kwargs.pop("n_bufferrors", 0)
+        self.produce_calls = 0
+
+        super().__init__(*args, **kwargs)
+
+    def produce(self, **kwargs):
+        self.produce_calls += 1
+        if self.produce_calls <= self.n_buffererrors:
+            raise BufferError("Local: Queue full")
+
+        self.produce_calls = 0
+        return super().produce(**kwargs)
+
+
+def test_write_BufferError_retry(kafka_prefix: str, kafka_server: str, caplog):
+    writer = KafkaJournalWriter[BaseModel](
+        brokers=[kafka_server],
+        client_id="kafka_writer",
+        prefix=kafka_prefix,
+        value_sanitizer=model_object_dict_sanitizer,
+        flush_timeout=1,
+        producer_class=MockBufferErrorProducer,
+    )
+
+    writer.producer.n_buffererrors = 4
+
+    empty_dir = Directory(entries=())
+
+    caplog.set_level(logging.DEBUG, "swh.journal.writer.kafka")
+    writer.write_addition("directory", empty_dir)
+    records = []
+    for record in caplog.records:
+        if "BufferError" in record.getMessage():
+            records.append(record)
+
+    assert len(records) == writer.producer.n_buffererrors
+
+
+def test_write_BufferError_give_up(kafka_prefix: str, kafka_server: str, caplog):
+    writer = KafkaJournalWriter[BaseModel](
+        brokers=[kafka_server],
+        client_id="kafka_writer",
+        prefix=kafka_prefix,
+        value_sanitizer=model_object_dict_sanitizer,
+        flush_timeout=1,
+        producer_class=MockBufferErrorProducer,
+    )
+
+    writer.producer.n_buffererrors = 5
+
+    empty_dir = Directory(entries=())
+
+    with pytest.raises(KafkaDeliveryError):
+        writer.write_addition("directory", empty_dir)
