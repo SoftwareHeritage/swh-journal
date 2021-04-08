@@ -49,6 +49,9 @@ def test_kafka_writer(
             )
     for key, obj_dict in consumed_messages["release"]:
         obj = Release.from_dict(obj_dict)
+        # author is optional for release
+        if obj.author is None:
+            continue
         for person in (obj.author,):
             assert not (
                 len(person.fullname) == 32
@@ -92,6 +95,9 @@ def test_kafka_writer_anonymized(
             )
     for key, obj_dict in consumed_messages["release"]:
         obj = Release.from_dict(obj_dict)
+        # author is optional for release
+        if obj.author is None:
+            continue
         for person in (obj.author,):
             assert (
                 len(person.fullname) == 32
