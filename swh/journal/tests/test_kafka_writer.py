@@ -234,3 +234,15 @@ def test_write_BufferError_give_up(kafka_prefix: str, kafka_server: str, caplog)
 
     with pytest.raises(KafkaDeliveryError):
         writer.write_addition("directory", empty_dir)
+
+
+def test_write_addition_errors_without_unique_key(kafka_prefix: str, kafka_server: str):
+    writer = KafkaJournalWriter[BaseModel](
+        brokers=[kafka_server],
+        client_id="kafka_writer",
+        prefix=kafka_prefix,
+        value_sanitizer=model_object_dict_sanitizer,
+    )
+
+    with pytest.raises(NotImplementedError):
+        writer.write_addition("BaseModel", BaseModel())
