@@ -171,11 +171,35 @@ class KafkaJournalWriter(Generic[TValue]):
 
     def send(self, topic: str, key: KeyType, value):
         kafka_key = key_to_kafka(key)
-        self.producer.produce(
-            topic=topic, key=kafka_key, value=value_to_kafka(value),
-        )
+        max_attempts = 5
+        last_exception: Optional[Exception] = None
+        for attempt in range(max_attempts):
+            try:
+                self.producer.produce(
+                    topic=topic, key=kafka_key, value=value_to_kafka(value),
+                )
+            except BufferError as e:
+                last_exception = e
+                wait = 1 + 3 * attempt
 
-        self.deliveries_pending[DeliveryTag(topic, kafka_key)] = key
+                if logger.isEnabledFor(logging.DEBUG):  # pprint_key is expensive
+                    logger.debug(
+                        "BufferError producing %s %s; waiting for %ss",
+                        get_object_type(topic),
+                        pprint_key(kafka_key),
+                        wait,
+                    )
+                self.producer.poll(wait)
+            else:
+                self.deliveries_pending[DeliveryTag(topic, kafka_key)] = key
+                return
+
+        # We reach this point if all delivery attempts have failed
+        self.delivery_failures.append(
+            DeliveryFailureInfo(
+                get_object_type(topic), key, str(last_exception), "SWH_BUFFER_ERROR"
+            )
+        )
 
     def delivery_error(self, message) -> KafkaDeliveryError:
         """Get all failed deliveries, and clear them"""

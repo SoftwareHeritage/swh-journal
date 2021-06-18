@@ -2,10 +2,10 @@
 .pre-commit-config.yaml
 AUTHORS
 CODE_OF_CONDUCT.md
+CONTRIBUTORS
 LICENSE
 MANIFEST.in
 Makefile
-Makefile.local
 README.md
 mypy.ini
 pyproject.toml
@@ -38,9 +38,12 @@ swh/journal/tests/__init__.py
 swh/journal/tests/journal_data.py
 swh/journal/tests/log4j.properties
 swh/journal/tests/test_client.py
+swh/journal/tests/test_inmemory.py
 swh/journal/tests/test_kafka_writer.py
 swh/journal/tests/test_pytest_plugin.py
 swh/journal/tests/test_serializers.py
+swh/journal/tests/test_stream.py
 swh/journal/writer/__init__.py
 swh/journal/writer/inmemory.py
 swh/journal/writer/kafka.py
+swh/journal/writer/stream.py
