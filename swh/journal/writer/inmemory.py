@@ -5,7 +5,7 @@
 
 import logging
 from multiprocessing import Manager
-from typing import Any, Generic, List, Tuple, TypeVar
+from typing import Any, Callable, Dict, Generic, List, Tuple, TypeVar
 
 from . import ValueProtocol
 
@@ -19,7 +19,9 @@ class InMemoryJournalWriter(Generic[TValue]):
     objects: List[Tuple[str, TValue]]
     privileged_objects: List[Tuple[str, TValue]]
 
-    def __init__(self, value_sanitizer: Any):
+    def __init__(
+        self, value_sanitizer: Callable[[str, Dict[str, Any]], Dict[str, Any]]
+    ):
         # Share the list of objects across processes, for RemoteAPI tests.
         self.manager = Manager()
         self.objects = self.manager.list()
