@@ -7,7 +7,7 @@ from collections import defaultdict
 import logging
 import os
 import time
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from confluent_kafka import Consumer, KafkaError, KafkaException
 
@@ -73,6 +73,16 @@ class JournalClient:
     Messages are processed by the `worker_fn` callback passed to the `process`
     method, in batches of maximum `batch_size` messages (defaults to 200).
 
+    The objects passed to the `worker_fn` callback are the result of the kafka
+    message converted by the `value_deserializer` function. By default (if this
+    argument is not given), it will produce dicts (using the `kafka_to_value`
+    function). This signature of the function is:
+
+        `value_deserializer(object_type: str, kafka_msg: bytes) -> Any`
+
+    If the value returned by `value_deserializer` is None, it is ignored and
+    not passed the `worker_fn` function.
+
     If set, the processing stops after processing `stop_after_objects` messages
     in total.
 
@@ -99,6 +109,7 @@ class JournalClient:
         process_timeout: Optional[float] = None,
         auto_offset_reset: str = "earliest",
         stop_on_eof: bool = False,
+        value_deserializer: Optional[Callable[[str, bytes], Any]] = None,
         **kwargs,
     ):
         if prefix is None:
@@ -111,8 +122,10 @@ class JournalClient:
 
         if batch_size <= 0:
             raise ValueError("Option 'batch_size' needs to be positive")
-
-        self.value_deserializer = kafka_to_value
+        if value_deserializer:
+            self.value_deserializer = value_deserializer
+        else:
+            self.value_deserializer = lambda _, value: kafka_to_value(value)
 
         if isinstance(brokers, str):
             brokers = [brokers]
@@ -286,7 +299,11 @@ class JournalClient:
                 continue
             nb_processed += 1
             object_type = message.topic().split(".")[-1]
-            objects[object_type].append(self.deserialize_message(message))
+            deserialized_object = self.deserialize_message(
+                message, object_type=object_type
+            )
+            if deserialized_object is not None:
+                objects[object_type].append(deserialized_object)
 
         if objects:
             worker_fn(dict(objects))
@@ -299,8 +316,8 @@ class JournalClient:
 
         return nb_processed, at_eof
 
-    def deserialize_message(self, message):
-        return self.value_deserializer(message.value())
+    def deserialize_message(self, message, object_type=None):
+        return self.value_deserializer(object_type, message.value())
 
     def close(self):
         self.consumer.close()

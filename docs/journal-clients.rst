@@ -6,12 +6,16 @@ Software Heritage Journal clients
 Journal client are processes that read data from the |swh| Journal,
 in order to efficiently process all existing objects, and process new objects
 as they come.
+
 Some journal clients, such as :ref:`swh-dataset <swh-dataset>` only read
 existing objects and stop when they are done.
 
-They can run in parallel, and the :mod:`swh.journal.client` module
-provides an abstraction handling all the setup, so actual clients are actually
-a single function that takes :mod:`model objects <swh.model.model>` as parameters.
+Other journal clients, such as the :ref:`mirror <swh-storage>` are expected to
+read constantly from the journal.
+
+They can run in parallel, and the :mod:`swh.journal.client` module provides an
+abstraction handling all the setup, so actual clients only consists in a single
+function that takes :mod:`model objects <swh.model.model>` as parameters.
 
 For example, a very simple journal client that prints all revisions and releases
 to the console can be implemented like this:
