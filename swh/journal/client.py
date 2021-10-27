@@ -290,7 +290,7 @@ class JournalClient:
 
         if objects:
             worker_fn(dict(objects))
-            self.consumer.commit()
+        self.consumer.commit()
 
         at_eof = self.stop_on_eof and all(
             (tp.topic, tp.partition) in self.eof_reached
