@@ -368,5 +368,10 @@ def test_client_with_deserializer(
     )
     worker_fn = MagicMock()
     client.process(worker_fn)
-    # check that the first Revision has not been passed to worker_fn
+
+    # a commit seems to be needed to prevent some race condition situation
+    # where the worker_fn has not yet been called at this point (not sure how)
+    client.consumer.commit()
+
+    # Check the first revision has not been passed to worker_fn
     worker_fn.assert_called_once_with({"revision": revisions[1:]})
