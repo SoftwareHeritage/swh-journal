@@ -19,7 +19,9 @@ tox.ini
 docs/.gitignore
 docs/Makefile
 docs/conf.py
+docs/example-journal-client.py
 docs/index.rst
+docs/journal-clients.rst
 docs/_static/.placeholder
 docs/_templates/.placeholder
 swh/__init__.py
