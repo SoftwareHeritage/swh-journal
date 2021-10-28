@@ -3,15 +3,16 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from typing import Dict, List
+from typing import Dict, List, cast
 from unittest.mock import MagicMock
 
 from confluent_kafka import Producer
 import pytest
 
 from swh.journal.client import JournalClient
-from swh.journal.serializers import key_to_kafka, value_to_kafka
-from swh.model.model import Content
+from swh.journal.serializers import kafka_to_value, key_to_kafka, value_to_kafka
+from swh.model.model import Content, Revision
+from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 REV = {
     "message": b"something cool",
@@ -327,3 +328,50 @@ def test_client_subscriptions_without_anonymized_topics(
     # we also only subscribed to the standard prefix, since there is no priviled prefix
     # on the kafka broker
     assert client.subscription == [kafka_prefix + ".revision"]
+
+
+def test_client_with_deserializer(
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server: str
+):
+    producer = Producer(
+        {
+            "bootstrap.servers": kafka_server,
+            "client.id": "test producer",
+            "acks": "all",
+        }
+    )
+
+    # Fill Kafka
+    revisions = cast(List[Revision], TEST_OBJECTS["revision"])
+    for rev in revisions:
+        producer.produce(
+            topic=kafka_prefix + ".revision",
+            key=rev.id,
+            value=value_to_kafka(rev.to_dict()),
+        )
+    producer.flush()
+
+    def custom_deserializer(object_type, msg):
+        assert object_type == "revision"
+        obj = kafka_to_value(msg)
+        # filter the first revision
+        if obj["id"] == revisions[0].id:
+            return None
+        return Revision.from_dict(obj)
+
+    client = JournalClient(
+        brokers=[kafka_server],
+        group_id=kafka_consumer_group,
+        prefix=kafka_prefix,
+        stop_after_objects=1,
+        value_deserializer=custom_deserializer,
+    )
+    worker_fn = MagicMock()
+    client.process(worker_fn)
+
+    # a commit seems to be needed to prevent some race condition situation
+    # where the worker_fn has not yet been called at this point (not sure how)
+    client.consumer.commit()
+
+    # Check the first revision has not been passed to worker_fn
+    worker_fn.assert_called_once_with({"revision": revisions[1:]})
