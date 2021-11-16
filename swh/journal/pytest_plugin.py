@@ -205,7 +205,7 @@ def kafka_server_base() -> Iterator[str]:
 
 TEST_CONFIG = {
     "consumer_id": "swh.journal.consumer",
-    "stop_after_objects": 1,  # will read 1 object and stop
+    "stop_on_eof": True,
     "storage": {"cls": "memory", "args": {}},
 }
 
