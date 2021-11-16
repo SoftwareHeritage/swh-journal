@@ -50,7 +50,7 @@ def test_kafka_server_with_topics(
 def test_test_config(test_config: dict, kafka_prefix: str, kafka_server_base: str):
     assert test_config == {
         "consumer_id": "swh.journal.consumer",
-        "stop_after_objects": 1,
+        "stop_on_eof": True,
         "storage": {"cls": "memory", "args": {}},
         "object_types": {
             "content",
