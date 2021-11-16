@@ -1,3 +1,11 @@
+swh-journal (0.9.1-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 0.9.1     - (tagged by David Douard
+    <david.douard@sdfa3.org> on 2021-11-16 16:28:40 +0100)
+  * Upstream changes:     - v0.9.1     - fix flaky tests
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Tue, 16 Nov 2021 15:38:07 +0000
+
 swh-journal (0.9.0-2~swh1) unstable-swh; urgency=medium
 
   * No need to explicitly call the pytest plugin, it's registered via
