@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 export PYBUILD_NAME=swh.journal
-export PYBUILD_TEST_ARGS=-m 'not db and not fs' -p swh.journal.pytest_plugin
+export PYBUILD_TEST_ARGS=-v
 
 %:
 	dh $@ --with python3 --buildsystem=pybuild
