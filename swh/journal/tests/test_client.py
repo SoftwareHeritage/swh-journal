@@ -363,7 +363,7 @@ def test_client_with_deserializer(
         brokers=[kafka_server],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_after_objects=1,
+        stop_on_eof=True,
         value_deserializer=custom_deserializer,
     )
     worker_fn = MagicMock()
