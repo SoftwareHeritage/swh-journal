@@ -59,7 +59,7 @@ def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str)
         brokers=[kafka_server],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_after_objects=1,
+        stop_on_eof=True,
     )
     worker_fn = MagicMock()
     client.process(worker_fn)
@@ -67,7 +67,10 @@ def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str)
     worker_fn.assert_called_once_with({"revision": [REV]})
 
 
-def test_client_eof(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str):
+@pytest.mark.parametrize("count", [1, 2])
+def test_client_stop_after_objects(
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server: str, count: int
+):
     producer = Producer(
         {
             "bootstrap.servers": kafka_server,
@@ -77,23 +80,39 @@ def test_client_eof(kafka_prefix: str, kafka_consumer_group: str, kafka_server: 
     )
 
     # Fill Kafka
-    producer.produce(
-        topic=kafka_prefix + ".revision", key=REV["id"], value=value_to_kafka(REV),
-    )
+    revisions = cast(List[Revision], TEST_OBJECTS["revision"])
+    for rev in revisions:
+        producer.produce(
+            topic=kafka_prefix + ".revision",
+            key=rev.id,
+            value=value_to_kafka(rev.to_dict()),
+        )
     producer.flush()
 
     client = JournalClient(
         brokers=[kafka_server],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_after_objects=None,
-        stop_on_eof=True,
+        stop_on_eof=False,
+        stop_after_objects=count,
     )
 
     worker_fn = MagicMock()
     client.process(worker_fn)
 
-    worker_fn.assert_called_once_with({"revision": [REV]})
+    # this code below is not pretty, but needed since we have to deal with
+    # dicts (so no set) which can have values that are list vs tuple, and we do
+    # not know for sure how many calls of the worker_fn will happen during the
+    # consumption of the topic...
+    worker_fn.assert_called()
+    revs = []  # list of (unique) rev dicts we got from the client
+    for call in worker_fn.call_args_list:
+        callrevs = call[0][0]["revision"]
+        for rev in callrevs:
+            assert Revision.from_dict(rev) in revisions
+            if rev not in revs:
+                revs.append(rev)
+    assert len(revs) == count
 
 
 @pytest.mark.parametrize("batch_size", [1, 5, 100])
@@ -127,7 +146,7 @@ def test_client_batch_size(
         brokers=[kafka_server],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_after_objects=num_objects,
+        stop_on_eof=True,
         batch_size=batch_size,
     )
 
@@ -179,7 +198,7 @@ def test_client_subscribe_all(
         brokers=[kafka_server_base],
         group_id="whatever",
         prefix=kafka_prefix,
-        stop_after_objects=2,
+        stop_on_eof=True,
     )
     assert set(client.subscription) == {
         f"{kafka_prefix}.something",
@@ -200,7 +219,7 @@ def test_client_subscribe_one_topic(
         brokers=[kafka_server_base],
         group_id="whatever",
         prefix=kafka_prefix,
-        stop_after_objects=1,
+        stop_on_eof=True,
         object_types=["else"],
     )
     assert client.subscription == [f"{kafka_prefix}.else"]
@@ -218,7 +237,7 @@ def test_client_subscribe_absent_topic(
             brokers=[kafka_server_base],
             group_id="whatever",
             prefix=kafka_prefix,
-            stop_after_objects=1,
+            stop_on_eof=True,
             object_types=["really"],
         )
 
@@ -231,14 +250,14 @@ def test_client_subscribe_absent_prefix(
             brokers=[kafka_server_base],
             group_id="whatever",
             prefix="wrong.prefix",
-            stop_after_objects=1,
+            stop_on_eof=True,
         )
     with pytest.raises(ValueError):
         JournalClient(
             brokers=[kafka_server_base],
             group_id="whatever",
             prefix="wrong.prefix",
-            stop_after_objects=1,
+            stop_on_eof=True,
             object_types=["else"],
         )
 
@@ -271,7 +290,7 @@ def test_client_subscriptions_with_anonymized_topics(
         brokers=[kafka_server_base],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_after_objects=1,
+        stop_on_eof=True,
         privileged=False,
     )
     # we only subscribed to "standard" topics
@@ -282,7 +301,6 @@ def test_client_subscriptions_with_anonymized_topics(
         brokers=[kafka_server_base],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_after_objects=1,
         privileged=True,
     )
     # we only subscribed to "privileged" topics
@@ -311,7 +329,7 @@ def test_client_subscriptions_without_anonymized_topics(
         brokers=[kafka_server_base],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_after_objects=1,
+        stop_on_eof=True,
         privileged=False,
     )
     # we only subscribed to the standard prefix
@@ -322,7 +340,7 @@ def test_client_subscriptions_without_anonymized_topics(
         brokers=[kafka_server_base],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_after_objects=1,
+        stop_on_eof=True,
         privileged=True,
     )
     # we also only subscribed to the standard prefix, since there is no priviled prefix
@@ -363,7 +381,7 @@ def test_client_with_deserializer(
         brokers=[kafka_server],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_after_objects=1,
+        stop_on_eof=True,
         value_deserializer=custom_deserializer,
     )
     worker_fn = MagicMock()
