@@ -1,4 +1,4 @@
-# Copyright (C) 2017  The Software Heritage developers
+# Copyright (C) 2017-2022  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from confluent_kafka import Consumer, KafkaError, KafkaException
 
+from swh.core.statsd import statsd
 from swh.journal import DEFAULT_PREFIX
 
 from .serializers import kafka_to_value
@@ -27,6 +28,9 @@ ACCEPTED_OFFSET_RESET = ["earliest", "latest"]
 _SPAMMY_ERRORS = [
     KafkaError._NO_OFFSET,
 ]
+
+JOURNAL_MESSAGE_NUMBER_METRIC = "swh_journal_client_handle_message_total"
+JOURNAL_STATUS_METRIC = "swh_journal_client_status"
 
 
 def get_journal_client(cls: str, **kwargs: Any):
@@ -275,25 +279,38 @@ class JournalClient:
         # timeout for message poll
         timeout = 1.0
 
-        while True:
-            batch_size = self.batch_size
-            if self.stop_after_objects:
-                if total_objects_processed >= self.stop_after_objects:
+        with statsd.status_gauge(
+            JOURNAL_STATUS_METRIC, statuses=["idle", "processing", "waiting"]
+        ) as set_status:
+            set_status("idle")
+            while True:
+                batch_size = self.batch_size
+                if self.stop_after_objects:
+                    if total_objects_processed >= self.stop_after_objects:
+                        break
+
+                    # clamp batch size to avoid overrunning stop_after_objects
+                    batch_size = min(
+                        self.stop_after_objects - total_objects_processed, batch_size,
+                    )
+
+                set_status("waiting")
+                while True:
+                    messages = self.consumer.consume(
+                        timeout=timeout, num_messages=batch_size
+                    )
+                    if messages:
+                        break
+
+                set_status("processing")
+                batch_processed, at_eof = self.handle_messages(messages, worker_fn)
+
+                set_status("idle")
+                # report the number of handled messages
+                statsd.increment(JOURNAL_MESSAGE_NUMBER_METRIC, value=batch_processed)
+                total_objects_processed += batch_processed
+                if at_eof:
                     break
-
-                # clamp batch size to avoid overrunning stop_after_objects
-                batch_size = min(
-                    self.stop_after_objects - total_objects_processed, batch_size,
-                )
-
-            messages = self.consumer.consume(timeout=timeout, num_messages=batch_size)
-            if not messages:
-                continue
-
-            batch_processed, at_eof = self.handle_messages(messages, worker_fn)
-            total_objects_processed += batch_processed
-            if at_eof:
-                break
 
         return total_objects_processed
 
