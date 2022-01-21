@@ -1,16 +1,17 @@
-# Copyright (C) 2017  The Software Heritage developers
+# Copyright (C) 2017-2022  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 from collections import defaultdict
+from importlib import import_module
 import logging
 import os
-import time
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from confluent_kafka import Consumer, KafkaError, KafkaException
 
+from swh.core.statsd import statsd
 from swh.journal import DEFAULT_PREFIX
 
 from .serializers import kafka_to_value
@@ -28,6 +29,9 @@ _SPAMMY_ERRORS = [
     KafkaError._NO_OFFSET,
 ]
 
+JOURNAL_MESSAGE_NUMBER_METRIC = "swh_journal_client_handle_message_total"
+JOURNAL_STATUS_METRIC = "swh_journal_client_status"
+
 
 def get_journal_client(cls: str, **kwargs: Any):
     """Factory function to instantiate a journal client object.
@@ -35,6 +39,30 @@ def get_journal_client(cls: str, **kwargs: Any):
     Currently, only the "kafka" journal client is supported.
     """
     if cls == "kafka":
+        if "stats_cb" in kwargs:
+            stats_cb = kwargs["stats_cb"]
+            if isinstance(stats_cb, str):
+                try:
+                    module_path, func_name = stats_cb.split(":")
+                except ValueError:
+                    raise ValueError(
+                        "Invalid stats_cb configuration option: "
+                        "it should be a string like 'path.to.module:function'"
+                    )
+                try:
+                    module = import_module(module_path, package=__package__)
+                except ModuleNotFoundError:
+                    raise ValueError(
+                        "Invalid stats_cb configuration option: "
+                        f"module {module_path} not found"
+                    )
+                try:
+                    kwargs["stats_cb"] = getattr(module, func_name)
+                except AttributeError:
+                    raise ValueError(
+                        "Invalid stats_cb configuration option: "
+                        f"function {func_name} not found in module {module_path}"
+                    )
         return JournalClient(**kwargs)
     raise ValueError("Unknown journal client class `%s`" % cls)
 
@@ -220,9 +248,15 @@ class JournalClient:
         self.subscribe()
 
         self.stop_after_objects = stop_after_objects
-        self.process_timeout = process_timeout
+
         self.eof_reached: Set[Tuple[str, str]] = set()
         self.batch_size = batch_size
+
+        if process_timeout is not None:
+            raise DeprecationWarning(
+                "'process_timeout' argument is not supported anymore by "
+                "JournalClient; please remove it from your configuration.",
+            )
 
     def subscribe(self):
         """Subscribe to topics listed in self.subscription
@@ -241,44 +275,42 @@ class JournalClient:
                                                        the messages as
                                                        argument.
         """
-        start_time = time.monotonic()
         total_objects_processed = 0
+        # timeout for message poll
+        timeout = 1.0
 
-        while True:
-            # timeout for message poll
-            timeout = 1.0
+        with statsd.status_gauge(
+            JOURNAL_STATUS_METRIC, statuses=["idle", "processing", "waiting"]
+        ) as set_status:
+            set_status("idle")
+            while True:
+                batch_size = self.batch_size
+                if self.stop_after_objects:
+                    if total_objects_processed >= self.stop_after_objects:
+                        break
 
-            elapsed = time.monotonic() - start_time
-            if self.process_timeout:
-                # +0.01 to prevent busy-waiting on / spamming consumer.poll.
-                # consumer.consume() returns shortly before X expired
-                # (a matter of milliseconds), so after it returns a first
-                # time, it would then be called with a timeout in the order
-                # of milliseconds, therefore returning immediately, then be
-                # called again, etc.
-                if elapsed + 0.01 >= self.process_timeout:
+                    # clamp batch size to avoid overrunning stop_after_objects
+                    batch_size = min(
+                        self.stop_after_objects - total_objects_processed, batch_size,
+                    )
+
+                set_status("waiting")
+                while True:
+                    messages = self.consumer.consume(
+                        timeout=timeout, num_messages=batch_size
+                    )
+                    if messages:
+                        break
+
+                set_status("processing")
+                batch_processed, at_eof = self.handle_messages(messages, worker_fn)
+
+                set_status("idle")
+                # report the number of handled messages
+                statsd.increment(JOURNAL_MESSAGE_NUMBER_METRIC, value=batch_processed)
+                total_objects_processed += batch_processed
+                if at_eof:
                     break
-
-                timeout = self.process_timeout - elapsed
-
-            batch_size = self.batch_size
-            if self.stop_after_objects:
-                if total_objects_processed >= self.stop_after_objects:
-                    break
-
-                # clamp batch size to avoid overrunning stop_after_objects
-                batch_size = min(
-                    self.stop_after_objects - total_objects_processed, batch_size,
-                )
-
-            messages = self.consumer.consume(timeout=timeout, num_messages=batch_size)
-            if not messages:
-                continue
-
-            batch_processed, at_eof = self.handle_messages(messages, worker_fn)
-            total_objects_processed += batch_processed
-            if at_eof:
-                break
 
         return total_objects_processed
 

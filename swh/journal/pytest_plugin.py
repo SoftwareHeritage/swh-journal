@@ -51,7 +51,7 @@ def consume_messages(consumer, kafka_prefix, expected_messages):
                 f"Only {fetched_messages}/{expected_messages} fetched"
             )
 
-        msg = consumer.poll(timeout=0.01)
+        msg = consumer.poll(timeout=0.1)
 
         if not msg:
             retries_left -= 1
