@@ -1,2 +1,3 @@
 pytest
 hypothesis
+swh.core[testing]
