@@ -392,4 +392,6 @@ def test_client_with_deserializer(
     client.consumer.commit()
 
     # Check the first revision has not been passed to worker_fn
-    worker_fn.assert_called_once_with({"revision": revisions[1:]})
+    processed_revisions = set(worker_fn.call_args[0][0]["revision"])
+    assert revisions[0] not in processed_revisions
+    assert all(rev in processed_revisions for rev in revisions[1:])
