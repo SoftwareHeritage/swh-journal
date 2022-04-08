@@ -67,7 +67,10 @@ def test_test_config(test_config: dict, kafka_prefix: str, kafka_server_base: st
             "snapshot",
             "skipped_content",
         },
-        "privileged_object_types": {"release", "revision",},
+        "privileged_object_types": {
+            "release",
+            "revision",
+        },
         "brokers": [kafka_server_base],
         "prefix": kafka_prefix,
     }

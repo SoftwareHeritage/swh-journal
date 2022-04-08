@@ -291,7 +291,8 @@ class JournalClient:
 
                     # clamp batch size to avoid overrunning stop_after_objects
                     batch_size = min(
-                        self.stop_after_objects - total_objects_processed, batch_size,
+                        self.stop_after_objects - total_objects_processed,
+                        batch_size,
                     )
 
                 set_status("waiting")

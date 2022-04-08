@@ -176,7 +176,9 @@ class KafkaJournalWriter(Generic[TValue]):
         for attempt in range(max_attempts):
             try:
                 self.producer.produce(
-                    topic=topic, key=kafka_key, value=value_to_kafka(value),
+                    topic=topic,
+                    key=kafka_key,
+                    value=value_to_kafka(value),
                 )
             except BufferError as e:
                 last_exception = e

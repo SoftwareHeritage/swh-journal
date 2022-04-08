@@ -16,7 +16,9 @@ def test_write_additions_with_test_objects():
     outs = io.BytesIO()
 
     writer = get_journal_writer(
-        cls="stream", value_sanitizer=model_object_dict_sanitizer, output_stream=outs,
+        cls="stream",
+        value_sanitizer=model_object_dict_sanitizer,
+        output_stream=outs,
     )
     expected = []
 
