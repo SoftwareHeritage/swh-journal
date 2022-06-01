@@ -3,7 +3,9 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from typing import Any, Dict, Type
+import os
+import sys
+from typing import Any, BinaryIO, Dict, Type
 import warnings
 
 from .interface import JournalWriterInterface
@@ -50,6 +52,14 @@ def get_journal_writer(cls, **kwargs) -> JournalWriterInterface:
         JournalWriter = StreamJournalWriter
 
         assert "output_stream" in kwargs
+        outstream: BinaryIO
+        if kwargs["output_stream"] in ("-", b"-"):
+            outstream = os.fdopen(sys.stdout.fileno(), "wb", closefd=False)
+        elif isinstance(kwargs["output_stream"], (str, bytes)):
+            outstream = open(kwargs["output_stream"], "wb")
+        else:
+            outstream = kwargs["output_stream"]
+        kwargs["output_stream"] = outstream
     else:
         raise ValueError("Unknown journal writer class `%s`" % cls)
 

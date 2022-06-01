@@ -23,6 +23,7 @@ def fill_writer(writer: JournalWriterInterface) -> List[Tuple[str, Dict]]:
                 objd.pop("data")
 
             expected.append((object_type, objd))
+    writer.flush()
     return expected
 
 
@@ -37,6 +38,41 @@ def test_stream_journal_writer_stream():
     expected = fill_writer(writer)
 
     outs.seek(0, 0)
+    unpacker = kafka_stream_to_value(outs)
+    for i, (objtype, objd) in enumerate(unpacker, start=1):
+        assert (objtype, objd) in expected
+    assert len(expected) == i
+
+
+def test_stream_journal_writer_filename(tmp_path):
+    out_fname = str(tmp_path / "journal.msgpack")
+
+    writer = get_journal_writer(
+        cls="stream",
+        value_sanitizer=model_object_dict_sanitizer,
+        output_stream=out_fname,
+    )
+    expected = fill_writer(writer)
+
+    with open(out_fname, "rb") as outs:
+        unpacker = kafka_stream_to_value(outs)
+        for i, (objtype, objd) in enumerate(unpacker, start=1):
+            assert (objtype, objd) in expected
+        assert len(expected) == i
+
+
+def test_stream_journal_writer_stdout(capfdbinary):
+    writer = get_journal_writer(
+        cls="stream",
+        value_sanitizer=model_object_dict_sanitizer,
+        output_stream="-",
+    )
+    expected = fill_writer(writer)
+
+    captured = capfdbinary.readouterr()
+    assert captured.err == b""
+    outs = io.BytesIO(captured.out)
+
     unpacker = kafka_stream_to_value(outs)
     for i, (objtype, objd) in enumerate(unpacker, start=1):
         assert (objtype, objd) in expected
