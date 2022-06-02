@@ -12,9 +12,7 @@ from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
 def test_write_additions_with_test_objects():
-    writer = InMemoryJournalWriter[BaseModel](
-        value_sanitizer=model_object_dict_sanitizer
-    )
+    writer = InMemoryJournalWriter(value_sanitizer=model_object_dict_sanitizer)
     expected = []
     priv_expected = []
 
@@ -33,9 +31,7 @@ def test_write_additions_with_test_objects():
 
 
 def test_write_addition_errors_without_unique_key():
-    writer = InMemoryJournalWriter[BaseModel](
-        value_sanitizer=model_object_dict_sanitizer
-    )
+    writer = InMemoryJournalWriter(value_sanitizer=model_object_dict_sanitizer)
 
     with pytest.raises(NotImplementedError):
         writer.write_addition("BaseModel", BaseModel())

@@ -1,28 +1,17 @@
-# Copyright (C) 2019-2020 The Software Heritage developers
+# Copyright (C) 2019-2022 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 import logging
 import time
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Generic,
-    Iterable,
-    List,
-    NamedTuple,
-    Optional,
-    Type,
-    TypeVar,
-)
+from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Type
 
 from confluent_kafka import KafkaException, Producer
 
 from swh.journal.serializers import KeyType, key_to_kafka, pprint_key, value_to_kafka
 
-from . import ValueProtocol
+from .interface import ValueProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -65,14 +54,11 @@ class KafkaDeliveryError(Exception):
         return f"KafkaDeliveryError({self.message}, [{self.pretty_failures()}])"
 
 
-TValue = TypeVar("TValue", bound=ValueProtocol)
-
-
-class KafkaJournalWriter(Generic[TValue]):
-    """This class is used to write serialized versions of value objects to a
-    series of Kafka topics. The type parameter `TValue`, which must implement the
-    `ValueProtocol`, is the type of values this writer will write.
-    Typically, `TValue` will be `swh.model.model.BaseModel`.
+class KafkaJournalWriter:
+    """This class is used to write serialized versions of value objects to a series
+    of Kafka topics. The type parameter of value objects, which must implement
+    the `ValueProtocol`, is the type of values this writer will write.
+    Typically, `ValueProtocol` will be `swh.model.model.BaseModel`.
 
     Topics used to send objects representations are built from a ``prefix`` plus the
     type of the object:
@@ -222,7 +208,7 @@ class KafkaJournalWriter(Generic[TValue]):
 
         return KafkaDeliveryError(message, ret)
 
-    def flush(self):
+    def flush(self) -> None:
         start = time.monotonic()
 
         self.producer.flush(self.flush_timeout)
@@ -240,7 +226,7 @@ class KafkaJournalWriter(Generic[TValue]):
         elif self.delivery_failures:
             raise self.delivery_error("Failed deliveries after flush()")
 
-    def _write_addition(self, object_type: str, object_: TValue) -> None:
+    def _write_addition(self, object_type: str, object_: ValueProtocol) -> None:
         """Write a single object to the journal"""
         key = object_.unique_key()
 
@@ -260,14 +246,14 @@ class KafkaJournalWriter(Generic[TValue]):
         logger.debug("topic: %s, key: %s, value: %s", topic, key, dict_)
         self.send(topic, key=key, value=dict_)
 
-    def write_addition(self, object_type: str, object_: TValue) -> None:
+    def write_addition(self, object_type: str, object_: ValueProtocol) -> None:
         """Write a single object to the journal"""
         self._write_addition(object_type, object_)
         self.flush()
 
-    write_update = write_addition
-
-    def write_additions(self, object_type: str, objects: Iterable[TValue]) -> None:
+    def write_additions(
+        self, object_type: str, objects: Iterable[ValueProtocol]
+    ) -> None:
         """Write a set of objects to the journal"""
         for object_ in objects:
             self._write_addition(object_type, object_)

@@ -5,19 +5,16 @@
 
 import logging
 from multiprocessing import Manager
-from typing import Any, Callable, Dict, Generic, List, Tuple, TypeVar
+from typing import Any, Callable, Dict, Iterable, List, Tuple
 
-from . import ValueProtocol
+from .interface import ValueProtocol
 
 logger = logging.getLogger(__name__)
 
 
-TValue = TypeVar("TValue", bound=ValueProtocol)
-
-
-class InMemoryJournalWriter(Generic[TValue]):
-    objects: List[Tuple[str, TValue]]
-    privileged_objects: List[Tuple[str, TValue]]
+class InMemoryJournalWriter:
+    objects: List[Tuple[str, ValueProtocol]]
+    privileged_objects: List[Tuple[str, ValueProtocol]]
 
     def __init__(
         self, value_sanitizer: Callable[[str, Dict[str, Any]], Dict[str, Any]]
@@ -27,7 +24,7 @@ class InMemoryJournalWriter(Generic[TValue]):
         self.objects = self.manager.list()
         self.privileged_objects = self.manager.list()
 
-    def write_addition(self, object_type: str, object_: TValue) -> None:
+    def write_addition(self, object_type: str, object_: ValueProtocol) -> None:
         object_.unique_key()  # Check this does not error, to mimic the kafka writer
         anon_object_ = object_.anonymize()
         if anon_object_ is not None:
@@ -36,8 +33,11 @@ class InMemoryJournalWriter(Generic[TValue]):
         else:
             self.objects.append((object_type, object_))
 
-    write_update = write_addition
-
-    def write_additions(self, object_type: str, objects: List[TValue]) -> None:
+    def write_additions(
+        self, object_type: str, objects: Iterable[ValueProtocol]
+    ) -> None:
         for object_ in objects:
             self.write_addition(object_type, object_)
+
+    def flush(self) -> None:
+        pass

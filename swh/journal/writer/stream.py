@@ -4,19 +4,16 @@
 # See top-level LICENSE file for more information
 
 import logging
-from typing import Any, BinaryIO, Callable, Dict, Generic, List, TypeVar
+from typing import Any, BinaryIO, Callable, Dict, Iterable
 
 from swh.journal.serializers import value_to_kafka
 
-from . import ValueProtocol
+from .interface import ValueProtocol
 
 logger = logging.getLogger(__name__)
 
 
-TValue = TypeVar("TValue", bound=ValueProtocol)
-
-
-class StreamJournalWriter(Generic[TValue]):
+class StreamJournalWriter:
     """A simple JournalWriter which serializes objects in a stream
 
     Might be used to serialize a storage in a file to generate a test dataset.
@@ -31,13 +28,16 @@ class StreamJournalWriter(Generic[TValue]):
         self.output = output_stream
         self.value_sanitizer = value_sanitizer
 
-    def write_addition(self, object_type: str, object_: TValue) -> None:
+    def write_addition(self, object_type: str, object_: ValueProtocol) -> None:
         object_.unique_key()  # Check this does not error, to mimic the kafka writer
         dict_ = self.value_sanitizer(object_type, object_.to_dict())
         self.output.write(value_to_kafka((object_type, dict_)))
 
-    write_update = write_addition
-
-    def write_additions(self, object_type: str, objects: List[TValue]) -> None:
+    def write_additions(
+        self, object_type: str, objects: Iterable[ValueProtocol]
+    ) -> None:
         for object_ in objects:
             self.write_addition(object_type, object_)
+
+    def flush(self) -> None:
+        self.output.flush()
