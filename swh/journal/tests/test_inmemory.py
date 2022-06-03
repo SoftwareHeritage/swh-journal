@@ -1,3 +1,8 @@
+# Copyright (C) 2019-2022 The Software Heritage developers
+# See the AUTHORS file at the top-level directory of this distribution
+# License: GNU General Public License version 3, or any later version
+# See top-level LICENSE file for more information
+
 import pytest
 
 from swh.journal.writer import model_object_dict_sanitizer
@@ -11,32 +16,20 @@ def test_write_additions_with_test_objects():
         value_sanitizer=model_object_dict_sanitizer
     )
     expected = []
+    priv_expected = []
 
     for object_type, objects in TEST_OBJECTS.items():
         writer.write_additions(object_type, objects)
 
         for object in objects:
-            expected.append((object_type, object))
+            if object.anonymize():
+                expected.append((object_type, object.anonymize()))
+                priv_expected.append((object_type, object))
+            else:
+                expected.append((object_type, object))
 
-    assert list(writer.privileged_objects) == []
+    assert set(priv_expected) == set(writer.privileged_objects)
     assert set(expected) == set(writer.objects)
-
-
-def test_write_additions_with_privileged_test_objects():
-    writer = InMemoryJournalWriter[BaseModel](
-        value_sanitizer=model_object_dict_sanitizer
-    )
-
-    expected = []
-
-    for object_type, objects in TEST_OBJECTS.items():
-        writer.write_additions(object_type, objects, True)
-
-        for object in objects:
-            expected.append((object_type, object))
-
-    assert list(writer.objects) == []
-    assert set(expected) == set(writer.privileged_objects)
 
 
 def test_write_addition_errors_without_unique_key():
