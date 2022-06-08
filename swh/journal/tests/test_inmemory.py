@@ -11,8 +11,10 @@ from swh.model.model import BaseModel
 from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
-def test_write_additions_with_test_objects():
-    writer = InMemoryJournalWriter(value_sanitizer=model_object_dict_sanitizer)
+def test_write_additions_anonymized():
+    writer = InMemoryJournalWriter(
+        value_sanitizer=model_object_dict_sanitizer, anonymize=True
+    )
     expected = []
     priv_expected = []
 
@@ -28,6 +30,20 @@ def test_write_additions_with_test_objects():
 
     assert set(priv_expected) == set(writer.privileged_objects)
     assert set(expected) == set(writer.objects)
+
+
+def test_write_additions():
+    writer = InMemoryJournalWriter(value_sanitizer=model_object_dict_sanitizer)
+    expected = set()
+
+    for object_type, objects in TEST_OBJECTS.items():
+        writer.write_additions(object_type, objects)
+
+        for object in objects:
+            expected.add((object_type, object))
+
+    assert not set(writer.privileged_objects)
+    assert expected == set(writer.objects)
 
 
 def test_write_addition_errors_without_unique_key():

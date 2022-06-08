@@ -17,16 +17,21 @@ class InMemoryJournalWriter:
     privileged_objects: List[Tuple[str, ValueProtocol]]
 
     def __init__(
-        self, value_sanitizer: Callable[[str, Dict[str, Any]], Dict[str, Any]]
+        self,
+        value_sanitizer: Callable[[str, Dict[str, Any]], Dict[str, Any]],
+        anonymize: bool = False,
     ):
         # Share the list of objects across processes, for RemoteAPI tests.
         self.manager = Manager()
         self.objects = self.manager.list()
         self.privileged_objects = self.manager.list()
+        self.anonymize = anonymize
 
     def write_addition(self, object_type: str, object_: ValueProtocol) -> None:
         object_.unique_key()  # Check this does not error, to mimic the kafka writer
-        anon_object_ = object_.anonymize()
+        anon_object_ = None
+        if self.anonymize:
+            anon_object_ = object_.anonymize()
         if anon_object_ is not None:
             self.privileged_objects.append((object_type, object_))
             self.objects.append((object_type, anon_object_))
