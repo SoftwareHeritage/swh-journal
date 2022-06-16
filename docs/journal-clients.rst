@@ -30,6 +30,8 @@ A single journal client, like the one above, is sequential.
 It can however run concurrently by running the same program multiple times.
 Kafka will coordinate the processes so the load is shared across processes.
 
+.. _journal-client-authentication:
+
 Authentication
 --------------
 
