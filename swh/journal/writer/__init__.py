@@ -1,27 +1,14 @@
-# Copyright (C) 2019-2021 The Software Heritage developers
+# Copyright (C) 2019-2022 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-from typing import Any, Dict, Optional, TypeVar
+import os
+import sys
+from typing import Any, BinaryIO, Dict, Type
 import warnings
 
-from typing_extensions import Protocol
-
-from swh.model.model import KeyType
-
-TSelf = TypeVar("TSelf")
-
-
-class ValueProtocol(Protocol):
-    def anonymize(self: TSelf) -> Optional[TSelf]:
-        ...
-
-    def unique_key(self) -> KeyType:
-        ...
-
-    def to_dict(self) -> Dict[str, Any]:
-        ...
+from .interface import JournalWriterInterface
 
 
 def model_object_dict_sanitizer(
@@ -33,7 +20,8 @@ def model_object_dict_sanitizer(
     return object_dict
 
 
-def get_journal_writer(cls, **kwargs):
+def get_journal_writer(cls, **kwargs) -> JournalWriterInterface:
+
     if "args" in kwargs:
         warnings.warn(
             'Explicit "args" key is deprecated, use keys directly instead.',
@@ -48,14 +36,30 @@ def get_journal_writer(cls, **kwargs):
             "cls = 'inmemory' is deprecated, use 'memory' instead", DeprecationWarning
         )
         cls = "memory"
+
+    JournalWriter: Type[JournalWriterInterface]
     if cls == "memory":
-        from .inmemory import InMemoryJournalWriter as JournalWriter
+        from .inmemory import InMemoryJournalWriter
+
+        JournalWriter = InMemoryJournalWriter
     elif cls == "kafka":
-        from .kafka import KafkaJournalWriter as JournalWriter
+        from .kafka import KafkaJournalWriter
+
+        JournalWriter = KafkaJournalWriter
     elif cls == "stream":
-        from .stream import StreamJournalWriter as JournalWriter
+        from .stream import StreamJournalWriter
+
+        JournalWriter = StreamJournalWriter
 
         assert "output_stream" in kwargs
+        outstream: BinaryIO
+        if kwargs["output_stream"] in ("-", b"-"):
+            outstream = os.fdopen(sys.stdout.fileno(), "wb", closefd=False)
+        elif isinstance(kwargs["output_stream"], (str, bytes)):
+            outstream = open(kwargs["output_stream"], "wb")
+        else:
+            outstream = kwargs["output_stream"]
+        kwargs["output_stream"] = outstream
     else:
         raise ValueError("Unknown journal writer class `%s`" % cls)
 

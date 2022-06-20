@@ -22,7 +22,7 @@ def test_kafka_writer(
     consumer: Consumer,
     privileged_object_types: Iterable[str],
 ):
-    writer = KafkaJournalWriter[BaseModel](
+    writer = KafkaJournalWriter(
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,
@@ -66,7 +66,7 @@ def test_kafka_writer_anonymized(
     consumer: Consumer,
     privileged_object_types: Iterable[str],
 ):
-    writer = KafkaJournalWriter[BaseModel](
+    writer = KafkaJournalWriter(
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,
@@ -153,7 +153,7 @@ def test_write_delivery_timeout(kafka_prefix: str, kafka_server: str):
         def produce(self, **kwargs):
             produced.append(kwargs)
 
-    writer = KafkaJournalWriter[BaseModel](
+    writer = KafkaJournalWriter(
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,
@@ -195,7 +195,7 @@ class MockBufferErrorProducer(Producer):
 
 
 def test_write_BufferError_retry(kafka_prefix: str, kafka_server: str, caplog):
-    writer = KafkaJournalWriter[BaseModel](
+    writer = KafkaJournalWriter(
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,
@@ -219,7 +219,7 @@ def test_write_BufferError_retry(kafka_prefix: str, kafka_server: str, caplog):
 
 
 def test_write_BufferError_give_up(kafka_prefix: str, kafka_server: str, caplog):
-    writer = KafkaJournalWriter[BaseModel](
+    writer = KafkaJournalWriter(
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,
@@ -237,7 +237,7 @@ def test_write_BufferError_give_up(kafka_prefix: str, kafka_server: str, caplog)
 
 
 def test_write_addition_errors_without_unique_key(kafka_prefix: str, kafka_server: str):
-    writer = KafkaJournalWriter[BaseModel](
+    writer = KafkaJournalWriter(
         brokers=[kafka_server],
         client_id="kafka_writer",
         prefix=kafka_prefix,

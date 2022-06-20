@@ -51,7 +51,9 @@ def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str)
 
     # Fill Kafka
     producer.produce(
-        topic=kafka_prefix + ".revision", key=REV["id"], value=value_to_kafka(REV),
+        topic=kafka_prefix + ".revision",
+        key=REV["id"],
+        value=value_to_kafka(REV),
     )
     producer.flush()
 
@@ -117,7 +119,10 @@ def test_client_stop_after_objects(
 
 @pytest.mark.parametrize("batch_size", [1, 5, 100])
 def test_client_batch_size(
-    kafka_prefix: str, kafka_consumer_group: str, kafka_server: str, batch_size: int,
+    kafka_prefix: str,
+    kafka_consumer_group: str,
+    kafka_server: str,
+    batch_size: int,
 ):
     num_objects = 2 * batch_size + 1
     assert num_objects < 256, "Too many objects, generation will fail"
@@ -208,7 +213,10 @@ def test_client_subscribe_all(
     worker_fn = MagicMock()
     client.process(worker_fn)
     worker_fn.assert_called_once_with(
-        {"something": ["value1"], "else": ["value2"],}
+        {
+            "something": ["value1"],
+            "else": ["value2"],
+        }
     )
 
 
@@ -276,7 +284,9 @@ def test_client_subscriptions_with_anonymized_topics(
     # Fill Kafka with revision object on both the regular prefix (normally for
     # anonymized objects in this case) and privileged one
     producer.produce(
-        topic=kafka_prefix + ".revision", key=REV["id"], value=value_to_kafka(REV),
+        topic=kafka_prefix + ".revision",
+        key=REV["id"],
+        value=value_to_kafka(REV),
     )
     producer.produce(
         topic=kafka_prefix + "_privileged.revision",
@@ -320,7 +330,9 @@ def test_client_subscriptions_without_anonymized_topics(
 
     # Fill Kafka with revision objects only on the standard prefix
     producer.produce(
-        topic=kafka_prefix + ".revision", key=REV["id"], value=value_to_kafka(REV),
+        topic=kafka_prefix + ".revision",
+        key=REV["id"],
+        value=value_to_kafka(REV),
     )
     producer.flush()
 
@@ -392,4 +404,6 @@ def test_client_with_deserializer(
     client.consumer.commit()
 
     # Check the first revision has not been passed to worker_fn
-    worker_fn.assert_called_once_with({"revision": revisions[1:]})
+    processed_revisions = set(worker_fn.call_args[0][0]["revision"])
+    assert revisions[0] not in processed_revisions
+    assert all(rev in processed_revisions for rev in revisions[1:])

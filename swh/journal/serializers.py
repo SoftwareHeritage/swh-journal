@@ -1,11 +1,11 @@
-# Copyright (C) 2016-2021 The Software Heritage developers
+# Copyright (C) 2016-2022 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 import datetime
 from enum import Enum
-from typing import Any, Union
+from typing import Any, BinaryIO, Union
 
 import msgpack
 
@@ -109,5 +109,18 @@ def kafka_to_value(kafka_value: bytes) -> Any:
         object_hook=decode_types_bw,
         ext_hook=msgpack_ext_hook,
         strict_map_key=False,
+        timestamp=3,  # convert Timestamp in datetime objects (tz UTC)
+    )
+
+
+def kafka_stream_to_value(file_like: BinaryIO) -> msgpack.Unpacker:
+    """Return a deserializer for data stored in kafka"""
+    return msgpack.Unpacker(
+        file_like,
+        raw=False,
+        object_hook=decode_types_bw,
+        ext_hook=msgpack_ext_hook,
+        strict_map_key=False,
+        use_list=False,
         timestamp=3,  # convert Timestamp in datetime objects (tz UTC)
     )

@@ -217,9 +217,7 @@ def test_config(
     object_types: Iterator[str],
     privileged_object_types: Iterator[str],
 ):
-    """Test configuration needed for producer/consumer
-
-    """
+    """Test configuration needed for producer/consumer"""
     return {
         **TEST_CONFIG,
         "object_types": object_types,
@@ -233,9 +231,7 @@ def test_config(
 def consumer(
     kafka_server: str, test_config: Dict, kafka_consumer_group: str
 ) -> Consumer:
-    """Get a connected Kafka consumer.
-
-    """
+    """Get a connected Kafka consumer."""
     consumer = Consumer(
         {
             "bootstrap.servers": kafka_server,
