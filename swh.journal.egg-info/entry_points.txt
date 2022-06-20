@@ -1,4 +1,2 @@
-
-        [pytest11]
-        pytest_swh_journal = swh.journal.pytest_plugin
-    
+[pytest11]
+pytest_swh_journal = swh.journal.pytest_plugin
