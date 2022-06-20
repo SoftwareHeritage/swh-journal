@@ -1,26 +1,19 @@
-# Copyright (C) 2021 The Software Heritage developers
+# Copyright (C) 2021-2022 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 import io
+from typing import Dict, List, Tuple
 
-import msgpack
-
-from swh.journal.serializers import msgpack_ext_hook
+from swh.journal.serializers import kafka_stream_to_value
 from swh.journal.writer import get_journal_writer, model_object_dict_sanitizer
+from swh.journal.writer.interface import JournalWriterInterface
 from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
-def test_write_additions_with_test_objects():
-    outs = io.BytesIO()
-
-    writer = get_journal_writer(
-        cls="stream", value_sanitizer=model_object_dict_sanitizer, output_stream=outs,
-    )
+def fill_writer(writer: JournalWriterInterface) -> List[Tuple[str, Dict]]:
     expected = []
-
-    n = 0
     for object_type, objects in TEST_OBJECTS.items():
         writer.write_additions(object_type, objects)
 
@@ -30,18 +23,57 @@ def test_write_additions_with_test_objects():
                 objd.pop("data")
 
             expected.append((object_type, objd))
-        n += len(objects)
+    writer.flush()
+    return expected
+
+
+def test_stream_journal_writer_stream():
+    outs = io.BytesIO()
+
+    writer = get_journal_writer(
+        cls="stream",
+        value_sanitizer=model_object_dict_sanitizer,
+        output_stream=outs,
+    )
+    expected = fill_writer(writer)
 
     outs.seek(0, 0)
-    unpacker = msgpack.Unpacker(
-        outs,
-        raw=False,
-        ext_hook=msgpack_ext_hook,
-        strict_map_key=False,
-        use_list=False,
-        timestamp=3,  # convert Timestamp in datetime objects (tz UTC)
-    )
+    unpacker = kafka_stream_to_value(outs)
+    for i, (objtype, objd) in enumerate(unpacker, start=1):
+        assert (objtype, objd) in expected
+    assert len(expected) == i
 
+
+def test_stream_journal_writer_filename(tmp_path):
+    out_fname = str(tmp_path / "journal.msgpack")
+
+    writer = get_journal_writer(
+        cls="stream",
+        value_sanitizer=model_object_dict_sanitizer,
+        output_stream=out_fname,
+    )
+    expected = fill_writer(writer)
+
+    with open(out_fname, "rb") as outs:
+        unpacker = kafka_stream_to_value(outs)
+        for i, (objtype, objd) in enumerate(unpacker, start=1):
+            assert (objtype, objd) in expected
+        assert len(expected) == i
+
+
+def test_stream_journal_writer_stdout(capfdbinary):
+    writer = get_journal_writer(
+        cls="stream",
+        value_sanitizer=model_object_dict_sanitizer,
+        output_stream="-",
+    )
+    expected = fill_writer(writer)
+
+    captured = capfdbinary.readouterr()
+    assert captured.err == b""
+    outs = io.BytesIO(captured.out)
+
+    unpacker = kafka_stream_to_value(outs)
     for i, (objtype, objd) in enumerate(unpacker, start=1):
         assert (objtype, objd) in expected
     assert len(expected) == i

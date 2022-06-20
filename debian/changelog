@@ -1,8 +1,26 @@
-swh-journal (1.0.0-1~swh1~bpo10+1) buster-swh; urgency=medium
+swh-journal (1.1.0-1~swh1) unstable-swh; urgency=medium
 
-  * Rebuild for buster-swh
+  * New upstream release 1.1.0     - (tagged by Antoine R. Dumont
+    (@ardumont) <ardumont@softwareheritage.org> on 2022-06-20 09:47:08
+    +0200)
+  * Upstream changes:     - v1.1.0     - Make the stream journal client
+    accept a string as output_stream config entry     - Add a
+    kafka_stream_to_value helper function in serializers.py     - Add
+    type annotation for JournalWriter related code     - Remove unused
+    'privileged' argument from journal writer's write_addition(s)     -
+    Regularly check for EOF in Client.process() while waiting for
+    messages     - docs/journal-clients: Reference a new anchor title
+    - Internal Maintenance     - -------------------     - Fix
+    InMemoryJournalWriter: do not anonymize objects by default     - add
+    strict asyncio_mode in pytest.ini     - pre-commit: Remove codespell
+    commit-msg hook     - Add .git-blame-ignore-revs file with automatic
+    reformatting commits     - python: Reformat code with black 22.3.0
+    - pre-commit, tox: Bump black from 19.10b0 to 22.3.0     -
+    test_client: Fix failing test since recent swh-model update     -
+    pytest: Exclude build directory for tests discovery     - pre-
+    commit: Bump hooks and add new one to check commit message spelling
 
- -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 21 Jan 2022 11:04:07 +0000
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Mon, 20 Jun 2022 07:54:11 +0000
 
 swh-journal (1.0.0-1~swh1) unstable-swh; urgency=medium
 

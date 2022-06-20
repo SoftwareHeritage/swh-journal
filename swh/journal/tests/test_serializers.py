@@ -50,13 +50,17 @@ def test_pprint_key():
 
 
 def test_kafka_to_key():
-    """Standard back and forth serialization with keys
-
-    """
+    """Standard back and forth serialization with keys"""
     # All KeyType(s)
     keys: Iterable[serializers.KeyType] = [
-        {"a": "foo", "b": "bar", "c": "baz",},
-        {"a": b"foobarbaz",},
+        {
+            "a": "foo",
+            "b": "bar",
+            "c": "baz",
+        },
+        {
+            "a": b"foobarbaz",
+        },
         b"foo",
     ]
     for object_type, objects in TEST_OBJECTS.items():
@@ -72,8 +76,8 @@ def test_kafka_to_key():
 
 
 # limits of supported int values by msgpack
-MININT = -(2 ** 63)
-MAXINT = 2 ** 64 - 1
+MININT = -(2**63)
+MAXINT = 2**64 - 1
 
 intvalues = [
     MININT * 2,

@@ -1,3 +1,4 @@
+.git-blame-ignore-revs
 .gitignore
 .pre-commit-config.yaml
 AUTHORS
@@ -47,5 +48,6 @@ swh/journal/tests/test_serializers.py
 swh/journal/tests/test_stream.py
 swh/journal/writer/__init__.py
 swh/journal/writer/inmemory.py
+swh/journal/writer/interface.py
 swh/journal/writer/kafka.py
 swh/journal/writer/stream.py
