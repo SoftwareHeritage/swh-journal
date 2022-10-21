@@ -182,7 +182,7 @@ def kafka_server(
     return kafka_server_base
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def kafka_server_base() -> Iterator[str]:
     """Create a mock kafka cluster suitable for tests.
 
