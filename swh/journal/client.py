@@ -205,7 +205,14 @@ class JournalClient:
         if self.stop_on_eof:
             consumer_settings["enable.partition.eof"] = True
 
-        logger.debug("Consumer settings: %s", consumer_settings)
+        if logger.isEnabledFor(logging.DEBUG):
+            filtered_keys = {"sasl.password"}
+            logger.debug("Consumer settings:")
+            for k, v in consumer_settings.items():
+                if k in filtered_keys:
+                    v = "**filtered**"
+
+                logger.debug("    %s: %s", k, v)
 
         self.consumer = Consumer(consumer_settings)
         if privileged:
