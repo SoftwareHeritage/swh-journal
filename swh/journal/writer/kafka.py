@@ -160,7 +160,7 @@ class KafkaJournalWriter:
                 )
             )
 
-    def send(self, topic: str, key: KeyType, value):
+    def reliable_produce(self, topic: str, key: KeyType, kafka_value: Optional[bytes]):
         kafka_key = key_to_kafka(key)
         max_attempts = 5
         last_exception: Optional[Exception] = None
@@ -169,7 +169,7 @@ class KafkaJournalWriter:
                 self.producer.produce(
                     topic=topic,
                     key=kafka_key,
-                    value=value_to_kafka(value),
+                    value=kafka_value,
                 )
             except BufferError as e:
                 last_exception = e
@@ -193,6 +193,10 @@ class KafkaJournalWriter:
                 get_object_type(topic), key, str(last_exception), "SWH_BUFFER_ERROR"
             )
         )
+
+    def send(self, topic: str, key: KeyType, value):
+        kafka_value = value_to_kafka(value)
+        return self.reliable_produce(topic, key, kafka_value)
 
     def delivery_error(self, message) -> KafkaDeliveryError:
         """Get all failed deliveries, and clear them"""
@@ -266,3 +270,8 @@ class KafkaJournalWriter:
 
         if self.auto_flush:
             self.flush()
+
+    def delete(self, object_type: str, object_keys: Iterable[KeyType]) -> None:
+        topic = f"{self._prefix}.{object_type}"
+        for key in object_keys:
+            self.reliable_produce(topic, key, None)

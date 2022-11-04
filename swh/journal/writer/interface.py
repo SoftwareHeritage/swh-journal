@@ -38,3 +38,7 @@ class JournalWriterInterface(Protocol):
     def flush(self) -> None:
         """Flush the pending object additions in the backend, if any."""
         ...
+
+    def delete(self, object_type: str, object_keys: Iterable[KeyType]) -> None:
+        """Delete the object with keys `object_keys`."""
+        ...

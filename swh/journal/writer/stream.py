@@ -8,7 +8,7 @@ from typing import Any, BinaryIO, Callable, Dict, Iterable
 
 from swh.journal.serializers import value_to_kafka
 
-from .interface import ValueProtocol
+from .interface import KeyType, ValueProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,9 @@ class StreamJournalWriter:
     ) -> None:
         for object_ in objects:
             self.write_addition(object_type, object_)
+
+    def delete(self, object_type: str, object_keys: Iterable[KeyType]) -> None:
+        pass
 
     def flush(self) -> None:
         self.output.flush()
