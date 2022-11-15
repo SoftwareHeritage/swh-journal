@@ -9,14 +9,7 @@ for more details.
 
 # Local test
 
-As a pre-requisite, you need a kakfa installation path.
-The following target will take care of this:
-
-```
-make install
-```
-
-Then, provided you are in the right virtual environment as described
+Provided you are in the right virtual environment as described
 in the [swh getting-started](https://docs.softwareheritage.org/devel/developer-setup.html#developer-setup):
 
 ```
