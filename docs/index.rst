@@ -10,4 +10,12 @@ Persistent logger of changes to the archive, with publish-subscribe support.
    :maxdepth: 2
 
    journal-clients
-   /apidoc/swh.journal
+
+.. only:: standalone_package_doc
+
+   Indices and tables
+   ------------------
+
+   * :ref:`genindex`
+   * :ref:`modindex`
+   * :ref:`search`
