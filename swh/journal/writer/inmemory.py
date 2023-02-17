@@ -5,8 +5,7 @@
 
 import logging
 from multiprocessing import Manager
-from multiprocessing.managers import ListProxy
-from typing import Any, Callable, Dict, Iterable, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Tuple
 
 from .interface import ValueProtocol
 
@@ -14,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 class InMemoryJournalWriter:
-    objects: ListProxy[Tuple[str, ValueProtocol]]
-    privileged_objects: ListProxy[Tuple[str, ValueProtocol]]
+    objects: List[Tuple[str, ValueProtocol]]
+    privileged_objects: List[Tuple[str, ValueProtocol]]
 
     def __init__(
         self,
@@ -24,8 +23,8 @@ class InMemoryJournalWriter:
     ):
         # Share the list of objects across processes, for RemoteAPI tests.
         self.manager = Manager()
-        self.objects = self.manager.list()
-        self.privileged_objects = self.manager.list()
+        self.objects = self.manager.list()  # type: ignore[assignment]
+        self.privileged_objects = self.manager.list()  # type: ignore[assignment]
         self.anonymize = anonymize
 
     def write_addition(self, object_type: str, object_: ValueProtocol) -> None:
