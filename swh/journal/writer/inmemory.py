@@ -5,7 +5,8 @@
 
 import logging
 from multiprocessing import Manager
-from typing import Any, Callable, Dict, Iterable, List, Tuple
+from multiprocessing.managers import ListProxy
+from typing import Any, Callable, Dict, Iterable, Tuple
 
 from .interface import ValueProtocol
 
@@ -13,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class InMemoryJournalWriter:
-    objects: List[Tuple[str, ValueProtocol]]
-    privileged_objects: List[Tuple[str, ValueProtocol]]
+    objects: ListProxy[Tuple[str, ValueProtocol]]
+    privileged_objects: ListProxy[Tuple[str, ValueProtocol]]
 
     def __init__(
         self,
