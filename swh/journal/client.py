@@ -1,18 +1,26 @@
-# Copyright (C) 2017-2022  The Software Heritage developers
+# Copyright (C) 2017-2023  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
 from collections import defaultdict
+import enum
 from importlib import import_module
 from itertools import cycle
 import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+import warnings
 
-from confluent_kafka import Consumer, KafkaError, KafkaException
+from confluent_kafka import (
+    OFFSET_BEGINNING,
+    Consumer,
+    KafkaError,
+    KafkaException,
+    TopicPartition,
+)
 
-from swh.core.statsd import statsd
+from swh.core.statsd import Statsd
 from swh.journal import DEFAULT_PREFIX
 
 from .serializers import kafka_to_value
@@ -30,8 +38,13 @@ _SPAMMY_ERRORS = [
     KafkaError._NO_OFFSET,
 ]
 
-JOURNAL_MESSAGE_NUMBER_METRIC = "swh_journal_client_handle_message_total"
-JOURNAL_STATUS_METRIC = "swh_journal_client_status"
+
+class EofBehavior(enum.Enum):
+    """Possible behaviors when reaching the end of the log"""
+
+    CONTINUE = "continue"
+    STOP = "stop"
+    RESTART = "restart"
 
 
 def get_journal_client(cls: str, **kwargs: Any):
@@ -92,35 +105,37 @@ class JournalClient:
     `'swh.journal.objects'`.
 
     Clients subscribe to events specific to each object type as listed in the
-    `object_types` argument (if unset, defaults to all existing kafka topic under
+    ``object_types`` argument (if unset, defaults to all existing kafka topic under
     the prefix).
 
-    Clients can be sharded by setting the `group_id` to a common
+    Clients can be sharded by setting the ``group_id`` to a common
     value across instances. The journal will share the message
     throughput across the nodes sharing the same group_id.
 
-    Messages are processed by the `worker_fn` callback passed to the `process`
-    method, in batches of maximum `batch_size` messages (defaults to 200).
+    Messages are processed by the ``worker_fn`` callback passed to the `process`
+    method, in batches of maximum ``batch_size`` messages (defaults to 200).
 
-    The objects passed to the `worker_fn` callback are the result of the kafka
-    message converted by the `value_deserializer` function. By default (if this
-    argument is not given), it will produce dicts (using the `kafka_to_value`
-    function). This signature of the function is:
+    The objects passed to the ``worker_fn`` callback are the result of the kafka
+    message converted by the ``value_deserializer`` function. By default (if this
+    argument is not given), it will produce dicts (using the ``kafka_to_value``
+    function). This signature of the function is::
 
-        `value_deserializer(object_type: str, kafka_msg: bytes) -> Any`
+        value_deserializer(object_type: str, kafka_msg: bytes) -> Any
 
-    If the value returned by `value_deserializer` is None, it is ignored and
-    not passed the `worker_fn` function.
+    If the value returned by ``value_deserializer`` is None, it is ignored and
+    not passed the ``worker_fn`` function.
 
-    If set, the processing stops after processing `stop_after_objects` messages
-    in total.
-
-    `stop_on_eof` stops the processing when the client has reached the end of
-    each partition in turn.
-
-    `auto_offset_reset` sets the behavior of the client when the consumer group
-    initializes: `'earliest'` (the default) processes all objects since the
-    inception of the topics; `''`
+    Arguments:
+        stop_after_objects: If set, the processing stops after processing
+            this number of messages in total.
+        on_eof: What to do when reaching the end of each partition (keep consuming,
+            stop, or restart from earliest offsets); defaults to continuing.
+            This can be either a :class:`EofBehavior` variant or a string containing the
+            name of one of the variants.
+        stop_on_eof: (deprecated) equivalent to passing ``on_eof=EofBehavior.STOP``
+        auto_offset_reset: sets the behavior of the client when the consumer group
+            initializes: ``'earliest'`` (the default) processes all objects since the
+            inception of the topics; ``''``
 
     Any other named argument is passed directly to KafkaConsumer().
 
@@ -137,7 +152,8 @@ class JournalClient:
         batch_size: int = 200,
         process_timeout: Optional[float] = None,
         auto_offset_reset: str = "earliest",
-        stop_on_eof: bool = False,
+        stop_on_eof: Optional[bool] = None,
+        on_eof: Optional[Union[EofBehavior, str]] = None,
         value_deserializer: Optional[Callable[[str, bytes], Any]] = None,
         **kwargs,
     ):
@@ -155,6 +171,29 @@ class JournalClient:
             self.value_deserializer = value_deserializer
         else:
             self.value_deserializer = lambda _, value: kafka_to_value(value)
+        if stop_on_eof is not None:
+            if on_eof is not None:
+                raise TypeError(
+                    "stop_on_eof and on_eof are mutually exclusive (the former is "
+                    "deprecated)"
+                )
+            elif stop_on_eof:
+                warnings.warn(
+                    "stop_on_eof=True should be replaced with "
+                    "on_eof=EofBehavior.STOP ('on_eof: stop' in YAML)",
+                    DeprecationWarning,
+                    2,
+                )
+                on_eof = EofBehavior.STOP
+            else:
+                warnings.warn(
+                    "stop_on_eof=False should be replaced with "
+                    "on_eof=EofBehavior.CONTINUE ('on_eof: continue' in YAML)",
+                    DeprecationWarning,
+                    2,
+                )
+                on_eof = EofBehavior.CONTINUE
+        self.on_eof = EofBehavior(on_eof or EofBehavior.CONTINUE)
 
         if isinstance(brokers, str):
             brokers = [brokers]
@@ -201,8 +240,7 @@ class JournalClient:
             "logger": rdkafka_logger,
         }
 
-        self.stop_on_eof = stop_on_eof
-        if self.stop_on_eof:
+        if self.on_eof != EofBehavior.CONTINUE:
             consumer_settings["enable.partition.eof"] = True
 
         if logger.isEnabledFor(logging.DEBUG):
@@ -213,6 +251,8 @@ class JournalClient:
                     v = "**filtered**"
 
                 logger.debug("    %s: %s", k, v)
+
+        self.statsd = Statsd("swh_journal_client")
 
         self.consumer = Consumer(consumer_settings)
         if privileged:
@@ -274,21 +314,19 @@ class JournalClient:
         logger.debug(f"Subscribing to: {self.subscription}")
         self.consumer.subscribe(topics=self.subscription)
 
-    def process(self, worker_fn):
+    def process(self, worker_fn: Callable[[Dict[str, List[dict]]], None]):
         """Polls Kafka for a batch of messages, and calls the worker_fn
         with these messages.
 
         Args:
-            worker_fn Callable[Dict[str, List[dict]]]: Function called with
-                                                       the messages as
-                                                       argument.
+            worker_fn: Function called with the messages as argument.
         """
         total_objects_processed = 0
         # timeout for message poll
         timeout = 1.0
 
-        with statsd.status_gauge(
-            JOURNAL_STATUS_METRIC, statuses=["idle", "processing", "waiting"]
+        with self.statsd.status_gauge(
+            "status", statuses=["idle", "processing", "waiting"]
         ) as set_status:
             set_status("idle")
             while True:
@@ -313,30 +351,48 @@ class JournalClient:
                     # do check for an EOF condition iff we already consumed
                     # messages, otherwise we could detect an EOF condition
                     # before messages had a chance to reach us (e.g. in tests)
-                    if total_objects_processed > 0 and self.stop_on_eof and i == 0:
-                        at_eof = all(
-                            (tp.topic, tp.partition) in self.eof_reached
-                            for tp in self.consumer.assignment()
-                        )
-                        if at_eof:
-                            break
+                    if total_objects_processed > 0 and i == 0:
+                        if self.on_eof == EofBehavior.STOP:
+                            at_eof = all(
+                                (tp.topic, tp.partition) in self.eof_reached
+                                for tp in self.consumer.assignment()
+                            )
+                            if at_eof:
+                                break
+                        elif self.on_eof == EofBehavior.RESTART:
+                            for tp in self.consumer.assignment():
+                                if (tp.topic, tp.partition) in self.eof_reached:
+                                    self.eof_reached.remove((tp.topic, tp.partition))
+                                    self.statsd.increment("partition_restart_total")
+                                    new_tp = TopicPartition(
+                                        tp.topic,
+                                        tp.partition,
+                                        OFFSET_BEGINNING,
+                                    )
+                                    self.consumer.seek(new_tp)
+                        elif self.on_eof == EofBehavior.CONTINUE:
+                            pass  # Nothing to do, we'll just keep consuming
+                        else:
+                            assert False, f"Unexpected on_eof behavior: {self.on_eof}"
+
                 if messages:
                     set_status("processing")
                     batch_processed, at_eof = self.handle_messages(messages, worker_fn)
 
                     set_status("idle")
                     # report the number of handled messages
-                    statsd.increment(
-                        JOURNAL_MESSAGE_NUMBER_METRIC, value=batch_processed
-                    )
+                    self.statsd.increment("handle_message_total", value=batch_processed)
                     total_objects_processed += batch_processed
 
-                if at_eof:
+                if self.on_eof == EofBehavior.STOP and at_eof:
+                    self.statsd.increment("stop_total")
                     break
 
         return total_objects_processed
 
-    def handle_messages(self, messages, worker_fn):
+    def handle_messages(
+        self, messages, worker_fn: Callable[[Dict[str, List[dict]]], None]
+    ) -> Tuple[int, bool]:
         objects: Dict[str, List[Any]] = defaultdict(list)
         nb_processed = 0
 
@@ -363,10 +419,15 @@ class JournalClient:
             worker_fn(dict(objects))
         self.consumer.commit()
 
-        at_eof = self.stop_on_eof and all(
-            (tp.topic, tp.partition) in self.eof_reached
-            for tp in self.consumer.assignment()
-        )
+        if self.on_eof in (EofBehavior.STOP, EofBehavior.RESTART):
+            at_eof = all(
+                (tp.topic, tp.partition) in self.eof_reached
+                for tp in self.consumer.assignment()
+            )
+        elif self.on_eof == EofBehavior.CONTINUE:
+            at_eof = False
+        else:
+            assert False, f"Unexpected on_eof behavior: {self.on_eof}"
 
         return nb_processed, at_eof
 

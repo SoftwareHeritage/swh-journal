@@ -6,7 +6,7 @@
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 import itertools
-from typing import Iterable
+from typing import List
 
 import pytest
 
@@ -49,10 +49,10 @@ def test_pprint_key():
                 assert pprinted_key == key.hex()
 
 
-def test_kafka_to_key():
+def test_kafka_to_key() -> None:
     """Standard back and forth serialization with keys"""
     # All KeyType(s)
-    keys: Iterable[serializers.KeyType] = [
+    keys: List[serializers.KeyType] = [
         {
             "a": "foo",
             "b": "bar",
