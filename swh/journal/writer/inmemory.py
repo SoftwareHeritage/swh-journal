@@ -23,8 +23,8 @@ class InMemoryJournalWriter:
     ):
         # Share the list of objects across processes, for RemoteAPI tests.
         self.manager = Manager()
-        self.objects = self.manager.list()
-        self.privileged_objects = self.manager.list()
+        self.objects = self.manager.list()  # type: ignore[assignment]
+        self.privileged_objects = self.manager.list()  # type: ignore[assignment]
         self.anonymize = anonymize
 
     def write_addition(self, object_type: str, object_: ValueProtocol) -> None:
