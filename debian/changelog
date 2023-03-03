@@ -1,3 +1,16 @@
+swh-journal (1.3.0-1~swh1) unstable-swh; urgency=medium
+
+  * New upstream release 1.3.0     - (tagged by Valentin Lorentz
+    <vlorentz@softwareheritage.org> on 2023-03-03 10:33:16 +0100)
+  * Upstream changes:     - v1.3.0     - * Replace stop_at_eof boolean
+    with EofBehavior, add support for restarting from beginning     - *
+    Remove obsolete test setup command from developper documentation
+    - * docs: Include module indices only when building standalone
+    package doc     - * Bump mypy to 1.0.1 and isort to 5.11.5     - *
+    Add support for tox 4
+
+ -- Software Heritage autobuilder (on jenkins-debian1) <jenkins@jenkins-debian1.internal.softwareheritage.org>  Fri, 03 Mar 2023 09:40:34 +0000
+
 swh-journal (1.2.1-1~swh1) unstable-swh; urgency=medium
 
   * New upstream release 1.2.1     - (tagged by Antoine Lambert
