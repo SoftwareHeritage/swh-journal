@@ -1,15 +1,16 @@
-# Copyright (C) 2019 The Software Heritage developers
+# Copyright (C) 2019-2023 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+import math
 from typing import Dict, List, cast
 from unittest.mock import MagicMock
 
 from confluent_kafka import Producer
 import pytest
 
-from swh.journal.client import JournalClient
+from swh.journal.client import EofBehavior, JournalClient
 from swh.journal.serializers import kafka_to_value, key_to_kafka, value_to_kafka
 from swh.model.model import Content, Revision
 from swh.model.tests.swh_model_data import TEST_OBJECTS
@@ -40,7 +41,10 @@ REV = {
 }
 
 
-def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str):
+@pytest.mark.parametrize("legacy_eof", [True, False])
+def test_client(
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server: str, legacy_eof: bool
+):
     producer = Producer(
         {
             "bootstrap.servers": kafka_server,
@@ -57,21 +61,106 @@ def test_client(kafka_prefix: str, kafka_consumer_group: str, kafka_server: str)
     )
     producer.flush()
 
-    client = JournalClient(
-        brokers=[kafka_server],
-        group_id=kafka_consumer_group,
-        prefix=kafka_prefix,
-        stop_on_eof=True,
-    )
+    if legacy_eof:
+        with pytest.deprecated_call():
+            client = JournalClient(
+                brokers=[kafka_server],
+                group_id=kafka_consumer_group,
+                prefix=kafka_prefix,
+                stop_on_eof=True,
+            )
+    else:
+        client = JournalClient(
+            brokers=[kafka_server],
+            group_id=kafka_consumer_group,
+            prefix=kafka_prefix,
+            on_eof=EofBehavior.STOP,
+        )
     worker_fn = MagicMock()
     client.process(worker_fn)
 
     worker_fn.assert_called_once_with({"revision": [REV]})
 
 
-@pytest.mark.parametrize("count", [1, 2])
+@pytest.mark.parametrize(
+    "count,legacy_eof", [(1, True), (2, True), (1, False), (2, False)]
+)
 def test_client_stop_after_objects(
-    kafka_prefix: str, kafka_consumer_group: str, kafka_server: str, count: int
+    kafka_prefix: str,
+    kafka_consumer_group: str,
+    kafka_server: str,
+    count: int,
+    legacy_eof: bool,
+):
+    producer = Producer(
+        {
+            "bootstrap.servers": kafka_server,
+            "client.id": "test producer",
+            "acks": "all",
+        }
+    )
+
+    # Fill Kafka
+    revisions = cast(List[Revision], TEST_OBJECTS["revision"])
+    for rev in revisions:
+        producer.produce(
+            topic=kafka_prefix + ".revision",
+            key=rev.id,
+            value=value_to_kafka(rev.to_dict()),
+        )
+    producer.flush()
+
+    if legacy_eof:
+        with pytest.deprecated_call():
+            client = JournalClient(
+                brokers=[kafka_server],
+                group_id=kafka_consumer_group,
+                prefix=kafka_prefix,
+                stop_on_eof=False,
+                stop_after_objects=count,
+            )
+    else:
+        client = JournalClient(
+            brokers=[kafka_server],
+            group_id=kafka_consumer_group,
+            prefix=kafka_prefix,
+            on_eof=EofBehavior.CONTINUE,
+            stop_after_objects=count,
+        )
+
+    worker_fn = MagicMock()
+    client.process(worker_fn)
+
+    # this code below is not pretty, but needed since we have to deal with
+    # dicts (so no set) which can have values that are list vs tuple, and we do
+    # not know for sure how many calls of the worker_fn will happen during the
+    # consumption of the topic...
+    worker_fn.assert_called()
+    revs = []  # list of (unique) rev dicts we got from the client
+    for call in worker_fn.call_args_list:
+        callrevs = call[0][0]["revision"]
+        for rev in callrevs:
+            assert Revision.from_dict(rev) in revisions
+            if rev not in revs:
+                revs.append(rev)
+    assert len(revs) == count
+
+
+assert len(TEST_OBJECTS["revision"]) < 10, (
+    'test_client_restart_and_stop_after_objects expects TEST_OBJECTS["revision"] '
+    "to have less than 10 objects to test exhaustively"
+)
+
+
+@pytest.mark.parametrize(
+    "count,string_eof", [(1, True), (2, False), (10, True), (20, False)]
+)
+def test_client_restart_and_stop_after_objects(
+    kafka_prefix: str,
+    kafka_consumer_group: str,
+    kafka_server: str,
+    count: int,
+    string_eof: bool,
 ):
     producer = Producer(
         {
@@ -95,7 +184,7 @@ def test_client_stop_after_objects(
         brokers=[kafka_server],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_on_eof=False,
+        on_eof="restart" if string_eof else EofBehavior.RESTART,
         stop_after_objects=count,
     )
 
@@ -107,14 +196,32 @@ def test_client_stop_after_objects(
     # not know for sure how many calls of the worker_fn will happen during the
     # consumption of the topic...
     worker_fn.assert_called()
-    revs = []  # list of (unique) rev dicts we got from the client
+    revs = []  # list of (possibly duplicated) rev dicts we got from the client
+    unique_revs = []  # list of (unique) rev dicts we got from the client
     for call in worker_fn.call_args_list:
         callrevs = call[0][0]["revision"]
         for rev in callrevs:
             assert Revision.from_dict(rev) in revisions
             if rev not in revs:
-                revs.append(rev)
+                unique_revs.append(rev)
+            revs.append(rev)
     assert len(revs) == count
+    assert len(unique_revs) == min(len(revisions), count)
+
+    # Each revision should be seen approximately count/len(revisions) times
+    rev_ids = [r["id"].hex() for r in revs]  # type: ignore
+    for rev in revisions:
+        assert (
+            math.floor(count / len(revisions))
+            <= rev_ids.count(rev.id.hex())
+            <= math.ceil(count / len(revisions))
+        )
+
+    # Check each run but the last contains all revisions
+    for i in range(int(count / len(revisions))):
+        assert set(rev_ids[i * len(revisions) : (i + 1) * len(revisions)]) == set(
+            rev.id.hex() for rev in revisions
+        ), i
 
 
 @pytest.mark.parametrize("batch_size", [1, 5, 100])
