@@ -252,7 +252,7 @@ class JournalClient:
 
                 logger.debug("    %s: %s", k, v)
 
-        self.statsd = Statsd("swh_journal_client")
+        self.statsd = Statsd(namespace="swh_journal_client")
 
         self.consumer = Consumer(consumer_settings)
         if privileged:
