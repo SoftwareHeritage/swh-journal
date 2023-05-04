@@ -252,7 +252,9 @@ class JournalClient:
 
                 logger.debug("    %s: %s", k, v)
 
-        self.statsd = Statsd(namespace="swh_journal_client")
+        self.statsd = Statsd(
+            namespace="swh_journal_client", constant_tags={"group": group_id}
+        )
 
         self.consumer = Consumer(consumer_settings)
         if privileged:
