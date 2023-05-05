@@ -1,4 +1,4 @@
-confluent-kafka
+confluent-kafka!=2.1.0
 msgpack!=1.0.1,>=1.0.0
 tenacity
 swh.core>=1.1
