@@ -354,7 +354,7 @@ def test_client_batch_size(
         brokers=[kafka_server],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_on_eof=True,
+        on_eof=EofBehavior.STOP,
         batch_size=batch_size,
     )
 
@@ -406,7 +406,7 @@ def test_client_subscribe_all(
         brokers=[kafka_server_base],
         group_id="whatever",
         prefix=kafka_prefix,
-        stop_on_eof=True,
+        on_eof=EofBehavior.STOP,
     )
     assert set(client.subscription) == {
         f"{kafka_prefix}.something",
@@ -430,7 +430,7 @@ def test_client_subscribe_one_topic(
         brokers=[kafka_server_base],
         group_id="whatever",
         prefix=kafka_prefix,
-        stop_on_eof=True,
+        on_eof=EofBehavior.STOP,
         object_types=["else"],
     )
     assert client.subscription == [f"{kafka_prefix}.else"]
@@ -448,7 +448,7 @@ def test_client_subscribe_absent_topic(
             brokers=[kafka_server_base],
             group_id="whatever",
             prefix=kafka_prefix,
-            stop_on_eof=True,
+            on_eof=EofBehavior.STOP,
             object_types=["really"],
         )
 
@@ -461,14 +461,14 @@ def test_client_subscribe_absent_prefix(
             brokers=[kafka_server_base],
             group_id="whatever",
             prefix="wrong.prefix",
-            stop_on_eof=True,
+            on_eof=EofBehavior.STOP,
         )
     with pytest.raises(ValueError):
         JournalClient(
             brokers=[kafka_server_base],
             group_id="whatever",
             prefix="wrong.prefix",
-            stop_on_eof=True,
+            on_eof=EofBehavior.STOP,
             object_types=["else"],
         )
 
@@ -503,7 +503,7 @@ def test_client_subscriptions_with_anonymized_topics(
         brokers=[kafka_server_base],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_on_eof=True,
+        on_eof=EofBehavior.STOP,
         privileged=False,
     )
     # we only subscribed to "standard" topics
@@ -544,7 +544,7 @@ def test_client_subscriptions_without_anonymized_topics(
         brokers=[kafka_server_base],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_on_eof=True,
+        on_eof=EofBehavior.STOP,
         privileged=False,
     )
     # we only subscribed to the standard prefix
@@ -555,7 +555,7 @@ def test_client_subscriptions_without_anonymized_topics(
         brokers=[kafka_server_base],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_on_eof=True,
+        on_eof=EofBehavior.STOP,
         privileged=True,
     )
     # we also only subscribed to the standard prefix, since there is no priviled prefix
@@ -596,7 +596,7 @@ def test_client_with_deserializer(
         brokers=[kafka_server],
         group_id=kafka_consumer_group,
         prefix=kafka_prefix,
-        stop_on_eof=True,
+        on_eof=EofBehavior.STOP,
         value_deserializer=custom_deserializer,
     )
     worker_fn = MagicMock()
@@ -610,3 +610,29 @@ def test_client_with_deserializer(
     processed_revisions = set(worker_fn.call_args[0][0]["revision"])
     assert revisions[0] not in processed_revisions
     assert all(rev in processed_revisions for rev in revisions[1:])
+
+
+def test_client_create_topics(
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server_base: str, mocker
+):
+
+    # the Mock broker does not support the CreateTopic admin API, so we
+    # mock the call to AdminClient.create_topics
+    mock_admin = mocker.patch("swh.journal.client.AdminClient")
+    mock_topic_future = mocker.Mock()
+    mock_topic_future.result.return_value = None
+    mock_admin.create_topics.return_value = {
+        kafka_prefix + ".revision": mock_topic_future
+    }
+
+    client = JournalClient(
+        brokers=[kafka_server_base],
+        group_id=kafka_consumer_group,
+        prefix=kafka_prefix,
+        on_eof=EofBehavior.STOP,
+        privileged=False,
+        object_types=["revision"],
+        create_topics=True,
+    )
+
+    assert client.subscription == [kafka_prefix + ".revision"]
