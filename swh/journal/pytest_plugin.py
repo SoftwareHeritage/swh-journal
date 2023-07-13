@@ -164,7 +164,7 @@ def kafka_server(
         f"{kafka_prefix}_privileged.{obj}" for obj in privileged_object_types
     ]
 
-    # unfortunately, the Mock broker does not support the CreatTopic admin API, so we
+    # unfortunately, the Mock broker does not support the CreateTopic admin API, so we
     # have to create topics using a Producer.
     producer = Producer(
         {
