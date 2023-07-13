@@ -19,6 +19,7 @@ from confluent_kafka import (
     KafkaException,
     TopicPartition,
 )
+from confluent_kafka.admin import AdminClient, NewTopic
 
 from swh.core.statsd import Statsd
 from swh.journal import DEFAULT_PREFIX
@@ -136,6 +137,8 @@ class JournalClient:
         auto_offset_reset: sets the behavior of the client when the consumer group
             initializes: ``'earliest'`` (the default) processes all objects since the
             inception of the topics; ``''``
+        create_topics: Create kafka topics if they do not exist, not for production, this
+            flag should only be enabled in development environments.
 
     Any other named argument is passed directly to KafkaConsumer().
 
@@ -155,6 +158,7 @@ class JournalClient:
         stop_on_eof: Optional[bool] = None,
         on_eof: Optional[Union[EofBehavior, str]] = None,
         value_deserializer: Optional[Callable[[str, bytes], Any]] = None,
+        create_topics: bool = False,
         **kwargs,
     ):
         if prefix is None:
@@ -269,7 +273,8 @@ class JournalClient:
                 or topic.startswith(f"{privileged_prefix}.")
             )
         ]
-        if not existing_topics:
+
+        if not create_topics and not existing_topics:
             raise ValueError(
                 f"The prefix {prefix} does not match any existing topic "
                 "on the kafka broker"
@@ -283,11 +288,28 @@ class JournalClient:
         for object_type in object_types:
             topics = (f"{privileged_prefix}.{object_type}", f"{prefix}.{object_type}")
             for topic in topics:
-                if topic in existing_topics:
+                if create_topics or topic in existing_topics:
                     self.subscription.append(topic)
                     break
             else:
                 unknown_types.append(object_type)
+
+        if create_topics:
+            topic_list = [
+                NewTopic(topic, 1, 1)
+                for topic in self.subscription
+                if topic not in existing_topics
+            ]
+            logger.debug("Creating topics: %s", topic_list)
+            admin_client = AdminClient({"bootstrap.servers": ",".join(brokers)})
+            for topic in admin_client.create_topics(topic_list).values():
+                try:
+                    # wait for topic to be created
+                    topic.result()  # type: ignore[attr-defined]
+                except KafkaException:
+                    # topic already exists
+                    pass
+
         if unknown_types:
             raise ValueError(
                 f"Topic(s) for object types {','.join(unknown_types)} "
