@@ -300,15 +300,16 @@ class JournalClient:
                 for topic in self.subscription
                 if topic not in existing_topics
             ]
-            logger.debug("Creating topics: %s", topic_list)
-            admin_client = AdminClient({"bootstrap.servers": ",".join(brokers)})
-            for topic in admin_client.create_topics(topic_list).values():
-                try:
-                    # wait for topic to be created
-                    topic.result()  # type: ignore[attr-defined]
-                except KafkaException:
-                    # topic already exists
-                    pass
+            if topic_list:
+                logger.debug("Creating topics: %s", topic_list)
+                admin_client = AdminClient({"bootstrap.servers": ",".join(brokers)})
+                for topic in admin_client.create_topics(topic_list).values():
+                    try:
+                        # wait for topic to be created
+                        topic.result()  # type: ignore[attr-defined]
+                    except KafkaException:
+                        # topic already exists
+                        pass
 
         if unknown_types:
             raise ValueError(
