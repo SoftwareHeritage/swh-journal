@@ -20,11 +20,16 @@ class InMemoryJournalWriter:
         self,
         value_sanitizer: Callable[[str, Dict[str, Any]], Dict[str, Any]],
         anonymize: bool = False,
+        use_shared_memory: bool = False,
     ):
         # Share the list of objects across processes, for RemoteAPI tests.
-        self.manager = Manager()
-        self.objects = self.manager.list()  # type: ignore[assignment]
-        self.privileged_objects = self.manager.list()  # type: ignore[assignment]
+        if use_shared_memory:
+            self.manager = Manager()
+            self.objects = self.manager.list()  # type: ignore[assignment]
+            self.privileged_objects = self.manager.list()  # type: ignore[assignment]
+        else:
+            self.objects = []
+            self.privileged_objects = []
         self.anonymize = anonymize
 
     def write_addition(self, object_type: str, object_: ValueProtocol) -> None:
