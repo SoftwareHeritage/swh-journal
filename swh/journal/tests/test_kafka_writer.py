@@ -246,3 +246,34 @@ def test_write_addition_errors_without_unique_key(kafka_prefix: str, kafka_serve
 
     with pytest.raises(NotImplementedError):
         writer.write_addition("BaseModel", BaseModel())
+
+
+def test_kafka_writer_delete(
+    kafka_prefix: str, kafka_server: str, consumer: Consumer
+) -> None:
+    # This test is a bit sad: we are using the Mock broker and it does not
+    # support configuring Kafka topics. Therefore we cannot enable compaction.
+    # So the only thing we can test is that a tombstone has been pushed.
+    writer = KafkaJournalWriter(
+        brokers=[kafka_server],
+        client_id="kafka_writer",
+        prefix=kafka_prefix,
+        value_sanitizer=model_object_dict_sanitizer,
+        anonymize=False,
+    )
+    # Push objects
+    expected_messages = 0
+    for object_type, objects in TEST_OBJECTS.items():
+        writer.write_additions(object_type, objects)
+        expected_messages += len(objects)
+
+    # Delete one release
+    removed_release_key = bytes.fromhex("8059dc4e17fcd0e51ca3bcd6b80f4577d281fd08")
+    writer.delete("release", [removed_release_key])
+    expected_messages += 1
+
+    # Retrieve messages
+    consumed_messages = consume_messages(consumer, kafka_prefix, expected_messages)
+
+    releases = dict(consumed_messages["release"])
+    assert releases[removed_release_key] is None

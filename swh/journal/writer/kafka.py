@@ -160,7 +160,7 @@ class KafkaJournalWriter:
                 )
             )
 
-    def send(self, topic: str, key: KeyType, value):
+    def reliable_produce(self, topic: str, key: KeyType, kafka_value: Optional[bytes]):
         kafka_key = key_to_kafka(key)
         max_attempts = 5
         last_exception: Optional[Exception] = None
@@ -169,7 +169,7 @@ class KafkaJournalWriter:
                 self.producer.produce(
                     topic=topic,
                     key=kafka_key,
-                    value=value_to_kafka(value),
+                    value=kafka_value,
                 )
             except BufferError as e:
                 last_exception = e
@@ -193,6 +193,10 @@ class KafkaJournalWriter:
                 get_object_type(topic), key, str(last_exception), "SWH_BUFFER_ERROR"
             )
         )
+
+    def send(self, topic: str, key: KeyType, value):
+        kafka_value = value_to_kafka(value)
+        return self.reliable_produce(topic, key, kafka_value)
 
     def delivery_error(self, message) -> KafkaDeliveryError:
         """Get all failed deliveries, and clear them"""
@@ -266,3 +270,29 @@ class KafkaJournalWriter:
 
         if self.auto_flush:
             self.flush()
+
+    def delete(self, object_type: str, object_keys: Iterable[KeyType]) -> None:
+        """Write a tombstone for the given keys.
+
+        For older data to be removed, the topic must be configured with
+        ``cleanup.policy=compact``. Please also consider setting:
+
+        - ``max.compaction.lag.ms``: delay between the appearance of a tombstone
+          and the actual deletion of older values.
+        - ``delete.retention.ms``: how long must tombstones themselves be kept.
+          This is important as they enable journal clients to learn that a given
+          kep has been deleted and act accordingly.
+
+        Note that deletion won’t happen for keys located in the currently active
+        log segment. It will only be possible once enough newer entries have be
+        added, pushing older keys to “dirty” log segments that can be compacted.
+        """
+        topic = f"{self._prefix}.{object_type}"
+        for key in object_keys:
+            self.reliable_produce(topic, key, None)
+        # Handle non-anomized objects
+        # XXX: is this list already available elsewhere?
+        if object_type in ("revision", "release"):
+            topic = f"{self._prefix_privileged}.{object_type}"
+            for key in object_keys:
+                self.reliable_produce(topic, key, None)
