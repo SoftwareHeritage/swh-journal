@@ -53,7 +53,7 @@ def consume_messages(consumer, kafka_prefix, expected_messages):
 
         msg = consumer.poll(timeout=0.1)
 
-        if not msg:
+        if msg is None or msg.key() is None:
             retries_left -= 1
             continue
 
@@ -72,7 +72,10 @@ def consume_messages(consumer, kafka_prefix, expected_messages):
         object_type = topic[len(kafka_prefix + ".") :]
 
         consumed_messages[object_type].append(
-            (kafka_to_key(msg.key()), kafka_to_value(msg.value()))
+            (
+                kafka_to_key(msg.key()),
+                kafka_to_value(msg.value()) if msg.value() else None,
+            )
         )
 
     return consumed_messages

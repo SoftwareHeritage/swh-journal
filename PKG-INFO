@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: swh.journal
-Version: 1.3.6
+Version: 1.4.0
 Summary: Software Heritage Journal utilities
 Home-page: https://forge.softwareheritage.org/diffusion/DJNL/
 Author: Software Heritage developers
@@ -15,51 +15,28 @@ Classifier: License :: OSI Approved :: GNU General Public License v3 (GPLv3)
 Classifier: Operating System :: OS Independent
 Classifier: Development Status :: 5 - Production/Stable
 Requires-Python: >=3.7
-Description-Content-Type: text/markdown
-Provides-Extra: testing
+Description-Content-Type: text/x-rst
 License-File: LICENSE
 License-File: AUTHORS
+Requires-Dist: confluent-kafka!=2.1.0
+Requires-Dist: msgpack!=1.0.1,>=1.0.0
+Requires-Dist: tenacity
+Requires-Dist: swh.core>=1.1
+Requires-Dist: swh.model>=0.12.0
+Provides-Extra: testing
+Requires-Dist: pytest; extra == "testing"
+Requires-Dist: pytest-mock; extra == "testing"
+Requires-Dist: hypothesis; extra == "testing"
+Requires-Dist: swh.core[testing]; extra == "testing"
 
 swh-journal
 ===========
 
 Persistent logger of changes to the archive, with publish-subscribe support.
 
-See the
-[documentation](https://docs.softwareheritage.org/devel/swh-journal/index.html#software-heritage-journal)
-for more details.
-
-# Local test
-
-Provided you are in the right virtual environment as described
-in the [swh getting-started](https://docs.softwareheritage.org/devel/developer-setup.html#developer-setup):
-
-```
-pytest
-```
-
-or:
-
-```
-tox
-```
+It allows other ``swh`` components to push log-like event in a Kafka (e.g.
+the ``swh-storage`` can log every added object in Kafka), or to consume these
+events (e.g. the replayer mechanism used to replicate the archive in a mirror).
 
 
-# Running
 
-## publisher
-
-Command:
-```
-$ swh-journal --config-file ~/.config/swh/journal/publisher.yml \
-              publisher
-```
-
-# Auto-completion
-
-To have the completion, add the following in your
-~/.virtualenvs/swh/bin/postactivate:
-
-```
-eval "$(_SWH_JOURNAL_COMPLETE=$autocomplete_cmd swh-journal)"
-```
