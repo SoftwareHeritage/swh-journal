@@ -1,10 +1,6 @@
 .. _swh-journal:
 
-Software Heritage - Journal
-===========================
-
-Persistent logger of changes to the archive, with publish-subscribe support.
-
+.. include:: README.rst
 
 .. toctree::
    :maxdepth: 2
