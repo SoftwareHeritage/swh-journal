@@ -5,6 +5,11 @@ swh.core>=1.1
 swh.model>=0.12.0
 
 [testing]
+confluent-kafka!=2.1.0
+msgpack!=1.0.1,>=1.0.0
+tenacity
+swh.core>=1.1
+swh.model>=0.12.0
 pytest
 pytest-mock
 hypothesis
