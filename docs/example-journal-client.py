@@ -3,7 +3,7 @@ import pprint
 
 def process_objects(all_objects):
     """Worker function handling incoming objects"""
-    for (object_type, objects) in all_objects.items():
+    for object_type, objects in all_objects.items():
         for object_ in objects:
             print(f"New {object_type} object:")
             pprint.pprint(object_)

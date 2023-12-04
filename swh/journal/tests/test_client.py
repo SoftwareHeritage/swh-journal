@@ -615,7 +615,6 @@ def test_client_with_deserializer(
 def test_client_create_topics(
     kafka_prefix: str, kafka_consumer_group: str, kafka_server_base: str, mocker
 ):
-
     # the Mock broker does not support the CreateTopic admin API, so we
     # mock the call to AdminClient.create_topics
     mock_admin = mocker.patch("swh.journal.client.AdminClient")

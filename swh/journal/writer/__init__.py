@@ -21,7 +21,6 @@ def model_object_dict_sanitizer(
 
 
 def get_journal_writer(cls, **kwargs) -> JournalWriterInterface:
-
     if "args" in kwargs:
         warnings.warn(
             'Explicit "args" key is deprecated, use keys directly instead.',

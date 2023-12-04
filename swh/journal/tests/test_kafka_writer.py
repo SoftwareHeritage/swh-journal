@@ -143,7 +143,6 @@ def test_write_delivery_failure(kafka_prefix: str, kafka_server: str):
 
 
 def test_write_delivery_timeout(kafka_prefix: str, kafka_server: str):
-
     produced = []
 
     class MockProducer(Producer):
