@@ -1,19 +1,18 @@
 Metadata-Version: 2.1
 Name: swh.journal
-Version: 1.4.0
+Version: 1.5.0
 Summary: Software Heritage Journal utilities
-Home-page: https://forge.softwareheritage.org/diffusion/DJNL/
-Author: Software Heritage developers
-Author-email: swh-devel@inria.fr
-Project-URL: Bug Reports, https://forge.softwareheritage.org/maniphest
+Author-email: Software Heritage developers <swh-devel@inria.fr>
+Project-URL: Homepage, https://gitlab.softwareheritage.org/swh/devel/swh-journal
+Project-URL: Bug Reports, https://gitlab.softwareheritage.org/swh/devel/swh-journal/-/issues
 Project-URL: Funding, https://www.softwareheritage.org/donate
-Project-URL: Source, https://forge.softwareheritage.org/source/swh-journal
 Project-URL: Documentation, https://docs.softwareheritage.org/devel/swh-journal/
+Project-URL: Source, https://gitlab.softwareheritage.org/swh/devel/swh-journal.git
 Classifier: Programming Language :: Python :: 3
 Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: GNU General Public License v3 (GPLv3)
 Classifier: Operating System :: OS Independent
-Classifier: Development Status :: 5 - Production/Stable
+Classifier: Development Status :: 3 - Alpha
 Requires-Python: >=3.7
 Description-Content-Type: text/x-rst
 License-File: LICENSE
@@ -24,6 +23,11 @@ Requires-Dist: tenacity
 Requires-Dist: swh.core>=1.1
 Requires-Dist: swh.model>=0.12.0
 Provides-Extra: testing
+Requires-Dist: confluent-kafka!=2.1.0; extra == "testing"
+Requires-Dist: msgpack!=1.0.1,>=1.0.0; extra == "testing"
+Requires-Dist: tenacity; extra == "testing"
+Requires-Dist: swh.core>=1.1; extra == "testing"
+Requires-Dist: swh.model>=0.12.0; extra == "testing"
 Requires-Dist: pytest; extra == "testing"
 Requires-Dist: pytest-mock; extra == "testing"
 Requires-Dist: hypothesis; extra == "testing"
