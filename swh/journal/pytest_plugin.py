@@ -14,6 +14,7 @@ from confluent_kafka.admin import AdminClient
 import pytest
 
 from swh.journal.serializers import kafka_to_key, kafka_to_value, pprint_key
+from swh.model.model import Content
 from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
@@ -102,7 +103,11 @@ def assert_all_objects_consumed(
             for value in received_values:
                 value.pop("ctime", None)
         if object_type == "content":
-            known_objects = [attr.evolve(o, data=None) for o in known_objects]
+            contents = []
+            for o in known_objects:
+                assert isinstance(o, Content)  # to keep mypy happy
+                contents.append(attr.evolve(o, data=None))
+            known_objects = contents
 
         for key in known_keys:
             assert key in received_keys, (
