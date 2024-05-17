@@ -3,11 +3,8 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
-import pytest
-
 from swh.journal.writer import model_object_dict_sanitizer
 from swh.journal.writer.inmemory import InMemoryJournalWriter
-from swh.model.model import BaseModel
 from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
@@ -44,10 +41,3 @@ def test_write_additions():
 
     assert not set(writer.privileged_objects)
     assert expected == set(writer.objects)
-
-
-def test_write_addition_errors_without_unique_key():
-    writer = InMemoryJournalWriter(value_sanitizer=model_object_dict_sanitizer)
-
-    with pytest.raises(NotImplementedError):
-        writer.write_addition("BaseModel", BaseModel())

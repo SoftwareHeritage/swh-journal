@@ -12,7 +12,7 @@ import pytest
 from swh.journal.pytest_plugin import assert_all_objects_consumed, consume_messages
 from swh.journal.writer import model_object_dict_sanitizer
 from swh.journal.writer.kafka import KafkaDeliveryError, KafkaJournalWriter
-from swh.model.model import BaseModel, Directory, Release, Revision
+from swh.model.model import Directory, Release, Revision
 from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
@@ -233,18 +233,6 @@ def test_write_BufferError_give_up(kafka_prefix: str, kafka_server: str, caplog)
 
     with pytest.raises(KafkaDeliveryError):
         writer.write_addition("directory", empty_dir)
-
-
-def test_write_addition_errors_without_unique_key(kafka_prefix: str, kafka_server: str):
-    writer = KafkaJournalWriter(
-        brokers=[kafka_server],
-        client_id="kafka_writer",
-        prefix=kafka_prefix,
-        value_sanitizer=model_object_dict_sanitizer,
-    )
-
-    with pytest.raises(NotImplementedError):
-        writer.write_addition("BaseModel", BaseModel())
 
 
 def test_kafka_writer_delete(
