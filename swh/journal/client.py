@@ -9,7 +9,6 @@ from importlib import import_module
 from itertools import cycle
 import logging
 import os
-import time
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 import warnings
 
@@ -374,21 +373,19 @@ class JournalClient:
                     if messages:
                         break
 
-                    # do check for an EOF condition if we already consumed
+                    # do check for an EOF condition iff we already consumed
                     # messages, otherwise we could detect an EOF condition
                     # before messages had a chance to reach us (e.g. in tests)
                     if total_objects_processed > 0 and i == 0:
-                        assignment = self.get_assignment()
-
                         if self.on_eof == EofBehavior.STOP:
                             at_eof = all(
                                 (tp.topic, tp.partition) in self.eof_reached
-                                for tp in assignment
+                                for tp in self.consumer.assignment()
                             )
                             if at_eof:
                                 break
                         elif self.on_eof == EofBehavior.RESTART:
-                            for tp in assignment:
+                            for tp in self.consumer.assignment():
                                 if (tp.topic, tp.partition) in self.eof_reached:
                                     self.eof_reached.remove((tp.topic, tp.partition))
                                     self.statsd.increment("partition_restart_total")
@@ -448,10 +445,9 @@ class JournalClient:
         self.consumer.commit()
 
         if self.on_eof in (EofBehavior.STOP, EofBehavior.RESTART):
-            assignment = self.get_assignment()
-
             at_eof = all(
-                (tp.topic, tp.partition) in self.eof_reached for tp in assignment
+                (tp.topic, tp.partition) in self.eof_reached
+                for tp in self.consumer.assignment()
             )
         elif self.on_eof == EofBehavior.CONTINUE:
             at_eof = False
@@ -465,10 +461,3 @@ class JournalClient:
 
     def close(self):
         self.consumer.close()
-
-    def get_assignment(self):
-        while not (assignment := self.consumer.assignment()):
-            logger.info("No partition assigned, waiting for a new assignment")
-            time.sleep(1)
-
-        return assignment
