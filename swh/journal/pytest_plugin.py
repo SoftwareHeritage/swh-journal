@@ -1,4 +1,4 @@
-# Copyright (C) 2019-2021 The Software Heritage developers
+# Copyright (C) 2019-2024 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -14,7 +14,7 @@ from confluent_kafka.admin import AdminClient
 import pytest
 
 from swh.journal.serializers import kafka_to_key, kafka_to_value, pprint_key
-from swh.model.model import Content
+from swh.model.model import Content, ModelObjectType
 from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
@@ -99,10 +99,10 @@ def assert_all_objects_consumed(
 
         (received_keys, received_values) = zip(*consumed_messages[object_type])
 
-        if object_type in ("content", "skipped_content"):
+        if object_type in (ModelObjectType.CONTENT, ModelObjectType.SKIPPED_CONTENT):
             for value in received_values:
                 value.pop("ctime", None)
-        if object_type == "content":
+        if object_type == ModelObjectType.CONTENT:
             contents = []
             for o in known_objects:
                 assert isinstance(o, Content)  # to keep mypy happy
@@ -120,7 +120,10 @@ def assert_all_objects_consumed(
 
         for value in known_objects:
             expected_value = value.to_dict()
-            if value.object_type in ("content", "skipped_content"):
+            if value.object_type in (
+                ModelObjectType.CONTENT,
+                ModelObjectType.SKIPPED_CONTENT,
+            ):
                 expected_value.pop("ctime", None)
             assert ensure_lists(expected_value) in received_values, (
                 f"expected {object_type} value {value!r} is "

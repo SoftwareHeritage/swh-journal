@@ -1,4 +1,4 @@
-# Copyright (C) 2021-2022 The Software Heritage developers
+# Copyright (C) 2021-2024 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -9,20 +9,22 @@ from typing import Dict, List, Tuple
 from swh.journal.serializers import kafka_stream_to_value
 from swh.journal.writer import get_journal_writer, model_object_dict_sanitizer
 from swh.journal.writer.interface import JournalWriterInterface
+from swh.model.model import ModelObjectType
 from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
 def fill_writer(writer: JournalWriterInterface) -> List[Tuple[str, Dict]]:
     expected = []
     for object_type, objects in TEST_OBJECTS.items():
-        writer.write_additions(object_type, objects)
+        object_type_str = str(object_type)
+        writer.write_additions(object_type_str, objects)
 
         for object in objects:
             objd = object.to_dict()
-            if object_type == "content":
+            if object_type == ModelObjectType.CONTENT:
                 objd.pop("data")
 
-            expected.append((object_type, objd))
+            expected.append((object_type_str, objd))
     writer.flush()
     return expected
 

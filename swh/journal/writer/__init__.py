@@ -1,4 +1,4 @@
-# Copyright (C) 2019-2022 The Software Heritage developers
+# Copyright (C) 2019-2024 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -8,6 +8,8 @@ import sys
 from typing import Any, BinaryIO, Dict, Type
 import warnings
 
+from swh.model.model import ModelObjectType
+
 from .interface import JournalWriterInterface
 
 
@@ -15,7 +17,7 @@ def model_object_dict_sanitizer(
     object_type: str, object_dict: Dict[str, Any]
 ) -> Dict[str, str]:
     object_dict = object_dict.copy()
-    if object_type == "content":
+    if ModelObjectType(object_type) == ModelObjectType.CONTENT:
         object_dict.pop("data", None)
     return object_dict
 

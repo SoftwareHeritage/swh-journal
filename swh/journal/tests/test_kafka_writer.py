@@ -1,4 +1,4 @@
-# Copyright (C) 2018-2021 The Software Heritage developers
+# Copyright (C) 2018-2024 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -33,7 +33,7 @@ def test_kafka_writer(
     expected_messages = 0
 
     for object_type, objects in TEST_OBJECTS.items():
-        writer.write_additions(object_type, objects)
+        writer.write_additions(object_type.value, objects)
         expected_messages += len(objects)
 
     consumed_messages = consume_messages(consumer, kafka_prefix, expected_messages)
@@ -77,9 +77,10 @@ def test_kafka_writer_anonymized(
     expected_messages = 0
 
     for object_type, objects in TEST_OBJECTS.items():
-        writer.write_additions(object_type, objects)
+        object_type_str = object_type.value
+        writer.write_additions(object_type_str, objects)
         expected_messages += len(objects)
-        if object_type in privileged_object_types:
+        if object_type_str in privileged_object_types:
             expected_messages += len(objects)
 
     consumed_messages = consume_messages(consumer, kafka_prefix, expected_messages)
@@ -251,7 +252,7 @@ def test_kafka_writer_delete(
     # Push objects
     expected_messages = 0
     for object_type, objects in TEST_OBJECTS.items():
-        writer.write_additions(object_type, objects)
+        writer.write_additions(object_type.value, objects)
         expected_messages += len(objects)
 
     # Delete one release

@@ -1,2 +1,2 @@
 swh.core >= 1.1
-swh.model >= 0.12.0
+swh.model >= 6.14.0

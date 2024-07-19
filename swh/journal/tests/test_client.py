@@ -1,4 +1,4 @@
-# Copyright (C) 2019-2023 The Software Heritage developers
+# Copyright (C) 2019-2024 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -13,7 +13,7 @@ import pytest
 from swh.core.pytest_plugin import FakeSocket
 from swh.journal.client import EofBehavior, JournalClient
 from swh.journal.serializers import kafka_to_value, key_to_kafka, value_to_kafka
-from swh.model.model import Content, Revision
+from swh.model.model import Content, ModelObjectType, Revision
 from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 REV = {
@@ -197,7 +197,7 @@ def test_client_stop_after_objects(
     )
 
     # Fill Kafka
-    revisions = cast(List[Revision], TEST_OBJECTS["revision"])
+    revisions = cast(List[Revision], TEST_OBJECTS[ModelObjectType.REVISION])
     for rev in revisions:
         producer.produce(
             topic=kafka_prefix + ".revision",
@@ -242,8 +242,8 @@ def test_client_stop_after_objects(
     assert len(revs) == count
 
 
-assert len(TEST_OBJECTS["revision"]) < 10, (
-    'test_client_restart_and_stop_after_objects expects TEST_OBJECTS["revision"] '
+assert len(TEST_OBJECTS[ModelObjectType.REVISION]) < 10, (
+    "test_client_restart_and_stop_after_objects expects TEST_OBJECTS[ModelObjectType.REVISION] "
     "to have less than 10 objects to test exhaustively"
 )
 
@@ -267,7 +267,7 @@ def test_client_restart_and_stop_after_objects(
     )
 
     # Fill Kafka
-    revisions = cast(List[Revision], TEST_OBJECTS["revision"])
+    revisions = cast(List[Revision], TEST_OBJECTS[ModelObjectType.REVISION])
     for rev in revisions:
         producer.produce(
             topic=kafka_prefix + ".revision",
@@ -575,7 +575,7 @@ def test_client_with_deserializer(
     )
 
     # Fill Kafka
-    revisions = cast(List[Revision], TEST_OBJECTS["revision"])
+    revisions = cast(List[Revision], TEST_OBJECTS[ModelObjectType.REVISION])
     for rev in revisions:
         producer.produce(
             topic=kafka_prefix + ".revision",
