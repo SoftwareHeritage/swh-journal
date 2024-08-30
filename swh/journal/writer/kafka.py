@@ -92,7 +92,7 @@ class KafkaJournalWriter:
       anonymize: if True, activate the anonymization feature.
       auto_flush: if True (default), flush the kafka producer in
         ``write_addition()`` and ``write_additions()``. This should be set
-        to False ONLY for testing purpuse. DO NOT USE ON PRODUCTION ENVIRONMENT.
+        to False ONLY for testing purpose. DO NOT USE ON PRODUCTION ENVIRONMENT.
 
     """
 
