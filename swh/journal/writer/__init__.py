@@ -8,8 +8,6 @@ import sys
 from typing import Any, BinaryIO, Dict, Type
 import warnings
 
-from swh.model.model import ModelObjectType
-
 from .interface import JournalWriterInterface
 
 
@@ -17,7 +15,7 @@ def model_object_dict_sanitizer(
     object_type: str, object_dict: Dict[str, Any]
 ) -> Dict[str, str]:
     object_dict = object_dict.copy()
-    if ModelObjectType(object_type) == ModelObjectType.CONTENT:
+    if object_type == "content":
         object_dict.pop("data", None)
     return object_dict
 

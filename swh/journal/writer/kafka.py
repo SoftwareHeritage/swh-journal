@@ -10,7 +10,6 @@ from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Ty
 from confluent_kafka import KafkaException, Producer
 
 from swh.journal.serializers import KeyType, key_to_kafka, pprint_key, value_to_kafka
-from swh.model.model import ModelObjectType
 
 from .interface import ValueProtocol
 
@@ -293,10 +292,7 @@ class KafkaJournalWriter:
             self.reliable_produce(topic, key, None)
         # Handle non-anonymized objects
         # XXX: is this list already available elsewhere?
-        if ModelObjectType(object_type) in (
-            ModelObjectType.REVISION,
-            ModelObjectType.RELEASE,
-        ):
+        if object_type in ("revision", "release"):
             topic = f"{self._prefix_privileged}.{object_type}"
             for key in object_keys:
                 self.reliable_produce(topic, key, None)
