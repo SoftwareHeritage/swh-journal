@@ -7,7 +7,7 @@ Journal client are processes that read data from the |swh| Journal,
 in order to efficiently process all existing objects, and process new objects
 as they come.
 
-Some journal clients, such as :ref:`swh-dataset <swh-dataset>` only read
+Some journal clients, such as :ref:`swh-export <swh-export>` only read
 existing objects and stop when they are done.
 
 Other journal clients, such as the :ref:`mirror <swh-storage>` are expected to
