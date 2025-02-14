@@ -1,4 +1,5 @@
+hypothesis
+msgpack-types
 pytest >= 8.1
 pytest-mock
-hypothesis
 swh.core[testing]

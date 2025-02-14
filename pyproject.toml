@@ -68,8 +68,6 @@ plugins = []
 [[tool.mypy.overrides]]
 module = [
      "confluent_kafka.*",
-     "msgpack.*",
-     "pytest_kafka.*",
      "systemd.daemon.*",
      "tenacity.*"
 ]
