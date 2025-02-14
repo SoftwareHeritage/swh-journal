@@ -68,7 +68,6 @@ plugins = []
 [[tool.mypy.overrides]]
 module = [
      "systemd.daemon.*",
-     "tenacity.*"
 ]
 ignore_missing_imports = true
 
