@@ -67,7 +67,6 @@ plugins = []
 # 3rd party libraries without stubs (yet)
 [[tool.mypy.overrides]]
 module = [
-     "confluent_kafka.*",
      "systemd.daemon.*",
      "tenacity.*"
 ]

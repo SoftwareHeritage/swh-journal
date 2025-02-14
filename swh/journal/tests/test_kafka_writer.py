@@ -204,7 +204,7 @@ def test_write_BufferError_retry(kafka_prefix: str, kafka_server: str, caplog):
         producer_class=MockBufferErrorProducer,
     )
 
-    writer.producer.n_buffererrors = 4
+    writer.producer.n_buffererrors = 4  # type: ignore[attr-defined]
 
     empty_dir = Directory(entries=())
 
@@ -215,7 +215,7 @@ def test_write_BufferError_retry(kafka_prefix: str, kafka_server: str, caplog):
         if "BufferError" in record.getMessage():
             records.append(record)
 
-    assert len(records) == writer.producer.n_buffererrors
+    assert len(records) == writer.producer.n_buffererrors  # type: ignore[attr-defined]
 
 
 def test_write_BufferError_give_up(kafka_prefix: str, kafka_server: str, caplog):
@@ -228,7 +228,7 @@ def test_write_BufferError_give_up(kafka_prefix: str, kafka_server: str, caplog)
         producer_class=MockBufferErrorProducer,
     )
 
-    writer.producer.n_buffererrors = 5
+    writer.producer.n_buffererrors = 5  # type: ignore[attr-defined]
 
     empty_dir = Directory(entries=())
 

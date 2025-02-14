@@ -303,10 +303,10 @@ class JournalClient:
             if topic_list:
                 logger.debug("Creating topics: %s", topic_list)
                 admin_client = AdminClient({"bootstrap.servers": ",".join(brokers)})
-                for topic in admin_client.create_topics(topic_list).values():
+                for topic_future in admin_client.create_topics(topic_list).values():
                     try:
                         # wait for topic to be created
-                        topic.result()  # type: ignore[attr-defined]
+                        topic_future.result()
                     except KafkaException:
                         # topic already exists
                         pass
@@ -322,7 +322,7 @@ class JournalClient:
 
         self.stop_after_objects = stop_after_objects
 
-        self.eof_reached: Set[Tuple[str, str]] = set()
+        self.eof_reached: Set[Tuple[str, int]] = set()
         self.batch_size = batch_size
 
         if process_timeout is not None:

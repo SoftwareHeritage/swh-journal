@@ -6,7 +6,7 @@
 from collections import defaultdict
 import random
 import string
-from typing import Any, Collection, Dict, Iterator, Optional
+from typing import Any, Collection, Dict, Generator, Iterator, Optional
 
 import attr
 from confluent_kafka import Consumer, KafkaException, Producer
@@ -241,7 +241,7 @@ def test_config(
 @pytest.fixture
 def consumer(
     kafka_server: str, test_config: Dict, kafka_consumer_group: str
-) -> Consumer:
+) -> Generator[Consumer, None, None]:
     """Get a connected Kafka consumer."""
     consumer = Consumer(
         {

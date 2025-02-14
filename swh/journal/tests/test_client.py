@@ -16,6 +16,7 @@ from swh.journal.serializers import kafka_to_value, key_to_kafka, value_to_kafka
 from swh.model.model import Content, ModelObjectType, Revision
 from swh.model.tests.swh_model_data import TEST_OBJECTS
 
+REV_ID = b"\x8b\xeb\xd1\x9d\x07\xe2\x1e0\xe2 \x91X\x8d\xbd\x1c\xa8\x86\xdeB\x0c"
 REV = {
     "message": b"something cool",
     "author": {"fullname": b"Peter", "name": None, "email": b"peter@ouiche.lo"},
@@ -38,7 +39,7 @@ REV = {
     "synthetic": False,
     "metadata": None,
     "parents": [],
-    "id": b"\x8b\xeb\xd1\x9d\x07\xe2\x1e0\xe2 \x91X\x8d\xbd\x1c\xa8\x86\xdeB\x0c",
+    "id": REV_ID,
 }
 
 
@@ -57,7 +58,7 @@ def test_client(
     # Fill Kafka
     producer.produce(
         topic=kafka_prefix + ".revision",
-        key=REV["id"],
+        key=REV_ID,
         value=value_to_kafka(REV),
     )
     producer.flush()
@@ -99,7 +100,7 @@ def test_client_statsd(
     # Fill Kafka
     producer.produce(
         topic=kafka_prefix + ".revision",
-        key=REV["id"],
+        key=REV_ID,
         value=value_to_kafka(REV),
     )
     producer.flush()
@@ -488,12 +489,12 @@ def test_client_subscriptions_with_anonymized_topics(
     # anonymized objects in this case) and privileged one
     producer.produce(
         topic=kafka_prefix + ".revision",
-        key=REV["id"],
+        key=REV_ID,
         value=value_to_kafka(REV),
     )
     producer.produce(
         topic=kafka_prefix + "_privileged.revision",
-        key=REV["id"],
+        key=REV_ID,
         value=value_to_kafka(REV),
     )
     producer.flush()
@@ -534,7 +535,7 @@ def test_client_subscriptions_without_anonymized_topics(
     # Fill Kafka with revision objects only on the standard prefix
     producer.produce(
         topic=kafka_prefix + ".revision",
-        key=REV["id"],
+        key=REV_ID,
         value=value_to_kafka(REV),
     )
     producer.flush()
