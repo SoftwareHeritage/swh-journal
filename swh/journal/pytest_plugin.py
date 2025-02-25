@@ -1,4 +1,4 @@
-# Copyright (C) 2019-2024 The Software Heritage developers
+# Copyright (C) 2019-2025 The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -14,7 +14,7 @@ from confluent_kafka.admin import AdminClient
 import pytest
 
 from swh.journal.serializers import kafka_to_key, kafka_to_value, pprint_key
-from swh.model.model import Content, ModelObjectType
+from swh.model.model import Content, SkippedContent
 from swh.model.tests.swh_model_data import TEST_OBJECTS
 
 
@@ -94,15 +94,15 @@ def assert_all_objects_consumed(
     for object_type, known_objects in TEST_OBJECTS.items():
         known_keys = [obj.unique_key() for obj in known_objects]
 
-        if not consumed_messages[object_type]:
+        if not consumed_messages[object_type.value]:
             return
 
-        (received_keys, received_values) = zip(*consumed_messages[object_type])
+        (received_keys, received_values) = zip(*consumed_messages[object_type.value])
 
-        if object_type in (ModelObjectType.CONTENT, ModelObjectType.SKIPPED_CONTENT):
+        if object_type in (Content.object_type, SkippedContent.object_type):
             for value in received_values:
                 value.pop("ctime", None)
-        if object_type == ModelObjectType.CONTENT:
+        if object_type == Content.object_type:
             contents = []
             for o in known_objects:
                 assert isinstance(o, Content)  # to keep mypy happy
@@ -115,14 +115,14 @@ def assert_all_objects_consumed(
                 "absent from consumed messages"
             )
 
-        if exclude and object_type in exclude:
+        if exclude and object_type.value in exclude:
             continue
 
         for value in known_objects:
             expected_value = value.to_dict()
             if value.object_type in (
-                ModelObjectType.CONTENT,
-                ModelObjectType.SKIPPED_CONTENT,
+                Content.object_type,
+                SkippedContent.object_type,
             ):
                 expected_value.pop("ctime", None)
             assert ensure_lists(expected_value) in received_values, (
@@ -146,7 +146,7 @@ def kafka_consumer_group(kafka_prefix: str):
 @pytest.fixture(scope="function")
 def object_types():
     """Set of object types to precreate topics for."""
-    return set(TEST_OBJECTS.keys())
+    return set(k.value for k in TEST_OBJECTS.keys())
 
 
 @pytest.fixture(scope="function")
