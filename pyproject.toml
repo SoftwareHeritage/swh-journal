@@ -23,10 +23,8 @@ include = ["swh.*"]
 dependencies = {file = ["requirements.txt", "requirements-swh.txt"]}
 
 [tool.setuptools.dynamic.optional-dependencies]
-testing = {file = ["requirements.txt", "requirements-swh.txt", "requirements-test.txt"]}
-
-[project.entry-points.pytest11]
-"pytest_swh_journal" = "swh.journal.pytest_plugin"
+testing = {file = ["requirements-test.txt", "requirements-pytest.txt"]}
+pytest = {file = ["requirements-pytest.txt"]}
 
 [project.urls]
 "Homepage" = "https://gitlab.softwareheritage.org/swh/devel/swh-journal"

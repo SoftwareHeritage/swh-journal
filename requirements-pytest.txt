@@ -1,0 +1,5 @@
+# Requirements for swh.journal.pytest_plugin
+attrs
+confluent-kafka
+pytest
+swh-model >= 6.14.0
