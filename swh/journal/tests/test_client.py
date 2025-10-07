@@ -307,7 +307,7 @@ def test_client_restart_and_stop_after_objects(
     assert len(unique_revs) == min(len(revisions), count)
 
     # Each revision should be seen approximately count/len(revisions) times
-    rev_ids = [r["id"].hex() for r in revs]  # type: ignore
+    rev_ids = [r["id"].hex() for r in revs]
     for rev in revisions:
         assert (
             math.floor(count / len(revisions))
