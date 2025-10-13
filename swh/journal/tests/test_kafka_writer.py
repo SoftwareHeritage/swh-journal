@@ -257,7 +257,8 @@ def test_kafka_writer_delete(
     # Delete one release
     removed_release_key = bytes.fromhex("8059dc4e17fcd0e51ca3bcd6b80f4577d281fd08")
     writer.delete("release", [removed_release_key])
-    expected_messages += 1
+    # tombstone is pushed for object types "release" and "privileged.release"
+    expected_messages += 2
 
     # Retrieve messages
     consumed_messages = consume_messages(consumer, kafka_prefix, expected_messages)
