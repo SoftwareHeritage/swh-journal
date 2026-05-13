@@ -104,6 +104,10 @@ def _on_commit(error, partitions):
         _error_cb(error)
 
 
+# Error Reporter type
+ErrorReporter = Callable[[dict, Exception], None]
+
+
 class JournalClient:
     """A base client for the Software Heritage journal.
 
@@ -167,7 +171,7 @@ class JournalClient:
         on_eof: Optional[Union[EofBehavior, str]] = None,
         value_deserializer: Optional[Callable[[str, bytes], Any]] = None,
         create_topics: bool = False,
-        error_reporter: Optional[Callable[[dict, Exception], None]] = None,
+        error_reporter: Optional[ErrorReporter] = None,
         **kwargs,
     ):
         if prefix is None:
@@ -341,12 +345,7 @@ class JournalClient:
             )
 
         # store the reporter; fall back to the noop implementation
-        self.error_reporter = error_reporter or self._noop_reporter
-
-    @staticmethod
-    def _noop_reporter(_: dict, __: Exception) -> None:
-        """Default noop reporter to keep the class usable without passing a custom func."""
-        pass
+        self.error_reporter = error_reporter
 
     def subscribe(self):
         """Subscribe to topics listed in self.subscription
@@ -356,7 +355,13 @@ class JournalClient:
         logger.debug(f"Subscribing to: {self.subscription}")
         self.consumer.subscribe(topics=self.subscription)
 
-    def process(self, worker_fn: Callable[[Dict[str, List[dict]]], None]):
+    def process(
+        self,
+        worker_fn: Union[
+            Callable[[Dict[str, List[dict]]], None],
+            Callable[[Dict[str, List[dict]], ErrorReporter], None],
+        ],
+    ):
         """Polls Kafka for a batch of messages, and calls the worker_fn
         with these messages.
 
@@ -433,7 +438,12 @@ class JournalClient:
         return total_objects_processed
 
     def handle_messages(
-        self, messages, worker_fn: Callable[[Dict[str, List[dict]]], None]
+        self,
+        messages,
+        worker_fn: Union[
+            Callable[[Dict[str, List[dict]]], None],
+            Callable[[Dict[str, List[dict]], ErrorReporter], None],
+        ],
     ) -> Tuple[int, bool]:
         objects: Dict[str, List[Any]] = defaultdict(list)
         nb_processed = 0
@@ -457,8 +467,15 @@ class JournalClient:
             if deserialized_object is not None:
                 objects[object_type].append(deserialized_object)
 
-        if objects:
-            worker_fn(dict(objects))
+        if objects and self.error_reporter:
+            # Provide the error reporter to worker_fn implementation so business logic
+            # can be managed within journal client implementation
+            worker_fn(dict(objects), self.error_reporter)  # type: ignore
+        elif objects:
+            # For retro-compatibility, we call worker_fn without an error_reporter when
+            # undefined
+            worker_fn(dict(objects))  # type: ignore
+
         self.consumer.commit()
 
         if self.on_eof in (EofBehavior.STOP, EofBehavior.RESTART):
