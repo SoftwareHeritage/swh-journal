@@ -1,4 +1,4 @@
-# Copyright (C) 2017-2023  The Software Heritage developers
+# Copyright (C) 2017-2026  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -78,6 +78,14 @@ def get_journal_client(cls: str, **kwargs: Any):
                         "Invalid stats_cb configuration option: "
                         f"function {func_name} not found in module {module_path}"
                     )
+
+        # Set up the optional redis error reporter
+        error_reporter_cfg = kwargs.get("error_reporter")
+        if error_reporter_cfg:
+            from redis import Redis
+
+            kwargs["error_reporter"] = Redis(**error_reporter_cfg)
+
         return JournalClient(**kwargs)
     raise ValueError("Unknown journal client class `%s`" % cls)
 
@@ -159,6 +167,7 @@ class JournalClient:
         on_eof: Optional[Union[EofBehavior, str]] = None,
         value_deserializer: Optional[Callable[[str, bytes], Any]] = None,
         create_topics: bool = False,
+        error_reporter: Optional[Callable[[dict, Exception], None]] = None,
         **kwargs,
     ):
         if prefix is None:
@@ -330,6 +339,14 @@ class JournalClient:
                 "'process_timeout' argument is not supported anymore by "
                 "JournalClient; please remove it from your configuration.",
             )
+
+        # store the reporter; fall back to the noop implementation
+        self.error_reporter = error_reporter or self._noop_reporter
+
+    @staticmethod
+    def _noop_reporter(_: dict, __: Exception) -> None:
+        """Default noop reporter to keep the class usable without passing a custom func."""
+        pass
 
     def subscribe(self):
         """Subscribe to topics listed in self.subscription
