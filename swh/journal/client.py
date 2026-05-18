@@ -108,27 +108,28 @@ def _on_commit(error, partitions):
 ErrorReporter = Callable[[dict, Exception], None]
 
 
-class JournalClient:
+class JournalClientBase:
     """A base client for the Software Heritage journal.
 
-    The current implementation of the journal uses Apache Kafka
-    brokers to publish messages under a given topic prefix, with each
-    object type using a specific topic under that prefix. If the `prefix`
-    argument is None (default value), it will take the default value
-    `'swh.journal.objects'`.
+    The current implementation of the journal uses Apache Kafka brokers to publish
+    messages under a given topic prefix, with each object type using a specific topic
+    under that prefix. If the `prefix` argument is None (default value), it will take
+    the default value `'swh.journal.objects'`.
 
     Clients subscribe to events specific to each object type as listed in the
     ``object_types`` argument (if unset, defaults to all existing kafka topic under
     the prefix).
 
-    Clients can be sharded by setting the ``group_id`` to a common
-    value across instances. The journal will share the message
-    throughput across the nodes sharing the same group_id.
+    Clients can be sharded by setting the ``group_id`` to a common value across
+    instances. The journal will share the message throughput across the nodes sharing
+    the same group_id.
 
-    Messages are processed by the ``worker_fn`` callback passed to the `process`
-    method, in batches of maximum ``batch_size`` messages (defaults to 200).
+    Messages are processed in batches of maximum ``batch_size``, one at a time through
+    the ``process_one_object`` method call. That method needs to be implemented by a
+    subclass method. It's up to the implementation to catch and report issues in the
+    error reporter if configured.
 
-    The objects passed to the ``worker_fn`` callback are the result of the kafka
+    The objects passed to the ``process_one_object`` method are the result of the kafka
     message converted by the ``value_deserializer`` function. By default (if this
     argument is not given), it will produce dicts (using the ``kafka_to_value``
     function). This signature of the function is::
@@ -136,7 +137,7 @@ class JournalClient:
         value_deserializer(object_type: str, kafka_msg: bytes) -> Any
 
     If the value returned by ``value_deserializer`` is None, it is ignored and
-    not passed the ``worker_fn`` function.
+    not passed to the method.
 
     Arguments:
         stop_after_objects: If set, the processing stops after processing
@@ -355,12 +356,26 @@ class JournalClient:
         logger.debug(f"Subscribing to: {self.subscription}")
         self.consumer.subscribe(topics=self.subscription)
 
-    def process(
+    def process_one_object(self, decoded_object, decoded_object_type, raw_message):
+        """Process decoded (unserialized) object of type decoded_object_type.
+
+        In case uncaught issue arises during the process (to be determined by the
+        implementation), this can record the issue with the error reporter
+        (self.error_reporter) if defined. The error report can then use the raw kafka
+        message (topic, partition and offset) and continue reading the topic.
+
+        If the error is too important, the implementation can let the exception be
+        raised so the process stops.
+
+        """
+        raise NotImplementedError
+
+    def commit_batch(self):
+        """Commit the batch of objects read."""
+        raise NotImplementedError
+
+    def process_messages(
         self,
-        worker_fn: Union[
-            Callable[[Dict[str, List[dict]]], None],
-            Callable[[Dict[str, List[dict]], ErrorReporter], None],
-        ],
     ):
         """Polls Kafka for a batch of messages, and calls the worker_fn
         with these messages.
@@ -424,7 +439,7 @@ class JournalClient:
 
                 if messages:
                     set_status("processing")
-                    batch_processed, at_eof = self.handle_messages(messages, worker_fn)
+                    batch_processed, at_eof = self.handle_messages(messages)
 
                     set_status("idle")
                     # report the number of handled messages
@@ -440,12 +455,7 @@ class JournalClient:
     def handle_messages(
         self,
         messages,
-        worker_fn: Union[
-            Callable[[Dict[str, List[dict]]], None],
-            Callable[[Dict[str, List[dict]], ErrorReporter], None],
-        ],
     ) -> Tuple[int, bool]:
-        objects: Dict[str, List[Any]] = defaultdict(list)
         nb_processed = 0
 
         for message in messages:
@@ -465,17 +475,13 @@ class JournalClient:
                 message, object_type=object_type
             )
             if deserialized_object is not None:
-                objects[object_type].append(deserialized_object)
+                # Process the object one at a time, provide the raw message to allow
+                # reporting detail issue if any
+                self.process_one_object(deserialized_object, object_type, message)
 
-        if objects and self.error_reporter:
-            # Provide the error reporter to worker_fn implementation so business logic
-            # can be managed within journal client implementation
-            worker_fn(dict(objects), self.error_reporter)  # type: ignore
-        elif objects:
-            # For retro-compatibility, we call worker_fn without an error_reporter when
-            # undefined
-            worker_fn(dict(objects))  # type: ignore
-
+        # Commit the read and deserialized objects accumulated
+        self.commit_batch()
+        # Commit the offsets
         self.consumer.commit()
 
         if self.on_eof in (EofBehavior.STOP, EofBehavior.RESTART):
@@ -495,3 +501,71 @@ class JournalClient:
 
     def close(self):
         self.consumer.close()
+
+
+class JournalClient(JournalClientBase):
+    """Existing JournalClient implementation kept for backward-compatibility.
+
+    Messages are still processed by the ``worker_fn`` callback function passed to the
+    `process` method of the journal client.
+
+    The objects passed to the ``worker_fn`` callback are the result of the kafka message
+    converted by the ``value_deserializer`` function. By default (if this argument is
+    not given), it will produce dicts (using the ``kafka_to_value`` function). This
+    signature of the function is::
+
+        value_deserializer(object_type: str, kafka_msg: bytes) -> Any
+
+    If the value returned by ``value_deserializer`` is None, it is ignored and not
+    passed the ``worker_fn`` function.
+
+    Note: The ``process_one_object`` and ``commit_batch`` methods are implemented to
+    reflect the existing behavior of the current journal client implementations
+    ([obj]storage-replayer, indexers...).
+
+    Note2: It's possible to slightly adapt the existing journal client implementation so
+    they can use the self.error_reporter object to trap known issues, report them with
+    the error reporter and continue instead of crashing.
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._init_decoded_objects()
+
+    def _init_decoded_objects(self):
+        """(Re)Initialize the batch of decoded objects to commit."""
+        self.decoded_objects: Dict[str, List[Any]] = defaultdict(list)
+
+    def process_one_object(self, decoded_object, decoded_object_type, raw_message):
+        # We simply collect the decoded object in an internal dict.
+
+        # The raw message is not part of the information we retrieve in previous
+        # implementation (so we do not use it yet)
+        self.decoded_objects[decoded_object_type].append(decoded_object)
+
+    def commit_batch(self):
+        if self.decoded_objects:
+            args_ = [dict(self.decoded_objects)]
+            if self.error_reporter is not None:
+                args_.append(self.error_reporter)
+
+            # Call the callback on the decoded objects as before
+            self._worker_fn(*args_)
+
+            # Empty the list for the next batch
+            self._init_decoded_objects()
+
+    # We open the `process` method implementation as before for retro-compatibility
+    # migration time
+    def process(
+        self,
+        worker_fn: Union[
+            Callable[[Dict[str, List[dict]]], None],
+            Callable[[Dict[str, List[dict]], ErrorReporter], None],
+        ],
+    ):
+        # workaround for retro-compatibility
+        self._worker_fn = worker_fn
+        # delegates call to default implem. of super class's process_messages method
+        return super().process_messages()

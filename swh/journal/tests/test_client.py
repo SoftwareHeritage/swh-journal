@@ -1,4 +1,4 @@
-# Copyright (C) 2019-2025  The Software Heritage developers
+# Copyright (C) 2019-2026  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -82,6 +82,40 @@ def test_client(
     client.process(worker_fn)
 
     worker_fn.assert_called_once_with({"revision": [REV]})
+
+
+def test_client_with_error_reporter(
+    kafka_prefix: str, kafka_consumer_group: str, kafka_server: str
+):
+    producer = Producer(
+        {
+            "bootstrap.servers": kafka_server,
+            "client.id": "test producer",
+            "acks": "all",
+        }
+    )
+
+    # Fill Kafka
+    producer.produce(
+        topic=kafka_prefix + ".revision",
+        key=REV_ID,
+        value=value_to_kafka(REV),
+    )
+    producer.flush()
+
+    error_reporter = MagicMock
+    client = JournalClient(
+        brokers=[kafka_server],
+        group_id=kafka_consumer_group,
+        prefix=kafka_prefix,
+        on_eof=EofBehavior.STOP,
+        error_reporter=error_reporter,
+    )
+
+    worker_fn = MagicMock()
+    client.process(worker_fn)
+
+    worker_fn.assert_called_once_with({"revision": [REV]}, error_reporter)
 
 
 def test_client_statsd(
