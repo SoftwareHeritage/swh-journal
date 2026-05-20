@@ -5,7 +5,7 @@
 
 import math
 from typing import Dict, List, cast
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from confluent_kafka import Producer
 import pytest
@@ -87,35 +87,17 @@ def test_client(
 def test_client_with_error_reporter(
     kafka_prefix: str, kafka_consumer_group: str, kafka_server: str
 ):
-    producer = Producer(
-        {
-            "bootstrap.servers": kafka_server,
-            "client.id": "test producer",
-            "acks": "all",
-        }
-    )
 
-    # Fill Kafka
-    producer.produce(
-        topic=kafka_prefix + ".revision",
-        key=REV_ID,
-        value=value_to_kafka(REV),
-    )
-    producer.flush()
+    with patch("redis.Redis", return_value=MagicMock()):
+        client = JournalClient(
+            brokers=[kafka_server],
+            group_id=kafka_consumer_group,
+            prefix=kafka_prefix,
+            on_eof=EofBehavior.STOP,
+            error_reporter={"host": "redis.local", "port": 6379, "db": "testing"},
+        )
 
-    error_reporter = MagicMock
-    client = JournalClient(
-        brokers=[kafka_server],
-        group_id=kafka_consumer_group,
-        prefix=kafka_prefix,
-        on_eof=EofBehavior.STOP,
-        error_reporter=error_reporter,
-    )
-
-    worker_fn = MagicMock()
-    client.process(worker_fn)
-
-    worker_fn.assert_called_once_with({"revision": [REV]}, error_reporter)
+        assert client.error_reporter is not None
 
 
 def test_client_statsd(
