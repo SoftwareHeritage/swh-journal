@@ -541,7 +541,7 @@ class JournalClient(JournalClientBase):
         super().__init__(*args, **kwargs)
         self._init_decoded_objects()
 
-    def _init_decoded_objects(self):
+    def _init_decoded_objects(self) -> None:
         """(Re)Initialize the batch of decoded objects to commit."""
         self.decoded_objects: Dict[str, List[Any]] = defaultdict(list)
 
