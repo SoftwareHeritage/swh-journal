@@ -3,6 +3,7 @@
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
 
+
 from collections import defaultdict
 import enum
 from importlib import import_module
@@ -365,14 +366,18 @@ class JournalClientBase:
         message (topic, partition and offset) and continue reading the topic.
 
         If the error is too important, the implementation can let the exception be
-        raised so the process stops.
+        raised so the main process stops.
 
         """
         raise NotImplementedError
 
     def commit_batch(self):
-        """Commit the batch of objects read."""
-        raise NotImplementedError
+        """Commit the batch of objects read. This should take care of the offset
+        commits.
+
+        """
+        # Commit the offsets
+        self.consumer.commit()
 
     def process_messages(
         self,
@@ -476,13 +481,11 @@ class JournalClientBase:
             )
             if deserialized_object is not None:
                 # Process the object one at a time, provide the raw message to allow
-                # reporting detail issue if any
+                # reporting detail issue if any (and implementers wants to trap it)
                 self.process_one_object(deserialized_object, object_type, message)
 
-        # Commit the read and deserialized objects accumulated
+        # Commit the batch of data read objects
         self.commit_batch()
-        # Commit the offsets
-        self.consumer.commit()
 
         if self.on_eof in (EofBehavior.STOP, EofBehavior.RESTART):
             at_eof = all(
@@ -555,6 +558,8 @@ class JournalClient(JournalClientBase):
 
             # Empty the list for the next batch
             self._init_decoded_objects()
+            # commit the offsets
+            self.consumer.commit()
 
     # We open the `process` method implementation as before for retro-compatibility
     # migration time
