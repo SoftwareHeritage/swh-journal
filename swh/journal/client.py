@@ -105,8 +105,9 @@ def _on_commit(error, partitions):
         _error_cb(error)
 
 
-# Error Reporter type
-ErrorReporter = Callable[[dict, Exception], None]
+# Error Reporter type is a function of an id as string (a swhid) and the bytes
+# representation of the objects serialized in msgpack
+ErrorReporter = Callable[[str, bytes], Any]
 
 
 class JournalClientBase:
@@ -173,7 +174,7 @@ class JournalClientBase:
         on_eof: Optional[Union[EofBehavior, str]] = None,
         value_deserializer: Optional[Callable[[str, bytes], Any]] = None,
         create_topics: bool = False,
-        error_reporter: Optional[ErrorReporter] = None,
+        error_reporter: Optional[Dict] = None,
         **kwargs,
     ):
         if prefix is None:
@@ -346,8 +347,12 @@ class JournalClientBase:
                 "JournalClient; please remove it from your configuration.",
             )
 
+        self.error_reporter: Optional[ErrorReporter] = None
         # store the reporter; fall back to the noop implementation
-        self.error_reporter = error_reporter
+        if error_reporter:
+            from redis import Redis
+
+            self.error_reporter = Redis(**error_reporter).set
 
     def subscribe(self):
         """Subscribe to topics listed in self.subscription
