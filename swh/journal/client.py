@@ -549,12 +549,8 @@ class JournalClient(JournalClientBase):
 
     def commit_batch(self):
         if self.decoded_objects:
-            args_ = [dict(self.decoded_objects)]
-            if self.error_reporter is not None:
-                args_.append(self.error_reporter)
-
             # Call the callback on the decoded objects as before
-            self._worker_fn(*args_)
+            self._worker_fn(dict(self.decoded_objects))
 
             # Empty the list for the next batch
             self._init_decoded_objects()
@@ -565,10 +561,7 @@ class JournalClient(JournalClientBase):
     # migration time
     def process(
         self,
-        worker_fn: Union[
-            Callable[[Dict[str, List[dict]]], None],
-            Callable[[Dict[str, List[dict]], ErrorReporter], None],
-        ],
+        worker_fn: Callable[[Dict[str, List[dict]]], None],
     ):
         # workaround for retro-compatibility
         self._worker_fn = worker_fn
