@@ -80,13 +80,6 @@ def get_journal_client(cls: str, **kwargs: Any):
                         f"function {func_name} not found in module {module_path}"
                     )
 
-        # Set up the optional redis error reporter
-        error_reporter_cfg = kwargs.get("error_reporter")
-        if error_reporter_cfg:
-            from redis import Redis
-
-            kwargs["error_reporter"] = Redis(**error_reporter_cfg)
-
         return JournalClient(**kwargs)
     raise ValueError("Unknown journal client class `%s`" % cls)
 
