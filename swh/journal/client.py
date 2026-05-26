@@ -361,13 +361,12 @@ class JournalClientBase:
     def process_one_object(self, decoded_object, decoded_object_type, raw_message):
         """Process decoded (unserialized) object of type decoded_object_type.
 
-        In case uncaught issue arises during the process (to be determined by the
-        implementation), this can record the issue with the error reporter
-        (self.error_reporter) if defined. The error report can then use the raw kafka
-        message (topic, partition and offset) and continue reading the topic.
+        Non-critical errors can be passed to `self.error_reporter` with the raw Kafka
+        message (`(topic, partition and offset)` as argument).
 
-        If the error is too important, the implementation can let the exception be
-        raised so the main process stops.
+        Currently implemented in this method so various journal clients can implement
+        their own trap-and-continue policy. We may decide to implement it generically in
+        `self.handle_message_batch` method instead in the future.
 
         """
         raise NotImplementedError
