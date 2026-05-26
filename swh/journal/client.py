@@ -147,6 +147,9 @@ class JournalClientBase:
             inception of the topics; ``''``
         create_topics: Create kafka topics if they do not exist, not for production, this
             flag should only be enabled in development environments.
+        error_reporter: (Optional) configuration dict regarding an error reporter to
+            instantiate. Implementation wise, It's up to the journal client to decide
+            whether to use the error_reporter (to trap errors and continue) or not.
 
     Any other named argument is passed directly to KafkaConsumer().
 
