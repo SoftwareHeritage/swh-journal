@@ -444,7 +444,7 @@ class JournalClientBase:
 
                 if messages:
                     set_status("processing")
-                    batch_processed, at_eof = self.handle_batch_messages(messages)
+                    batch_processed, at_eof = self.handle_message_batch(messages)
 
                     set_status("idle")
                     # report the number of handled messages
@@ -457,7 +457,7 @@ class JournalClientBase:
 
         return total_objects_processed
 
-    def handle_batch_messages(
+    def handle_message_batch(
         self,
         messages,
     ) -> Tuple[int, bool]:
@@ -580,11 +580,11 @@ class JournalClient(JournalClientBase):
         """Retro-compatible method to expose the `worker_fn` callback to previous
         implementations.
 
-        This delegates the call `super().handle_batch_messages` which will use
+        This delegates the call `super().handle_message_batch` which will use
         internally the `self.worker_fn`.
 
         """
         # should have been set by the main call to `self.process` method
         assert worker_fn == self.worker_fn
         # delegates call to default implem. of super class's process_messages method
-        return super().handle_batch_messages(messages)
+        return super().handle_message_batch(messages)
