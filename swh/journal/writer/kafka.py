@@ -1,4 +1,4 @@
-# Copyright (C) 2019-2022  The Software Heritage developers
+# Copyright (C) 2019-2026  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -150,7 +150,7 @@ class KafkaJournalWriter:
         logger.info("Received non-fatal kafka error: %s", error)
 
     def _on_delivery(self, error, message):
-        (topic, key) = delivery_tag = DeliveryTag(message.topic(), message.key())
+        topic, key = delivery_tag = DeliveryTag(message.topic(), message.key())
         sent_key = self.deliveries_pending.pop(delivery_tag, None)
 
         if error is not None:
@@ -205,7 +205,7 @@ class KafkaJournalWriter:
 
         while self.deliveries_pending:
             delivery_tag, orig_key = self.deliveries_pending.popitem()
-            (topic, kafka_key) = delivery_tag
+            topic, kafka_key = delivery_tag
             ret.append(
                 DeliveryFailureInfo(
                     get_object_type(topic),

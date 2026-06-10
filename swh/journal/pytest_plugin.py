@@ -1,4 +1,4 @@
-# Copyright (C) 2019-2025  The Software Heritage developers
+# Copyright (C) 2019-2026  The Software Heritage developers
 # See the AUTHORS file at the top-level directory of this distribution
 # License: GNU General Public License version 3, or any later version
 # See top-level LICENSE file for more information
@@ -97,7 +97,7 @@ def assert_all_objects_consumed(
         if not consumed_messages[object_type.value]:
             return
 
-        (received_keys, received_values) = zip(*consumed_messages[object_type.value])
+        received_keys, received_values = zip(*consumed_messages[object_type.value])
 
         if object_type in (Content.object_type, SkippedContent.object_type):
             for value in received_values:
