@@ -1,11 +1,11 @@
 [project]
 name = "swh.journal"
 authors = [
-    {name="Software Heritage developers", email="swh-devel@inria.fr"},
+    { name = "Software Heritage developers", email = "swh-devel@inria.fr" },
 ]
 
 description = "Software Heritage Journal utilities"
-readme = {file = "README.rst", content-type = "text/x-rst"}
+readme = { file = "README.rst", content-type = "text/x-rst" }
 requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -16,15 +16,6 @@ classifiers = [
 ]
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
-[tool.setuptools.packages.find]
-include = ["swh.*"]
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt", "requirements-swh.txt"]}
-
-[tool.setuptools.dynamic.optional-dependencies]
-testing = {file = ["requirements-test.txt", "requirements-pytest.txt"]}
-pytest = {file = ["requirements-pytest.txt"]}
 
 [project.urls]
 "Homepage" = "https://gitlab.softwareheritage.org/swh/devel/swh-journal"
@@ -34,11 +25,22 @@ pytest = {file = ["requirements-pytest.txt"]}
 "Source" = "https://gitlab.softwareheritage.org/swh/devel/swh-journal.git"
 
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "hatch-requirements-txt", "hatch-vcs"]
+build-backend = "hatchling.build"
 
-[tool.setuptools_scm]
-fallback_version = "0.0.1"
+[tool.hatch.metadata.hooks.requirements_txt]
+files = ["requirements.txt", "requirements-swh.txt"]
+
+[tool.hatch.metadata.hooks.requirements_txt.optional-dependencies]
+testing = ["requirements-test.txt", "requirements-pytest.txt"]
+pytest = ["requirements-pytest.txt"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["swh"]
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.1"
 
 [tool.black]
 target-version = ['py311', 'py312', 'py313']
@@ -64,9 +66,7 @@ plugins = []
 
 # 3rd party libraries without stubs (yet)
 [[tool.mypy.overrides]]
-module = [
-     "systemd.daemon.*",
-]
+module = ["systemd.daemon.*"]
 ignore_missing_imports = true
 
 [tool.flake8]
@@ -76,7 +76,7 @@ ignore = [
     "E231", # missing whitespace after ','
     "E501", # line too long, use B950 warning from flake8-bugbear instead
     "E704", # multiple statements on one line
-    "W503" # line break before binary operator <https://github.com/psf/black/issues/52>
+    "W503", # line break before binary operator <https://github.com/psf/black/issues/52>
 ]
 max-line-length = 88
 extend-exclude = ["build/"]
